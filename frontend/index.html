@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🔮 The Failure Oracle</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <div class="logo">🔮</div>
+    <h1>The Failure Oracle</h1>
+    <p class="tagline">90% of startups fail for known, preventable reasons.<br>Know yours — before it's too late.</p>
+  </header>
+
+  <main>
+
+    <!-- ── Metrics Input ────────────────────────────────────────── -->
+    <section class="card" id="input-section">
+      <h2>Your Current Metrics</h2>
+      <form id="metrics-form">
+        <div class="form-grid">
+          <div class="field">
+            <label>Startup Name</label>
+            <input type="text" id="startup_name" placeholder="Acme SaaS" required />
+          </div>
+          <div class="field">
+            <label>Current Month <span class="hint">(since founding)</span></label>
+            <input type="number" id="current_month" min="1" max="120" placeholder="14" required />
+          </div>
+          <div class="field">
+            <label>MRR <span class="hint">(USD)</span></label>
+            <input type="number" id="mrr" min="0" placeholder="85000" required />
+          </div>
+          <div class="field">
+            <label>Monthly Growth Rate <span class="hint">(e.g. 0.18 = 18%)</span></label>
+            <input type="number" id="mrr_growth_rate" step="0.01" min="0" placeholder="0.18" required />
+          </div>
+          <div class="field">
+            <label>Monthly Churn Rate <span class="hint">(e.g. 0.09 = 9%)</span></label>
+            <input type="number" id="churn_rate" step="0.01" min="0" max="1" placeholder="0.09" required />
+          </div>
+          <div class="field">
+            <label>Monthly Burn <span class="hint">(USD)</span></label>
+            <input type="number" id="burn_rate" min="0" placeholder="120000" required />
+          </div>
+          <div class="field">
+            <label>Runway <span class="hint">(months)</span></label>
+            <input type="number" id="runway_months" min="0" placeholder="8" required />
+          </div>
+          <div class="field">
+            <label>Headcount</label>
+            <input type="number" id="headcount" min="1" placeholder="12" required />
+          </div>
+          <div class="field">
+            <label>NPS Score <span class="hint">(-100 to 100)</span></label>
+            <input type="number" id="nps" min="-100" max="100" placeholder="31" required />
+          </div>
+          <div class="field">
+            <label>CAC <span class="hint">(USD)</span></label>
+            <input type="number" id="cac" min="0" placeholder="1800" required />
+          </div>
+          <div class="field">
+            <label>LTV <span class="hint">(USD)</span></label>
+            <input type="number" id="ltv" min="0" placeholder="9200" required />
+          </div>
+          <div class="field">
+            <label>Industry</label>
+            <select id="industry">
+              <option value="B2B SaaS">B2B SaaS</option>
+              <option value="B2C">B2C</option>
+              <option value="Marketplace">Marketplace</option>
+              <option value="E-commerce">E-commerce</option>
+              <option value="Consumer">Consumer</option>
+              <option value="Enterprise">Enterprise</option>
+              <option value="Fintech">Fintech</option>
+              <option value="Healthtech">Healthtech</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" id="analyze-btn">
+          <span id="btn-text">🔍 Run Pattern Analysis</span>
+          <span id="btn-spinner" class="hidden">⏳ Analysing…</span>
+        </button>
+      </form>
+
+      <!-- Quick demo fill -->
+      <div class="demo-bar">
+        <span class="demo-label">Load real scenario:</span>
+        <button class="demo-btn demo-safe"    onclick="fillDemo('healthy')">✅ Healthy</button>
+        <button class="demo-btn demo-warn"    onclick="fillDemo('warning')">⚠️ Danger Zone</button>
+        <button class="demo-btn demo-dead"    onclick="fillDemo('quibi')">💀 Quibi</button>
+        <button class="demo-btn demo-dead"    onclick="fillDemo('wework')">🏢 WeWork</button>
+        <button class="demo-btn demo-dead"    onclick="fillDemo('theranos')">🩸 Theranos</button>
+      </div>
+    </section>
+
+    <!-- ── Alert Panel ───────────────────────────────────────────── -->
+    <section class="card alert-card hidden" id="alert-section">
+      <div class="alert-header">
+        <span class="alert-icon">⚠️</span>
+        <div>
+          <div class="alert-title" id="alert-title"></div>
+          <div class="confidence-row">
+            <span>Confidence:</span>
+            <div class="bar-wrap"><div class="bar-fill" id="conf-bar"></div></div>
+            <span id="conf-pct"></span>
+          </div>
+        </div>
+      </div>
+
+      <p class="narrative" id="alert-narrative"></p>
+
+      <div class="two-col">
+        <div>
+          <h3>⚡ Warning Signals Detected</h3>
+          <ul id="signals-list"></ul>
+        </div>
+        <div>
+          <h3>📊 Historical Outcomes</h3>
+          <div class="outcome-stats">
+            <div class="stat red"><span id="fail-pct"></span><small>Failed</small></div>
+            <div class="stat green"><span id="surv-pct"></span><small>Survived</small></div>
+            <div class="stat muted"><span id="total-cases"></span><small>Total Cases</small></div>
+          </div>
+          <p class="crisis-est">Estimated days to crisis: <strong id="days-crisis"></strong></p>
+        </div>
+      </div>
+
+      <div class="playbook">
+        <h3>🛡️ Survival Playbook</h3>
+        <p class="playbook-sub">Used by every startup that survived this pattern</p>
+        <ol id="playbook-list"></ol>
+      </div>
+
+      <div class="famous">
+        <h3>🏢 Companies That Matched This Pattern</h3>
+        <div id="famous-list"></div>
+      </div>
+
+      <div class="output-info">
+        📄 Full report saved to: <code id="output-path"></code>
+      </div>
+    </section>
+
+    <!-- ── Safe Panel ────────────────────────────────────────────── -->
+    <section class="card safe-card hidden" id="safe-section">
+      <div class="safe-icon">✅</div>
+      <h2>No Dangerous Patterns Detected</h2>
+      <p>Your current metrics don't match any known high-risk failure patterns. Keep monitoring — things change fast.</p>
+      <p class="safe-tip">💡 Tip: Run this analysis every month. Patterns emerge gradually.</p>
+    </section>
+
+    <!-- ── Decision Auditor ──────────────────────────────────────── -->
+    <section class="card" id="audit-section">
+      <h2>Decision Auditor</h2>
+      <p class="section-desc">Describe a decision you're considering. The Oracle will evaluate it against historical failure cases.</p>
+      <div class="audit-form">
+        <textarea id="decision-text" rows="3"
+          placeholder="e.g. Hire 3 engineers this month, Increase pricing by 20%, Expand to Europe..."></textarea>
+        <button id="audit-btn" onclick="runAudit()">📋 Audit This Decision</button>
+      </div>
+      <div id="audit-result" class="hidden"></div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>Built with Gemini 2.5 Flash · MongoDB Atlas · Google Cloud</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

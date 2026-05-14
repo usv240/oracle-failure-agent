@@ -1,0 +1,497 @@
+[
+  {
+    "pattern_id": "F-016",
+    "name": "Single Customer Concentration",
+    "category": "go_to_market",
+    "stage_month_min": 12,
+    "stage_month_max": 60,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.10,
+      "churn_rate_min": 0.05
+    },
+    "narrative": "One customer represents 30%+ of revenue. Every board meeting, every product decision, every hire revolves around keeping them happy. When they leave — and they always eventually leave, through budget cuts, acquisition, or competitive switch — the company cannot survive the revenue cliff.",
+    "warning_signals": [
+      {"signal": "Single customer >30% of total MRR", "days_before_failure": 365},
+      {"signal": "Product roadmap driven by one customer's requests", "days_before_failure": 180},
+      {"signal": "That customer entering budget review or M&A process", "days_before_failure": 90},
+      {"signal": "Sales pipeline excluding that customer is empty", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Set a hard target: no single customer above 15% of revenue within 18 months",
+      "Use the large customer as a case study to close 10 more, not as a crutch",
+      "Diversify the product to serve their competitors — turn one into a category win",
+      "Have an explicit contract renewal strategy for the concentration customer",
+      "Build a pipeline that assumes the concentration customer leaves next quarter"
+    ],
+    "failure_count": 167,
+    "survival_count": 43,
+    "famous_failures": [
+      {"company": "Solyndra", "outcome": "Failed", "detail": "Government contract dependency collapsed when subsidies changed."},
+      {"company": "Many B2B SaaS companies", "outcome": "Failed", "detail": "Classic single-enterprise-customer trap documented in SaaS data."}
+    ],
+    "sources": ["CB Insights revenue concentration analysis", "SaaStr customer concentration research"]
+  },
+  {
+    "pattern_id": "F-017",
+    "name": "Technical Debt Paralysis",
+    "category": "product",
+    "stage_month_min": 18,
+    "stage_month_max": 72,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.07,
+      "churn_rate_min": 0.06,
+      "nps_max": 38
+    },
+    "narrative": "The engineering team spends 70% of its time on fires, not features. Every new feature takes 3x longer than estimated because of accumulated technical debt. The product falls behind competitors who built on modern architecture. Eventually, a full rewrite is proposed — which takes 18 months and never ships.",
+    "warning_signals": [
+      {"signal": "Feature velocity declining despite team growth", "days_before_failure": 180},
+      {"signal": "Incident rate increasing month-over-month", "days_before_failure": 120},
+      {"signal": "Estimated engineering time for simple features exceeding 2 weeks", "days_before_failure": 90},
+      {"signal": "Full rewrite being seriously proposed", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Dedicate exactly 20% of every sprint to technical debt — no more, no less",
+      "Identify the 3 most critical pain points and fix them before anything new",
+      "Never do a full rewrite — strangle-fig pattern only, replace piece by piece",
+      "Hire a Staff Engineer specifically to lead the technical debt reduction effort",
+      "Track engineering velocity as a first-class metric alongside revenue"
+    ],
+    "failure_count": 145,
+    "survival_count": 67,
+    "famous_failures": [
+      {"company": "Friendster", "outcome": "Failed", "detail": "Technical scaling issues while MySpace and Facebook overtook them."},
+      {"company": "Nokia", "outcome": "Declined", "detail": "Legacy Symbian technical debt prevented adapting to smartphone era."}
+    ],
+    "sources": ["Martin Fowler technical debt research", "Joel Spolsky 'Things You Should Never Do'"]
+  },
+  {
+    "pattern_id": "F-018",
+    "name": "Regulatory Blindside",
+    "category": "product",
+    "stage_month_min": 12,
+    "stage_month_max": 72,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.08,
+      "churn_rate_min": 0.06
+    },
+    "narrative": "The company built a business on a regulatory gray area and ignored the signals that enforcement was coming. GDPR, financial regulation, healthcare compliance, data privacy — regulators always move slower than startups, which creates false confidence. When enforcement arrives, the cost of compliance wipes out the business model.",
+    "warning_signals": [
+      {"signal": "Regulatory inquiry or investigation opened", "days_before_failure": 365},
+      {"signal": "Competitor receiving enforcement action in same space", "days_before_failure": 270},
+      {"signal": "Legal counsel flagging compliance gaps in core business model", "days_before_failure": 180},
+      {"signal": "Enterprise customers asking about compliance certifications you don't have", "days_before_failure": 90}
+    ],
+    "survival_playbook": [
+      "Hire a VP of Compliance before you think you need one",
+      "Proactively engage with regulators — be the industry spokesperson, not the target",
+      "Model the business with full compliance costs included from day one",
+      "Pursue certifications (SOC2, HIPAA, GDPR) proactively — they become competitive moats",
+      "If core business model requires regulatory change, build the lobbying strategy now"
+    ],
+    "failure_count": 123,
+    "survival_count": 34,
+    "famous_failures": [
+      {"company": "LendUp", "outcome": "Failed", "detail": "CFPB enforcement action shut down core lending product."},
+      {"company": "Libra/Diem (Facebook)", "outcome": "Shut down", "detail": "Global regulatory resistance killed the project despite $200M investment."}
+    ],
+    "sources": ["CFPB enforcement patterns", "GDPR startup impact analysis"]
+  },
+  {
+    "pattern_id": "F-019",
+    "name": "Distribution Without Retention",
+    "category": "go_to_market",
+    "stage_month_min": 6,
+    "stage_month_max": 24,
+    "trigger_conditions": {
+      "mrr_growth_rate_min": 0.15,
+      "churn_rate_min": 0.12,
+      "nps_max": 35
+    },
+    "narrative": "Viral or paid growth fills the funnel but a leaky bucket empties it just as fast. The company looks like it's growing but the cohort analysis tells the truth: every acquisition class churns within 90 days. You're paying to acquire customers to lose them. Eventually the acquisition economics break and growth stops entirely.",
+    "warning_signals": [
+      {"signal": "90-day cohort retention below 30%", "days_before_failure": 90},
+      {"signal": "Growth rate requiring ever-increasing spend to maintain", "days_before_failure": 75},
+      {"signal": "Re-acquisition rate above 20% (churned users coming back)", "days_before_failure": 60},
+      {"signal": "D30 retention below D7 retention by more than 30%", "days_before_failure": 45}
+    ],
+    "survival_playbook": [
+      "Stop all acquisition spend — fix retention first, growth second",
+      "Map the exact drop-off point in the user journey where churn happens",
+      "Define your activation event: the moment users get real value. Move every user there",
+      "Do not resume growth until 90-day retention exceeds 40%",
+      "Consider a product-led growth model where retention is built into the core loop"
+    ],
+    "failure_count": 334,
+    "survival_count": 56,
+    "famous_failures": [
+      {"company": "HQ Trivia", "outcome": "Failed", "detail": "Viral growth but terrible retention as the novelty wore off."},
+      {"company": "Houseparty", "outcome": "Acquired at low price", "detail": "Viral among teens but retention collapsed with every cohort."}
+    ],
+    "sources": ["Andrew Chen retention research", "Reforge cohort analysis frameworks"]
+  },
+  {
+    "pattern_id": "F-020",
+    "name": "API-First Race to Zero",
+    "category": "competition",
+    "stage_month_min": 12,
+    "stage_month_max": 48,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.08,
+      "churn_rate_min": 0.07,
+      "ltv_cac_ratio_max": 3.0
+    },
+    "narrative": "Infrastructure and API companies face constant price pressure as cloud providers commoditize their core technology. AWS, Google, and Azure can afford to offer the same service at cost to grow their platform. Startups that don't move up the stack — from API to workflow to application — get squeezed to zero.",
+    "warning_signals": [
+      {"signal": "AWS/GCP/Azure announcing competing managed service", "days_before_failure": 365},
+      {"signal": "Pricing pressure conversations in >30% of deals", "days_before_failure": 180},
+      {"signal": "Gross margin declining quarter over quarter", "days_before_failure": 120},
+      {"signal": "Customers self-building your core functionality", "days_before_failure": 90}
+    ],
+    "survival_playbook": [
+      "Move up the stack immediately: from API to workflow layer to application",
+      "Build the integration ecosystem that makes switching costly",
+      "Go vertical: own one industry completely instead of serving all horizontally",
+      "Differentiate on developer experience and reliability, not just features",
+      "Find the use cases too complex or regulated for cloud giants to serve"
+    ],
+    "failure_count": 189,
+    "survival_count": 78,
+    "famous_failures": [
+      {"company": "Parse", "outcome": "Shut down", "detail": "Facebook acquired then shut down as AWS Lambda made it redundant."},
+      {"company": "Iron.io", "outcome": "Declined", "detail": "Cloud functions commoditized the core product."}
+    ],
+    "sources": ["Ben Thompson 'Aggregation Theory'", "AWS commoditization patterns analysis"]
+  },
+  {
+    "pattern_id": "F-021",
+    "name": "Sales-Led Without Product-Led Foundation",
+    "category": "go_to_market",
+    "stage_month_min": 14,
+    "stage_month_max": 36,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.09,
+      "ltv_cac_ratio_max": 2.5,
+      "nps_max": 42
+    },
+    "narrative": "Enterprise sales reps are brought in to accelerate a product that doesn't have organic demand. Sales can close deals but cannot manufacture retention. Each deal requires heavy customization to close, creating a services business disguised as a software company. Gross margins collapse and the company becomes a professional services firm.",
+    "warning_signals": [
+      {"signal": "Gross margins below 60% in software company", "days_before_failure": 180},
+      {"signal": "Average deal requiring >40 hours of pre-sales work", "days_before_failure": 120},
+      {"signal": "Deals requiring significant implementation services to close", "days_before_failure": 90},
+      {"signal": "Sales reps hitting quota but company not growing", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Freeze enterprise sales hiring until product can close SMB deals without sales help",
+      "Build self-serve onboarding that reduces time-to-value to under 30 minutes",
+      "Define a No-Custom-Work policy — standard product only",
+      "Measure and track product-qualified lead rate as primary growth metric",
+      "If you must have sales: make their job to accelerate product-led motion, not replace it"
+    ],
+    "failure_count": 156,
+    "survival_count": 45,
+    "famous_failures": [
+      {"company": "Kana Communications", "outcome": "Failed", "detail": "CRM company with sales-heavy motion, never achieved product-led scale."},
+      {"company": "Various enterprise SaaS", "outcome": "Failed", "detail": "Classic pattern from SaaStr analysis of failed B2B companies."}
+    ],
+    "sources": ["OpenView PLG research", "Jason Lemkin enterprise sales failure patterns"]
+  },
+  {
+    "pattern_id": "F-022",
+    "name": "Acqui-Hire Trap",
+    "category": "team",
+    "stage_month_min": 24,
+    "stage_month_max": 60,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.05,
+      "nps_max": 40,
+      "churn_rate_min": 0.07
+    },
+    "narrative": "Growth has stalled, key engineers are being recruited away by FAANG companies, and acquisition conversations are happening — but the terms being offered are essentially acqui-hires that pay out the team but leave investors with nothing. The company is in a slow death spiral where every departing engineer makes the acquisition offer worse.",
+    "warning_signals": [
+      {"signal": "Senior engineers accepting FAANG offers in last 90 days", "days_before_failure": 180},
+      {"signal": "Acquisition conversations happening at <3x revenue multiples", "days_before_failure": 120},
+      {"signal": "Investor pressure to accept acquisition increasing", "days_before_failure": 90},
+      {"signal": "Recruiting pipeline drying up as word spreads", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Create a retention pool for key engineers — equity or cash bonuses contingent on 18-month stay",
+      "Accelerate acquisition conversations: a good deal today beats a bad deal in 6 months",
+      "Identify the 3 strategic acquirers most likely to pay above-market — pursue them directly",
+      "Get board alignment on minimum acceptable outcome before running a process",
+      "If staying independent: do a strategic pivot to reignite growth story before team fully demoralizes"
+    ],
+    "failure_count": 112,
+    "survival_count": 67,
+    "famous_failures": [
+      {"company": "Sparrow", "outcome": "Acqui-hired by Google", "detail": "Product shut down, team absorbed, investors got minimal return."},
+      {"company": "Milk (app)", "outcome": "Acqui-hired by Google", "detail": "Never reached scale, talent acquired instead of product."}
+    ],
+    "sources": ["CB Insights acqui-hire analysis", "First Round 'Lessons from startup exits'"]
+  },
+  {
+    "pattern_id": "F-023",
+    "name": "Marketplace Cold Start Never Solved",
+    "category": "product_market_fit",
+    "stage_month_min": 6,
+    "stage_month_max": 30,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.10,
+      "churn_rate_min": 0.10,
+      "nps_max": 38
+    },
+    "narrative": "Marketplaces require supply and demand to grow together. Most marketplace startups subsidize one side, acquire the other, only to discover that subsidized supply doesn't create real demand, and real demand doesn't materialize without supply quality. The chicken-and-egg never resolves and the company burns cash at both ends.",
+    "warning_signals": [
+      {"signal": "Supply-to-demand ratio consistently out of balance", "days_before_failure": 180},
+      {"signal": "Take rate below 10% indicating insufficient value creation", "days_before_failure": 120},
+      {"signal": "Repeat usage rate below 30% after initial transaction", "days_before_failure": 90},
+      {"signal": "Suppliers or customers transacting off-platform", "days_before_failure": 75}
+    ],
+    "survival_playbook": [
+      "Constrain the market: one city, one category, one customer segment — go deep not wide",
+      "Act as the supply side yourself initially to guarantee demand experience quality",
+      "Build in transaction stickiness before worrying about growth",
+      "Find the 10 power suppliers who can serve 80% of demand — build around them",
+      "Prove the marketplace model works in one micromarket before scaling"
+    ],
+    "failure_count": 223,
+    "survival_count": 45,
+    "famous_failures": [
+      {"company": "Homejoy", "outcome": "Failed", "detail": "Home cleaning marketplace. Cold start problems, supply quality issues, legal issues."},
+      {"company": "Beepi", "outcome": "Failed", "detail": "Used car marketplace. $150M raised. Never solved supply-demand balance."}
+    ],
+    "sources": ["a16z marketplace playbook", "Andreessen 'Cold start problem' research"]
+  },
+  {
+    "pattern_id": "F-024",
+    "name": "Hardware Startup Cash Trap",
+    "category": "unit_economics",
+    "stage_month_min": 12,
+    "stage_month_max": 48,
+    "trigger_conditions": {
+      "burn_multiple_min": 4.0,
+      "mrr_growth_rate_max": 0.12,
+      "runway_months_max": 12
+    },
+    "narrative": "Hardware startups face capital requirements that software investors don't understand. Tooling, manufacturing minimums, inventory carrying costs, and 6-month production cycles create a capital trap. Each product iteration requires millions, quality issues require costly recalls, and the software-like valuation multiples don't apply.",
+    "warning_signals": [
+      {"signal": "Gross margins below 30% after year 1", "days_before_failure": 180},
+      {"signal": "Next production run requiring capital that isn't raised", "days_before_failure": 120},
+      {"signal": "Return rate above 8% indicating quality issues", "days_before_failure": 90},
+      {"signal": "Contract manufacturer requesting higher MOQ than cash allows", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Get to 50%+ gross margin before scaling — it's possible in hardware with design discipline",
+      "Use crowdfunding as demand validation AND pre-funding for first production run",
+      "Find a contract manufacturer partner willing to carry inventory risk for equity",
+      "Build the software/service layer that makes hardware subscription-like",
+      "Do not order next production run without pre-sold demand covering 70% of costs"
+    ],
+    "failure_count": 189,
+    "survival_count": 23,
+    "famous_failures": [
+      {"company": "Juicero", "outcome": "Failed", "detail": "$120M raised for a $400 juicer. Returned capital to investors after backlash."},
+      {"company": "Jawbone", "outcome": "Failed", "detail": "$900M raised, hardware quality issues destroyed brand, never recovered."}
+    ],
+    "sources": ["Bolt.io hardware failure analysis", "First Round hardware company research"]
+  },
+  {
+    "pattern_id": "F-025",
+    "name": "Premature Monetization of Free Users",
+    "category": "product_market_fit",
+    "stage_month_min": 6,
+    "stage_month_max": 24,
+    "trigger_conditions": {
+      "churn_rate_min": 0.15,
+      "mrr_growth_rate_max": 0.08,
+      "nps_max": 35
+    },
+    "narrative": "Investor pressure or founder anxiety causes premature monetization of a free user base that hasn't experienced enough value to pay. The resulting churn devastates DAU/MAU ratios, word-of-mouth turns negative, and the company loses both the growth flywheel and the paying customers in the same quarter.",
+    "warning_signals": [
+      {"signal": "NPS score below 40 at time of monetization", "days_before_failure": 90},
+      {"signal": "Free-to-paid conversion below 2%", "days_before_failure": 75},
+      {"signal": "DAU/MAU ratio declining post-monetization", "days_before_failure": 60},
+      {"signal": "Negative app store reviews citing pricing change", "days_before_failure": 45}
+    ],
+    "survival_playbook": [
+      "Monetize only users who have completed your activation event at least 5 times",
+      "Test pricing with a small cohort (5% of users) before rolling out",
+      "Launch freemium first — give users a genuine free tier, not a crippled trial",
+      "NPS must exceed 50 before monetization — users who love your product will pay",
+      "Build the upgrade flow into natural usage moments, not intrusive paywalls"
+    ],
+    "failure_count": 256,
+    "survival_count": 67,
+    "famous_failures": [
+      {"company": "Evernote", "outcome": "Declined", "detail": "Premature feature restrictions on free tier caused massive churn and brand damage."},
+      {"company": "Tumblr", "outcome": "Sold for $3M (from $1.1B)", "detail": "Never successfully monetized free users."}
+    ],
+    "sources": ["Sean Ellis freemium conversion research", "Reforge monetization timing analysis"]
+  },
+  {
+    "pattern_id": "F-026",
+    "name": "Founder-Dependent Sales Ceiling",
+    "category": "go_to_market",
+    "stage_month_min": 14,
+    "stage_month_max": 42,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.08,
+      "headcount_growth_rate_min": 0.15,
+      "nps_min": 45
+    },
+    "narrative": "The founder closes every deal personally. Customers buy the founder's vision, relationships, and credibility. When the first sales team is hired, win rates collapse because the sales reps can't replicate what makes the founder compelling. The company hires and fires 3 sales teams before realizing the product isn't actually saleable without the founder.",
+    "warning_signals": [
+      {"signal": "First sales hire closing less than 40% of founder's deal rate", "days_before_failure": 180},
+      {"signal": "Average deal size with sales team 50% lower than founder deals", "days_before_failure": 120},
+      {"signal": "Founder still involved in >50% of deals despite sales team", "days_before_failure": 90},
+      {"signal": "Third sales hire being made as first two underperformed", "days_before_failure": 75}
+    ],
+    "survival_playbook": [
+      "Shadow the founder on 20 deals before your first sales hire joins",
+      "Document every step of the founder sales process before hiring",
+      "Hire a sales manager before reps — you need someone to build the process",
+      "Make founder available for final-stage deal support for first 6 months of ramp",
+      "If reps can't close at 60% of founder rate after 90 days, the product needs work not better reps"
+    ],
+    "failure_count": 178,
+    "survival_count": 56,
+    "famous_failures": [
+      {"company": "Many B2B SaaS companies", "outcome": "Failed", "detail": "Classic pattern from SaaStr where founder-led sales didn't transfer."},
+      {"company": "Various services-disguised-as-SaaS", "outcome": "Failed", "detail": "Documented in First Round Capital analysis."}
+    ],
+    "sources": ["Mark Roberge 'The Sales Acceleration Formula'", "Jason Lemkin sales hiring research"]
+  },
+  {
+    "pattern_id": "F-027",
+    "name": "Data Moat Illusion",
+    "category": "competition",
+    "stage_month_min": 18,
+    "stage_month_max": 60,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.07,
+      "churn_rate_min": 0.06,
+      "nps_max": 42
+    },
+    "narrative": "The company claims their data is their moat but the data they have isn't unique, isn't growing, and isn't translating to product advantages. Meanwhile, well-funded competitors use foundation models and synthetic data to bypass the assumed moat. The 'data flywheel' never actually spun.",
+    "warning_signals": [
+      {"signal": "Product improvements not accelerating despite data accumulation", "days_before_failure": 180},
+      {"signal": "Competitors achieving similar accuracy without proprietary data", "days_before_failure": 120},
+      {"signal": "Data labeling costs consuming >20% of R&D budget", "days_before_failure": 90},
+      {"signal": "Customers not seeing quality improvements that justify switching costs", "days_before_failure": 75}
+    ],
+    "survival_playbook": [
+      "Audit your actual data advantage: is it really unique and growing?",
+      "Find the specific model performance gap your data creates — quantify it",
+      "Move the moat: from data to workflow integrations and customer relationships",
+      "Partner or license data sources to deepen the moat where it exists",
+      "Invest in data quality not quantity — 1M high-quality examples beat 100M noisy ones"
+    ],
+    "failure_count": 134,
+    "survival_count": 45,
+    "famous_failures": [
+      {"company": "Enlitic", "outcome": "Failed", "detail": "Medical AI company whose data moat thesis was undermined by foundation models."},
+      {"company": "Multiple AI startups 2019-2021", "outcome": "Failed", "detail": "Data moat thesis failed as foundation models reduced data advantages."}
+    ],
+    "sources": ["a16z AI data moat analysis", "Andrew Ng 'AI Transformation Playbook'"]
+  },
+  {
+    "pattern_id": "F-028",
+    "name": "Blitzscaling Overextension",
+    "category": "premature_scaling",
+    "stage_month_min": 18,
+    "stage_month_max": 48,
+    "trigger_conditions": {
+      "burn_multiple_min": 5.0,
+      "mrr_growth_rate_min": 0.12,
+      "runway_months_max": 14,
+      "churn_rate_min": 0.07
+    },
+    "narrative": "Inspired by the winner-take-all narrative, the company raises and spends to achieve market dominance before profitability. This works in winner-take-all markets with strong network effects. In most markets, it just means burning capital faster than competitors without creating a defensible position. When funding dries up, there's no path to profitability.",
+    "warning_signals": [
+      {"signal": "Burn multiple above 5x for 2+ consecutive quarters", "days_before_failure": 180},
+      {"signal": "Revenue growing slower than headcount", "days_before_failure": 120},
+      {"signal": "Market share not increasing despite spending", "days_before_failure": 90},
+      {"signal": "Lead investor cooling on follow-on funding", "days_before_failure": 75}
+    ],
+    "survival_playbook": [
+      "Immediately calculate burn multiple and share with board — transparency first",
+      "Identify the minimum team size to maintain current revenue — reduce to 120% of that",
+      "Prove profitability in one market segment before expanding",
+      "Change the narrative from growth story to efficiency story before next raise",
+      "Only blitzscale in winner-take-all markets with proven network effects — verify yours"
+    ],
+    "failure_count": 198,
+    "survival_count": 34,
+    "famous_failures": [
+      {"company": "Zume Pizza", "outcome": "Failed", "detail": "$445M raised, robot pizza delivery. Pivoted three times, still failed."},
+      {"company": "Atrium", "outcome": "Shut down", "detail": "$75M raised for legal tech blitzscaling. Returned remaining capital."}
+    ],
+    "sources": ["Reid Hoffman 'Blitzscaling'", "CB Insights 2023 blitzscaling failure analysis"]
+  },
+  {
+    "pattern_id": "F-029",
+    "name": "Remote Team Coordination Collapse",
+    "category": "team",
+    "stage_month_min": 12,
+    "stage_month_max": 48,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.08,
+      "headcount_growth_rate_min": 0.25,
+      "nps_max": 40
+    },
+    "narrative": "A distributed team that worked well at 10 people breaks down at 30. Information silos form across time zones, decisions take weeks instead of hours, duplicate work consumes 20% of capacity, and the shared mission that united the early team is lost in Slack channels. The product slows to match the coordination overhead.",
+    "warning_signals": [
+      {"signal": "Cross-team dependencies causing regular feature delays", "days_before_failure": 150},
+      {"signal": "Decisions escalating to founders that should be made autonomously", "days_before_failure": 120},
+      {"signal": "Team survey showing communication as top issue", "days_before_failure": 90},
+      {"signal": "Senior hires leaving within 90 days citing 'coordination challenges'", "days_before_failure": 75}
+    ],
+    "survival_playbook": [
+      "Implement clear DRI (Directly Responsible Individual) for every decision and project",
+      "Reduce meeting overhead by 50% and replace with async documentation",
+      "Collocate the core product team — even remote-first companies benefit from quarterly sprints",
+      "Write down your decision-making framework: what gets escalated, what gets decided autonomously",
+      "Hire a Chief of Staff or Head of Operations before your 30th employee"
+    ],
+    "failure_count": 112,
+    "survival_count": 56,
+    "famous_failures": [
+      {"company": "Automattic (challenging phase)", "outcome": "Survived with restructuring", "detail": "Remote coordination challenges required significant process overhaul."},
+      {"company": "Various remote-first startups", "outcome": "Failed", "detail": "Documented in First Round remote work research."}
+    ],
+    "sources": ["GitLab remote work handbook", "Stripe remote engineering research"]
+  },
+  {
+    "pattern_id": "F-030",
+    "name": "Consumerization of Enterprise Backfire",
+    "category": "go_to_market",
+    "stage_month_min": 18,
+    "stage_month_max": 60,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.07,
+      "churn_rate_min": 0.07,
+      "ltv_cac_ratio_max": 3.0,
+      "nps_max": 42
+    },
+    "narrative": "The product spread virally through individual end-users inside enterprises (the Slack/Zoom pattern), but the company can't convert that usage into paid enterprise contracts. IT security blocks it. Procurement refuses. The champion doesn't have budget authority. Free usage grows while paid conversion stagnates — a massive valuation built on metrics that don't convert.",
+    "warning_signals": [
+      {"signal": "High individual user NPS but low enterprise contract conversion", "days_before_failure": 180},
+      {"signal": "IT/security blocklisting the product in enterprise accounts", "days_before_failure": 120},
+      {"signal": "Deal cycle extending beyond 6 months for accounts with active free users", "days_before_failure": 90},
+      {"signal": "Free-to-paid conversion declining as account sizes increase", "days_before_failure": 75}
+    ],
+    "survival_playbook": [
+      "Build enterprise security features (SSO, SCIM, audit logs) before enterprise sales motion",
+      "Find the 10 accounts with highest free usage — assign an AE to each immediately",
+      "Get a security questionnaire response template ready — it unblocks 60% of deals",
+      "Find internal champions and give them decks to sell upward",
+      "Consider a freemium-to-enterprise pricing model that makes the upgrade path natural"
+    ],
+    "failure_count": 134,
+    "survival_count": 56,
+    "famous_failures": [
+      {"company": "Yammer (pre-Microsoft)", "outcome": "Acquired at modest price", "detail": "Viral enterprise adoption but struggled to convert to paid enterprise contracts."},
+      {"company": "Many PLG startups 2021-2023", "outcome": "Failed", "detail": "PLG without enterprise motion failed as free tiers didn't convert."}
+    ],
+    "sources": ["OpenView PLG to Enterprise research", "Kyle Poyar enterprise motion analysis"]
+  }
+]

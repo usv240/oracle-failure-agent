@@ -1,0 +1,503 @@
+[
+  {
+    "pattern_id": "F-001",
+    "name": "Premature Scaling with Hidden Churn",
+    "category": "premature_scaling",
+    "stage_month_min": 10,
+    "stage_month_max": 22,
+    "trigger_conditions": {
+      "mrr_growth_rate_min": 0.10,
+      "mrr_growth_rate_max": 0.30,
+      "churn_rate_min": 0.07,
+      "churn_rate_max": 0.20,
+      "nps_max": 42,
+      "burn_multiple_min": 2.0
+    },
+    "narrative": "Founders mistake gross growth for net growth. MRR looks healthy because new customers mask churn. When acquisition slows — and it always does — the hidden churn becomes a cliff. By the time the problem is visible in top-line metrics, runway is gone.",
+    "warning_signals": [
+      {"signal": "NPS declining while MRR grows", "days_before_failure": 90},
+      {"signal": "Support ticket volume increasing month-over-month", "days_before_failure": 75},
+      {"signal": "Power user cohort engagement declining", "days_before_failure": 60},
+      {"signal": "CAC trending upward for 2+ months", "days_before_failure": 45},
+      {"signal": "Expansion revenue flat despite growing customer base", "days_before_failure": 30}
+    ],
+    "survival_playbook": [
+      "Pause all hiring immediately — freeze burn while you diagnose",
+      "Run a 30-day customer development sprint with recently churned users",
+      "Identify your top 3 churn drivers — fix these before growing again",
+      "Get NPS above 45 before re-engaging any acquisition channels",
+      "Reduce burn multiple below 1.5x before next scale attempt",
+      "Implement a formal health score system for all accounts"
+    ],
+    "failure_count": 312,
+    "survival_count": 34,
+    "famous_failures": [
+      {"company": "Fab.com", "outcome": "Failed", "detail": "Grew from $10M to $100M ARR then collapsed. Hidden churn masked by hypergrowth for 18 months."},
+      {"company": "Homejoy", "outcome": "Failed", "detail": "10x growth, then rapid collapse when unit economics never worked at scale."},
+      {"company": "Sprig", "outcome": "Failed", "detail": "Expanded to 7 cities while losing money on every single order."}
+    ],
+    "sources": ["YC post-mortem library", "CB Insights 2023 failure report", "First Round Capital analysis"]
+  },
+  {
+    "pattern_id": "F-002",
+    "name": "Runway Optimism Bias",
+    "category": "fundraising",
+    "stage_month_min": 6,
+    "stage_month_max": 30,
+    "trigger_conditions": {
+      "runway_months_max": 8,
+      "burn_rate_growth_min": 0.05,
+      "mrr_growth_rate_max": 0.10
+    },
+    "narrative": "Founders consistently underestimate how long fundraising takes and overestimate their next milestone's fundraisability. 8 months of runway feels like plenty until month 6 when you're in conversations and month 8 when you're out of cash.",
+    "warning_signals": [
+      {"signal": "Runway below 9 months with no term sheet", "days_before_failure": 120},
+      {"signal": "MRR growth rate declining for 2+ consecutive months", "days_before_failure": 90},
+      {"signal": "Burn increasing while growth slows", "days_before_failure": 75},
+      {"signal": "Key hires departing", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Start fundraising process immediately — not when runway hits 6 months",
+      "Extend runway: cut burn to absolute minimum to get to 12+ months",
+      "Identify and double down on your single highest-leverage growth channel",
+      "Reach default alive: get to cash-flow neutral within 6 months",
+      "Talk to 50+ investors before you need money, not after"
+    ],
+    "failure_count": 489,
+    "survival_count": 71,
+    "famous_failures": [
+      {"company": "Theranos", "outcome": "Failed", "detail": "Extreme case — ran out of credibility before cash."},
+      {"company": "Clinkle", "outcome": "Failed", "detail": "$25M raised, burned through it without shipping, couldn't raise again."}
+    ],
+    "sources": ["Paul Graham 'Default Alive or Default Dead'", "YC Partner office hours patterns"]
+  },
+  {
+    "pattern_id": "F-003",
+    "name": "Product-Market Fit Mirage",
+    "category": "product_market_fit",
+    "stage_month_min": 4,
+    "stage_month_max": 18,
+    "trigger_conditions": {
+      "churn_rate_min": 0.10,
+      "nps_max": 30,
+      "ltv_cac_ratio_max": 2.0
+    },
+    "narrative": "Early customers said yes out of politeness, friendship, or curiosity — not genuine need. Retention is weak, expansion is nonexistent, and referrals don't happen. The founders convince themselves this is a onboarding problem, a pricing problem, or a feature problem. It's a fit problem.",
+    "warning_signals": [
+      {"signal": "Churn above 10% monthly from month 3+", "days_before_failure": 120},
+      {"signal": "No organic referrals or word-of-mouth", "days_before_failure": 100},
+      {"signal": "NPS below 20", "days_before_failure": 90},
+      {"signal": "Users not completing core workflow", "days_before_failure": 80},
+      {"signal": "LTV:CAC ratio below 2x", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Stop selling — talk to your 5 most active users and understand exactly why they stay",
+      "Define your 'must-have' user: the person who would be 'very disappointed' if product disappeared",
+      "Rebuild product specifically for that user — cut everything else",
+      "Re-launch only to that specific segment with explicit targeting",
+      "Do not scale until monthly churn is below 3% for 3 consecutive months"
+    ],
+    "failure_count": 567,
+    "survival_count": 89,
+    "famous_failures": [
+      {"company": "Color Labs", "outcome": "Failed", "detail": "$41M raised, launched a social photo app nobody wanted. Shut down in 2012."},
+      {"company": "Rdio", "outcome": "Failed", "detail": "Superior product to Spotify in many ways — but lost on distribution and network effects."}
+    ],
+    "sources": ["Sean Ellis PMF survey methodology", "First Round 'Knowing When You Have PMF'", "YC startup school"]
+  },
+  {
+    "pattern_id": "F-004",
+    "name": "CAC Exceeds LTV at Scale",
+    "category": "unit_economics",
+    "stage_month_min": 12,
+    "stage_month_max": 36,
+    "trigger_conditions": {
+      "ltv_cac_ratio_max": 2.5,
+      "cac_growth_rate_min": 0.08,
+      "mrr_growth_rate_min": 0.10
+    },
+    "narrative": "The business looks great in a spreadsheet and terrible in reality. Early customers were cheap to acquire (warm intros, personal networks). As you scale into paid channels, CAC increases and you discover the unit economics never actually worked.",
+    "warning_signals": [
+      {"signal": "CAC increasing 2+ months in a row", "days_before_failure": 120},
+      {"signal": "LTV:CAC ratio falling below 3x", "days_before_failure": 90},
+      {"signal": "Payback period extending beyond 18 months", "days_before_failure": 75},
+      {"signal": "Marketing spend growing faster than revenue", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Stop paid acquisition entirely — find the 1-2 organic channels that work",
+      "Rigorously calculate true fully-loaded CAC including all sales and marketing costs",
+      "Increase LTV: improve retention, add upsells, increase prices for new customers",
+      "Find adjacent customers you can reach more cheaply",
+      "Do not resume paid acquisition until LTV:CAC is consistently above 4x"
+    ],
+    "failure_count": 234,
+    "survival_count": 45,
+    "famous_failures": [
+      {"company": "LivingSocial", "outcome": "Failed", "detail": "Daily deal economics fell apart as CAC rose and retention collapsed."},
+      {"company": "Gilt Groupe", "outcome": "Declined", "detail": "Flash sale model works once — repeat customers don't come back at same CAC."}
+    ],
+    "sources": ["David Skok SaaS metrics framework", "Bessemer Venture Partners cloud index"]
+  },
+  {
+    "pattern_id": "F-005",
+    "name": "Co-Founder Conflict at Inflection",
+    "category": "team",
+    "stage_month_min": 12,
+    "stage_month_max": 36,
+    "trigger_conditions": {
+      "headcount_growth_rate_min": 0.20,
+      "mrr_growth_rate_min": 0.10
+    },
+    "narrative": "Co-founder conflicts are the #1 reason YC companies fail according to PG. The conflict usually surfaces at inflection points: first major hire, first enterprise customer, first pivot decision. Each co-founder's vision for the company diverges as stakes get real.",
+    "warning_signals": [
+      {"signal": "Co-founders avoiding direct communication", "days_before_failure": 180},
+      {"signal": "Parallel decision-making without alignment", "days_before_failure": 120},
+      {"signal": "Equity or role disputes surfacing", "days_before_failure": 90},
+      {"signal": "Team members reporting to different co-founders on same issues", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Have the hard conversation now — before it becomes unfixable",
+      "Engage a neutral third party: a board member, advisor, or executive coach",
+      "Establish explicit decision rights: who has final say on what",
+      "If irresolvable: negotiate a buyout before the conflict destroys value",
+      "Bring in a COO to manage operational conflicts between technical/commercial visions"
+    ],
+    "failure_count": 198,
+    "survival_count": 67,
+    "famous_failures": [
+      {"company": "Zenefits", "outcome": "Declined", "detail": "Parker Conrad forced out, company culture collapsed."},
+      {"company": "Snap (early)", "outcome": "Survived with legal battle", "detail": "Reggie Brown lawsuit over co-founder status cost years and millions."}
+    ],
+    "sources": ["Paul Graham 'The 18 Mistakes That Kill Startups'", "YC co-founder matching research"]
+  },
+  {
+    "pattern_id": "F-006",
+    "name": "Pivot Without Signal",
+    "category": "pivot",
+    "stage_month_min": 8,
+    "stage_month_max": 24,
+    "trigger_conditions": {
+      "churn_rate_min": 0.08,
+      "nps_max": 35,
+      "runway_months_max": 10
+    },
+    "narrative": "Founders pivot out of desperation, not data. They abandon a product that might have worked with 6 more months of iteration for something new that feels exciting. The new direction has even less validation than the original, and runway is now shorter.",
+    "warning_signals": [
+      {"signal": "Strategic direction changing monthly", "days_before_failure": 120},
+      {"signal": "Team morale declining due to constant change", "days_before_failure": 90},
+      {"signal": "Investor confidence declining", "days_before_failure": 75},
+      {"signal": "No clear hypothesis being tested — just activity", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Before pivoting, define exactly what metric would prove your current product works",
+      "Give the current approach 60 more days with a specific, testable hypothesis",
+      "If pivoting, pivot toward your existing strongest customers — not away from them",
+      "A pivot to adjacent use case has 3x better success rate than a full pivot",
+      "Never pivot twice in less than 6 months — it signals lost conviction"
+    ],
+    "failure_count": 287,
+    "survival_count": 52,
+    "famous_failures": [
+      {"company": "Rdio", "outcome": "Failed", "detail": "Multiple pivots, lost focus, eventually sold for scraps."},
+      {"company": "Secret", "outcome": "Failed", "detail": "Anonymous social app pivoted multiple times, shut down returning $6M to investors."}
+    ],
+    "sources": ["Eric Ries 'The Lean Startup'", "Steve Blank pivot research"]
+  },
+  {
+    "pattern_id": "F-007",
+    "name": "Bridge Round Death Spiral",
+    "category": "fundraising",
+    "stage_month_min": 18,
+    "stage_month_max": 48,
+    "trigger_conditions": {
+      "runway_months_max": 6,
+      "mrr_growth_rate_max": 0.07,
+      "burn_multiple_min": 3.0
+    },
+    "narrative": "A bridge round buys time but not survival. If the underlying metrics don't improve, the next round is even harder to raise. Each bridge creates overhang, complicates the cap table, and signals distress to later investors. Most companies that take 2+ bridge rounds don't survive.",
+    "warning_signals": [
+      {"signal": "First bridge round raised without hitting milestones", "days_before_failure": 180},
+      {"signal": "Growth rate not improving post-bridge", "days_before_failure": 120},
+      {"signal": "Lead investors not participating in bridge", "days_before_failure": 90},
+      {"signal": "Team departures accelerating post-bridge", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Take bridge only if you have a clear, specific milestone that will enable the next raise",
+      "Cut burn to minimum sustainable levels before taking bridge",
+      "Have explicit agreement with bridge investors on what success looks like",
+      "Consider acqui-hire as alternative to second bridge",
+      "If lead investors won't bridge, that's a signal — take it seriously"
+    ],
+    "failure_count": 156,
+    "survival_count": 23,
+    "famous_failures": [
+      {"company": "Jawbone", "outcome": "Failed", "detail": "Raised $900M+ across many rounds and bridges, still failed."},
+      {"company": "Quibi", "outcome": "Failed", "detail": "Launched, failed to gain traction, shut down in 6 months."}
+    ],
+    "sources": ["CB Insights bridge round analysis", "Crunchbase funding pattern research"]
+  },
+  {
+    "pattern_id": "F-008",
+    "name": "Premature International Expansion",
+    "category": "premature_scaling",
+    "stage_month_min": 14,
+    "stage_month_max": 30,
+    "trigger_conditions": {
+      "churn_rate_min": 0.06,
+      "nps_max": 45,
+      "headcount_growth_rate_min": 0.25,
+      "burn_multiple_min": 2.5
+    },
+    "narrative": "International expansion before domestic PMF. Each new market requires localisation, compliance, support, sales — a completely new go-to-market. Companies that expand internationally before their core market is healthy almost always stretch themselves too thin.",
+    "warning_signals": [
+      {"signal": "Domestic NPS still below 50", "days_before_failure": 120},
+      {"signal": "International revenue below 5% of total after 6 months", "days_before_failure": 90},
+      {"signal": "Operational complexity increasing faster than revenue", "days_before_failure": 75},
+      {"signal": "Team spending >30% of time on international without results", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Pause international expansion entirely until domestic NPS exceeds 55",
+      "Pick ONE international market and go deep — not shallow in 5",
+      "Hire a local country manager who owns P&L before expanding",
+      "Set a 12-month deadline: if international doesn't reach X% of revenue, exit",
+      "Use international revenue targets — not headcount — as expansion trigger"
+    ],
+    "failure_count": 178,
+    "survival_count": 38,
+    "famous_failures": [
+      {"company": "Target Canada", "outcome": "Failed", "detail": "$7B investment, shut down in 2 years. Core US model not ready for export."},
+      {"company": "Uber China", "outcome": "Exited", "detail": "Burned $2B before selling to DiDi. Wrong market timing."}
+    ],
+    "sources": ["Sequoia international expansion playbook", "a16z global market entry research"]
+  },
+  {
+    "pattern_id": "F-009",
+    "name": "Platform Dependency Collapse",
+    "category": "competition",
+    "stage_month_min": 12,
+    "stage_month_max": 60,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.05,
+      "churn_rate_min": 0.08
+    },
+    "narrative": "Building on top of a platform (Facebook, Salesforce, Shopify, Twitter) that can kill your business with a policy change or by building the feature themselves. Every major platform has done this — it's not 'if' but 'when'.",
+    "warning_signals": [
+      {"signal": ">70% of revenue dependent on single platform", "days_before_failure": 365},
+      {"signal": "Platform launching competing native features", "days_before_failure": 180},
+      {"signal": "Platform changing API terms or pricing", "days_before_failure": 90},
+      {"signal": "Platform acquiring a competitor", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Immediately begin reducing platform dependency to below 50% of revenue",
+      "Build a direct channel: email list, native app, direct sales",
+      "Differentiate along dimension the platform cannot easily copy",
+      "Engage with platform BD team — become a strategic partner not a parasite",
+      "Pursue channel diversification as a top-3 company priority"
+    ],
+    "failure_count": 234,
+    "survival_count": 67,
+    "famous_failures": [
+      {"company": "Zynga", "outcome": "Declined", "detail": "98% Facebook dependent. Facebook changed algo, Zynga lost 90% of value."},
+      {"company": "Vine", "outcome": "Killed by platform", "detail": "Twitter shut it down. Entire business on one platform."}
+    ],
+    "sources": ["Ben Thompson 'Aggregation Theory'", "CB Insights platform risk analysis"]
+  },
+  {
+    "pattern_id": "F-010",
+    "name": "Feature Creep Stagnation",
+    "category": "product",
+    "stage_month_min": 18,
+    "stage_month_max": 60,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.06,
+      "churn_rate_min": 0.07,
+      "nps_max": 40
+    },
+    "narrative": "The product tries to be everything to everyone and ends up being nothing to anyone. Each enterprise customer gets custom features. The roadmap is driven by whoever shouts loudest. Core product becomes unusable for the original ICP while new prospects don't see the value either.",
+    "warning_signals": [
+      {"signal": "More than 30% of features used by less than 5% of users", "days_before_failure": 180},
+      {"signal": "Enterprise custom requests consuming >40% of engineering", "days_before_failure": 120},
+      {"signal": "Onboarding time increasing quarter over quarter", "days_before_failure": 90},
+      {"signal": "Sales cycle lengthening due to product complexity", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Freeze all new feature development for 90 days",
+      "Audit: remove or hide every feature used by less than 5% of active users",
+      "Redefine your ICP with radical specificity — who exactly is this for?",
+      "Rebuild onboarding from scratch for the new ICP",
+      "Create a 'no-new-features' policy for custom enterprise requests"
+    ],
+    "failure_count": 189,
+    "survival_count": 56,
+    "famous_failures": [
+      {"company": "Basecamp (early HQ)", "outcome": "Survived by going back to basics", "detail": "Famous for removing features and improving product."},
+      {"company": "IBM Notes/Lotus", "outcome": "Declined", "detail": "Feature bloat made product unusable while simpler competitors won."}
+    ],
+    "sources": ["Jason Fried 'Getting Real'", "Intercom product philosophy"]
+  },
+  {
+    "pattern_id": "F-011",
+    "name": "Hiring Ahead of Revenue",
+    "category": "premature_scaling",
+    "stage_month_min": 8,
+    "stage_month_max": 24,
+    "trigger_conditions": {
+      "headcount_growth_rate_min": 0.30,
+      "mrr_growth_rate_max": 0.12,
+      "burn_multiple_min": 3.5,
+      "runway_months_max": 14
+    },
+    "narrative": "Team grows 3x while revenue grows 1.3x. It feels good — momentum, ambition, the right 'grown up company' signaling. Then you need to raise again and realize the only thing that grew was your burn rate. Reducing headcount is expensive, morale-destroying, and public.",
+    "warning_signals": [
+      {"signal": "Headcount growth rate 3x+ revenue growth rate", "days_before_failure": 120},
+      {"signal": "Burn multiple above 3x", "days_before_failure": 90},
+      {"signal": "Manager layers being added before revenue justifies them", "days_before_failure": 75},
+      {"signal": "New hires not ramped within 60 days", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Hiring freeze immediately until burn multiple falls below 2x",
+      "Audit every open role: must be tied to specific revenue or retention outcome",
+      "Consider: can you hit next milestone with current team plus process improvements?",
+      "Implement a 90-day ramp plan for every hire — no more 'figuring it out'",
+      "Rule: don't hire for a role until you're doing that job yourself and it's clearly limiting growth"
+    ],
+    "failure_count": 267,
+    "survival_count": 48,
+    "famous_failures": [
+      {"company": "WeWork", "outcome": "Near-collapse", "detail": "Headcount and spending wildly ahead of sustainable revenue."},
+      {"company": "Pets.com", "outcome": "Failed", "detail": "IPO'd, built huge team, never had viable unit economics."}
+    ],
+    "sources": ["YC default alive framework", "Sequoia 'RIP Good Times' presentation"]
+  },
+  {
+    "pattern_id": "F-012",
+    "name": "Well-Funded Competitor Entry",
+    "category": "competition",
+    "stage_month_min": 12,
+    "stage_month_max": 48,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.08,
+      "churn_rate_min": 0.06
+    },
+    "narrative": "A large, well-funded player (incumbent or well-capitalized startup) enters your market. If you haven't built deep defensibility — proprietary data, network effects, unique distribution — you will lose a war of attrition. Most startups don't survive this.",
+    "warning_signals": [
+      {"signal": "Salesforce/HubSpot/insert-giant launching similar feature", "days_before_failure": 365},
+      {"signal": "VC-backed competitor raising $20M+ Series A", "days_before_failure": 270},
+      {"signal": "Churn starting to mention competitor by name", "days_before_failure": 180},
+      {"signal": "Win rate declining in competitive deals", "days_before_failure": 90}
+    ],
+    "survival_playbook": [
+      "Move upmarket or downmarket immediately — pick a lane the giant won't follow",
+      "Double down on your unique data or workflow integrations they can't replicate",
+      "Accelerate customer lock-in: deeper integrations, data gravity, switching costs",
+      "Find 3 enterprise customers for whom you are mission-critical — protect them at all cost",
+      "Position as the specialist vs. their generalist — own a use case completely"
+    ],
+    "failure_count": 312,
+    "survival_count": 78,
+    "famous_failures": [
+      {"company": "Yammer", "outcome": "Acquired (not failed)", "detail": "Microsoft bought Yammer as Teams competition grew."},
+      {"company": "Sparrow (email)", "outcome": "Acquired", "detail": "Google acquired to kill competition for Gmail."}
+    ],
+    "sources": ["a16z 'Why Software is Eating the World'", "Hamilton Helmer '7 Powers'"]
+  },
+  {
+    "pattern_id": "F-013",
+    "name": "Negative Net Revenue Retention",
+    "category": "unit_economics",
+    "stage_month_min": 12,
+    "stage_month_max": 60,
+    "trigger_conditions": {
+      "churn_rate_min": 0.08,
+      "mrr_growth_rate_max": 0.08,
+      "nps_max": 40
+    },
+    "narrative": "Net Revenue Retention below 100% means your existing customers are worth less each year. Even if you keep acquiring new customers, you're running on a treadmill. Businesses with NRR below 100% cannot build durable value — every customer cohort decays.",
+    "warning_signals": [
+      {"signal": "Expansion revenue not covering churn revenue", "days_before_failure": 120},
+      {"signal": "Average contract value declining in renewal cohorts", "days_before_failure": 90},
+      {"signal": "Downgrades more common than upgrades", "days_before_failure": 75},
+      {"signal": "Customers not discovering new features", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Calculate NRR by cohort — find which segments are below 100% and why",
+      "Build a customer success function focused exclusively on expansion revenue",
+      "Introduce a usage-based pricing tier that grows with customer success",
+      "Identify your top 10% of customers by expansion — understand what makes them different",
+      "Kill features and segments where NRR is permanently below 90%"
+    ],
+    "failure_count": 198,
+    "survival_count": 67,
+    "famous_failures": [
+      {"company": "Bazaarvoice", "outcome": "Declined", "detail": "Ratings/reviews SaaS with contracting enterprise contracts."},
+      {"company": "Jive Software", "outcome": "Acquired at low price", "detail": "Enterprise social, high churn as Slack entered market."}
+    ],
+    "sources": ["David Skok SaaS benchmarks", "Bessemer NRR analysis"]
+  },
+  {
+    "pattern_id": "F-014",
+    "name": "Enterprise Sales Trapped in SMB",
+    "category": "go_to_market",
+    "stage_month_min": 18,
+    "stage_month_max": 48,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.08,
+      "ltv_cac_ratio_max": 3.0,
+      "nps_min": 45
+    },
+    "narrative": "SMB customers love the product but their LTV is too low to build a sustainable business. The company tries to move upmarket to enterprise, but the product, process, and team aren't ready. Enterprise deals take 9-18 months, SMB churn continues, and the company runs out of runway in the transition.",
+    "warning_signals": [
+      {"signal": "Average ACV below $5K with high churn", "days_before_failure": 180},
+      {"signal": "Enterprise pilots converting below 30%", "days_before_failure": 120},
+      {"signal": "Sales cycle exceeding 6 months for first enterprise deals", "days_before_failure": 90},
+      {"signal": "Product not ready for enterprise security/compliance requirements", "days_before_failure": 75}
+    ],
+    "survival_playbook": [
+      "Pick a lane: commit to SMB with volume model OR enterprise with ACV >$25K",
+      "If enterprise: hire an enterprise AE with 3+ references before building pipeline",
+      "Raise prices for SMB to improve unit economics — lower volume, better economics",
+      "Build enterprise requirements (SSO, audit logs, SLAs) before starting enterprise sales motion",
+      "Give yourself 24 months for the enterprise transition — it's slower than you think"
+    ],
+    "failure_count": 145,
+    "survival_count": 34,
+    "famous_failures": [
+      {"company": "Yast", "outcome": "Failed", "detail": "SMB scheduling tool tried to move to enterprise, ran out of runway in transition."},
+      {"company": "Several unnamed SaaS companies", "outcome": "Failed", "detail": "Classic pattern documented in SaaS benchmarks."}
+    ],
+    "sources": ["Jason Lemkin 'SaaStr' enterprise transition guidance", "OpenView SaaS benchmarks"]
+  },
+  {
+    "pattern_id": "F-015",
+    "name": "Founder-Market Fit Loss",
+    "category": "team",
+    "stage_month_min": 24,
+    "stage_month_max": 60,
+    "trigger_conditions": {
+      "mrr_growth_rate_max": 0.06,
+      "nps_max": 42,
+      "churn_rate_min": 0.07
+    },
+    "narrative": "The founder built what they personally needed, and that was enough to get to $1-2M ARR. But the market has moved, the ICP has shifted, and the founder is no longer the target customer. Growth stalls because the founder's intuition — once their superpower — is now leading them in the wrong direction.",
+    "warning_signals": [
+      {"signal": "Founder spending less time with customers", "days_before_failure": 180},
+      {"signal": "Product roadmap driven by intuition not data", "days_before_failure": 120},
+      {"signal": "Win rates declining in new customer segments", "days_before_failure": 90},
+      {"signal": "NPS dropping among newest customer cohorts", "days_before_failure": 60}
+    ],
+    "survival_playbook": [
+      "Do 20 customer interviews this month — not with old customers, with newest churned ones",
+      "Hire a Head of Product who is closer to the current customer than you are",
+      "Separate your personal opinions from user research — document everything",
+      "Consider whether the company needs a different type of leader for this phase",
+      "Build a systematic customer feedback loop — stop relying on founder intuition alone"
+    ],
+    "failure_count": 134,
+    "survival_count": 56,
+    "famous_failures": [
+      {"company": "Twitter", "outcome": "Declined (late)", "detail": "Multiple leadership issues rooted in founder vision vs. market reality."},
+      {"company": "Rdio", "outcome": "Failed", "detail": "Founders built what they wanted, not what the mass market needed."}
+    ],
+    "sources": ["Marc Andreessen PMF essay", "Ben Horowitz 'The Hard Thing About Hard Things'"]
+  }
+]

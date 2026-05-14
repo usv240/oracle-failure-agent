@@ -1,0 +1,12 @@
+﻿venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+env-cloud.yaml
+outputs/
+*.egg-info/
+.pytest_cache/
+plan/
+ORACLE_TODO.md
+gcloud

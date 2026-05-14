@@ -1,0 +1,44 @@
+{
+  "tools": [
+    {
+      "name": "analyze_metrics",
+      "description": "Submit startup metrics to detect matching failure patterns",
+      "endpoint": "POST /api/metrics/analyze",
+      "parameters": {
+        "startup_name": "string",
+        "current_month": "integer",
+        "mrr": "number",
+        "mrr_growth_rate": "number (e.g. 0.18 = 18%)",
+        "churn_rate": "number",
+        "burn_rate": "number",
+        "runway_months": "integer",
+        "headcount": "integer",
+        "nps": "integer",
+        "cac": "number",
+        "ltv": "number"
+      }
+    },
+    {
+      "name": "audit_decision",
+      "description": "Evaluate a proposed decision against historical failure cases",
+      "endpoint": "POST /api/audit/evaluate",
+      "parameters": {
+        "decision": "string — describe what the founder is considering",
+        "metrics": "object — current startup metrics (same fields as analyze_metrics)"
+      }
+    },
+    {
+      "name": "get_pattern_details",
+      "description": "Get full details of a specific failure pattern including playbook",
+      "endpoint": "GET /api/patterns/{pattern_id}",
+      "parameters": {
+        "pattern_id": "string — e.g. F-001"
+      }
+    },
+    {
+      "name": "list_all_patterns",
+      "description": "List all failure patterns in the library",
+      "endpoint": "GET /api/patterns/"
+    }
+  ]
+}
