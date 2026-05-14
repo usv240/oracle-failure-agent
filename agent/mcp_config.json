@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mongodb-atlas": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mongodb-js/mcp-server-mongodb",
+        "--connectionString",
+        "${MONGODB_URI}"
+      ],
+      "description": "MongoDB Atlas MCP server for failure pattern library queries"
+    }
+  }
+}
