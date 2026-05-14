@@ -6,6 +6,7 @@ import asyncio
 import json
 from pathlib import Path
 from backend.db.connection import get_db, close
+from backend.services.gemini import embed
 
 
 async def seed_patterns():
@@ -20,8 +21,15 @@ async def seed_patterns():
     # Drop existing and re-seed for idempotency
     await collection.drop()
 
+    # Generate embeddings for each pattern's narrative
+    print(f"Generating embeddings for {len(patterns)} patterns...")
+    for i, pattern in enumerate(patterns):
+        embed_text = f"{pattern['name']}: {pattern['narrative']}"
+        pattern["narrative_embedding"] = await embed(embed_text)
+        print(f"  [{i+1}/{len(patterns)}] {pattern['pattern_id']} embedded")
+
     result = await collection.insert_many(patterns)
-    print(f"✅ Seeded {len(result.inserted_ids)} failure patterns")
+    print(f"✅ Seeded {len(result.inserted_ids)} failure patterns with embeddings")
 
     # Create indexes
     await collection.create_index("pattern_id", unique=True)

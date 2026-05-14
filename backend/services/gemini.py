@@ -68,6 +68,25 @@ async def generate_json(prompt: str) -> str:
         return response.text
 
 
+async def embed(text: str) -> list[float]:
+    """Generate a 768-dim embedding using text-embedding-004 via Vertex AI."""
+    try:
+        client = _get_vertex_client()
+        response = client.models.embed_content(
+            model="text-embedding-004",
+            contents=text,
+        )
+        return response.embeddings[0].values
+    except Exception as e:
+        logger.warning("Vertex AI embed failed (%s), falling back to API key", e)
+        client = _get_api_key_client()
+        response = client.models.embed_content(
+            model="text-embedding-004",
+            contents=text,
+        )
+        return response.embeddings[0].values
+
+
 async def generate_json_fast(prompt: str) -> str:
     """Ask Gemini for a JSON response with thinking disabled (fast scoring path)."""
     config = types.GenerateContentConfig(

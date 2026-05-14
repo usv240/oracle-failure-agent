@@ -25,16 +25,48 @@ def _ltv_cac_ratio(metrics: MetricsInput) -> float:
 
 async def _candidate_patterns(metrics: MetricsInput) -> list[dict]:
     """
-    First-pass filter: pull patterns whose numeric trigger conditions
-    overlap with the startup's current metrics.
-    Returns up to 5 candidates.
+    Two-stage retrieval:
+    1. MongoDB Atlas Vector Search — semantic similarity on narrative embeddings
+    2. Fallback to numeric filter query if vector search fails or returns nothing
     """
     db = get_db()
+
+    # Stage 1: Vector Search using Gemini text-embedding-004
+    try:
+        query_text = (
+            f"startup failure: month {metrics.current_month}, "
+            f"churn {metrics.churn_rate*100:.0f}%, NPS {metrics.nps}, "
+            f"burn ${metrics.burn_rate:,.0f}/month, runway {metrics.runway_months} months, "
+            f"LTV:CAC {_ltv_cac_ratio(metrics):.1f}x, burn multiple {_burn_multiple(metrics):.1f}x"
+        )
+        query_vector = await gemini.embed(query_text)
+
+        pipeline = [
+            {
+                "$vectorSearch": {
+                    "index": "vector_index",
+                    "path": "narrative_embedding",
+                    "queryVector": query_vector,
+                    "numCandidates": 20,
+                    "limit": 3,
+                    "filter": {
+                        "stage_month_min": {"$lte": metrics.current_month},
+                        "stage_month_max": {"$gte": metrics.current_month},
+                    },
+                }
+            },
+            {"$project": {"narrative_embedding": 0}},  # exclude large vector from result
+        ]
+        results = await db["failure_patterns"].aggregate(pipeline).to_list(length=3)
+        if results:
+            return results
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Vector search failed (%s), using filter fallback", e)
+
+    # Stage 2: Numeric filter fallback
     burn_mult = _burn_multiple(metrics)
     ltv_cac = _ltv_cac_ratio(metrics)
-
-    # First-pass filter: stage month range + any one trigger condition signals a match.
-    # Each condition is separate in $or so a pattern only needs ONE field defined to qualify.
     query = {
         "stage_month_min": {"$lte": metrics.current_month},
         "stage_month_max": {"$gte": metrics.current_month},
@@ -48,8 +80,7 @@ async def _candidate_patterns(metrics: MetricsInput) -> list[dict]:
             {"trigger_conditions.runway_months_max": {"$gte": metrics.runway_months}},
         ],
     }
-
-    cursor = get_db()["failure_patterns"].find(query).limit(3)
+    cursor = db["failure_patterns"].find(query, {"narrative_embedding": 0}).limit(3)
     return await cursor.to_list(length=3)
 
 
