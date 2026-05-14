@@ -13,7 +13,7 @@ from backend.config import OUTPUT_PATH
 async def lifespan(app: FastAPI):
     # Startup
     await ping()
-    print("✅ MongoDB connected")
+    print("[OK] MongoDB connected")
     OUTPUT_PATH.mkdir(exist_ok=True)
     yield
     # Shutdown

@@ -8,8 +8,7 @@ router = APIRouter()
 async def list_patterns():
     db = get_db()
     patterns = await db["failure_patterns"].find(
-        {}, {"_id": 0, "pattern_id": 1, "name": 1, "category": 1,
-             "failure_count": 1, "survival_count": 1}
+        {}, {"_id": 0, "narrative_embedding": 0}
     ).to_list(length=100)
     return {"patterns": patterns, "total": len(patterns)}
 
