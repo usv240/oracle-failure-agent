@@ -271,6 +271,20 @@ function riskIcon(level) {
   return { LOW: '🟢', MEDIUM: '🟡', HIGH: '🔴', CRITICAL: '💀' }[level] || '⚠️';
 }
 
+// ── How It Works Modal ──────────────────────────────────────────
+function openHowItWorks() {
+  document.getElementById('hiw-overlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+function closeHowItWorks() {
+  document.getElementById('hiw-overlay').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+function closeIfBackdrop(e) {
+  if (e.target === document.getElementById('hiw-overlay')) closeHowItWorks();
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeHowItWorks(); });
+
 // ── Helpers ─────────────────────────────────────────────────────
 function val(id) { return document.getElementById(id)?.value || ''; }
 function num(id) { return parseFloat(document.getElementById(id)?.value) || 0; }

@@ -376,3 +376,192 @@ footer {
   font-size: 0.8rem;
   border-top: 1px solid var(--border);
 }
+.footer-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  padding: 0;
+}
+.footer-link:hover { color: var(--accent-h); }
+
+/* ── How It Works button in header ────────────────────────────── */
+.how-btn {
+  margin-top: 0.75rem;
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+.how-btn:hover { background: var(--accent); color: #fff; }
+
+/* ── How It Works Modal ────────────────────────────────────────── */
+.hiw-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 1rem;
+  overflow-y: auto;
+  backdrop-filter: blur(4px);
+}
+.hiw-overlay.hidden { display: none; }
+
+.hiw-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  max-width: 760px;
+  width: 100%;
+  padding: 2.5rem;
+  position: relative;
+}
+.hiw-close {
+  position: absolute;
+  top: 1rem; right: 1rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.hiw-close:hover { color: var(--text); border-color: var(--accent); }
+
+.hiw-hero {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+.hiw-logo { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+.hiw-hero h2 { font-size: 1.6rem; margin-bottom: 0.75rem; color: var(--text); }
+.hiw-hero p { color: var(--muted); max-width: 520px; margin: 0 auto; line-height: 1.6; }
+
+.hiw-steps { margin-bottom: 2rem; }
+.hiw-step {
+  display: flex;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.hiw-step:last-child { border-bottom: none; margin-bottom: 0; }
+.step-num {
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.95rem;
+}
+.step-body h4 { color: var(--text); margin-bottom: 0.4rem; font-size: 1rem; }
+.step-body p { color: var(--muted); font-size: 0.88rem; line-height: 1.6; margin-bottom: 0.5rem; }
+.tech-tag {
+  display: inline-block;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  margin: 0.2rem 0.2rem 0 0;
+}
+
+/* Architecture flow */
+.hiw-arch {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.hiw-arch h3 { font-size: 1rem; color: var(--text); margin-bottom: 1rem; }
+.arch-flow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.arch-box {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  text-align: center;
+  line-height: 1.4;
+}
+.arch-box small { color: var(--muted); display: block; font-size: 0.7rem; }
+.arch-arrow { color: var(--muted); font-size: 1.2rem; }
+
+/* Pattern library */
+.hiw-library { margin-bottom: 2rem; }
+.hiw-library h3 { color: var(--text); margin-bottom: 0.5rem; font-size: 1rem; }
+.hiw-library > p { color: var(--muted); font-size: 0.88rem; margin-bottom: 1rem; }
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.lib-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.lib-item strong { color: var(--text); display: block; margin-bottom: 0.2rem; }
+.pattern-categories { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.cat-tag {
+  background: rgba(124,58,237,0.15);
+  border: 1px solid rgba(124,58,237,0.3);
+  color: var(--accent);
+  font-size: 0.75rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 20px;
+}
+
+/* Tech stack */
+.hiw-stack { margin-bottom: 2rem; }
+.hiw-stack h3 { color: var(--text); margin-bottom: 1rem; font-size: 1rem; }
+.stack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+.stack-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+}
+.stack-icon { font-size: 1.6rem; margin-bottom: 0.4rem; }
+.stack-item strong { display: block; color: var(--text); font-size: 0.9rem; margin-bottom: 0.3rem; }
+.stack-item small { color: var(--muted); font-size: 0.78rem; line-height: 1.4; }
+
+.hiw-footer { text-align: center; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+.hiw-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+.hiw-link:hover { color: var(--accent-h); text-decoration: underline; }
