@@ -34,13 +34,16 @@ cp .env.example .env
 #   GEMINI_API_KEY    — from Google AI Studio (add to .env)
 ```
 
-### Step 4 — Seed the failure library
+### Step 4 — Seed the failure library (generates Gemini embeddings)
 ```bash
 python -m backend.db.seed
 # Expected output:
-# ✅ Seeded 30 failure patterns
+# Generating embeddings for 30 patterns...
+# ✅ Seeded 30 failure patterns with embeddings
 # ✅ Indexes created
 ```
+
+> **Note:** Seeding calls `text-embedding-004` via Vertex AI for each pattern. Requires `GOOGLE_PROJECT_ID` and application default credentials (`gcloud auth application-default login`).
 
 ### Step 5 — Run locally
 ```bash
@@ -56,13 +59,14 @@ python tests/test_oracle.py
 
 ---
 
-## How It Works
+## How It Works — 6-Step Agent Pipeline
 
-1. Founder inputs their current metrics (MRR, churn, burn, NPS, etc.)
-2. Agent queries MongoDB failure pattern library
-3. Gemini evaluates confidence of pattern match
-4. If >60% confidence: fires alert with playbook + saves to `outputs/`
-5. Founder can also audit decisions before making them
+1. **Vectorize** — Metrics converted to text and embedded with `text-embedding-004`
+2. **Vector Search** — MongoDB Atlas Vector Search (cosine similarity, 768 dims) retrieves top-3 semantically similar failure patterns
+3. **Score** — Gemini 2.5 Flash scores all 3 candidates **in parallel** (2-4s total)
+4. **Alert** — Pattern with >60% confidence fires: narrative, warning signals, survival playbook, historical outcomes
+5. **Audit** — Decision Auditor evaluates any proposed decision against historical failure cases
+6. **Output** — Downloadable markdown report, shareable URL, pattern library browser
 
 ---
 
