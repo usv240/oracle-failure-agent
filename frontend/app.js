@@ -579,6 +579,11 @@ function renderPatternGrid(patterns) {
       `<span class="pc-failure-tag">💀 ${f.company}</span>`
     ).join('');
 
+    // Sources
+    const sources = (p.sources || []).map(s =>
+      `<span class="pc-source-tag">📚 ${s}</span>`
+    ).join('');
+
     return `
       <div class="pattern-card" onclick="togglePatternDetail(this)">
         <div class="pc-top">
@@ -599,6 +604,7 @@ function renderPatternGrid(patterns) {
           ${signals ? `<div class="pc-section"><div class="pc-section-title">⚡ Early Warning Signals</div><ul class="pc-signal-list">${signals}</ul></div>` : ''}
           ${playbook ? `<div class="pc-section"><div class="pc-section-title">🛡️ Survival Playbook</div><ul class="pc-playbook-list">${playbook}</ul></div>` : ''}
           ${failures ? `<div class="pc-section"><div class="pc-section-title">🏢 Known Cases</div><div class="pc-failures">${failures}</div></div>` : ''}
+          ${sources ? `<div class="pc-section"><div class="pc-section-title">📚 Sources</div><div class="pc-sources">${sources}</div></div>` : ''}
         </div>
         <div class="pc-expand-hint">Click to expand ▾</div>
       </div>`;
@@ -613,10 +619,46 @@ function togglePatternDetail(card) {
   if (hint) hint.textContent = card.classList.contains('expanded') ? 'Click to collapse ▴' : 'Click to expand ▾';
 }
 
+// ── Category survival chart for How It Works ────────────────────
+function renderCatChart() {
+  const container = document.getElementById('hiw-cat-bars');
+  if (!container || !_allPatterns.length) return;
+
+  // Aggregate by category
+  const cats = {};
+  _allPatterns.forEach(p => {
+    const cat = CAT_LABELS[p.category] || p.category;
+    if (!cats[cat]) cats[cat] = { failed: 0, survived: 0 };
+    cats[cat].failed   += p.failure_count  || 0;
+    cats[cat].survived += p.survival_count || 0;
+  });
+
+  const sorted = Object.entries(cats)
+    .map(([cat, d]) => {
+      const total = d.failed + d.survived;
+      return { cat, total, survRate: total > 0 ? Math.round(d.survived / total * 100) : 0 };
+    })
+    .sort((a, b) => a.survRate - b.survRate);
+
+  container.innerHTML = sorted.map(({ cat, total, survRate }) => {
+    const color = survRate < 15 ? '#ef4444' : survRate < 25 ? '#f59e0b' : '#10b981';
+    return `
+      <div class="cat-bar-row">
+        <div class="cat-bar-label">${cat}</div>
+        <div class="cat-bar-track">
+          <div class="cat-bar-fill" style="width:${survRate}%;background:${color}"></div>
+        </div>
+        <div class="cat-bar-pct" style="color:${color}">${survRate}%</div>
+        <div class="cat-bar-cases">${total} cases</div>
+      </div>`;
+  }).join('');
+}
+
 // ── How It Works Modal ──────────────────────────────────────────
 function openHowItWorks() {
   document.getElementById('hiw-overlay').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  setTimeout(renderCatChart, 100);
 }
 function closeHowItWorks() {
   document.getElementById('hiw-overlay').classList.add('hidden');

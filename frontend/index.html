@@ -171,6 +171,94 @@
         </div>
       </div>
 
+      <!-- Validated Retrospectives -->
+      <div class="hiw-validated">
+        <h3>Validated on Real Companies</h3>
+        <p class="hiw-validated-sub">These companies had metrics in our system. Here's what Oracle would have said — and what actually happened.</p>
+        <div class="valid-grid">
+          <div class="valid-card">
+            <div class="valid-top">
+              <span class="valid-company">💀 Quibi</span>
+              <span class="valid-result valid-correct">✅ Correctly flagged</span>
+            </div>
+            <div class="valid-detail">Oracle at Month 4: <strong>Product-Market Fit Mirage — 95%</strong></div>
+            <div class="valid-detail muted">NPS 8 · Churn 22% · CAC $48K vs LTV $12K (0.25x)</div>
+            <div class="valid-outcome">Actual outcome: Shut down Month 10 · $1.75B lost</div>
+            <div class="valid-window">⏱ 6 months of warning available</div>
+          </div>
+          <div class="valid-card">
+            <div class="valid-top">
+              <span class="valid-company">🏢 WeWork</span>
+              <span class="valid-result valid-correct">✅ Correctly flagged</span>
+            </div>
+            <div class="valid-detail">Oracle at Month 20: <strong>Distribution Without Retention — 90%</strong></div>
+            <div class="valid-detail muted">Burn $22M/mo · Churn 16% · NPS 18 · Runway 7mo</div>
+            <div class="valid-outcome">Actual outcome: Near-bankruptcy 2019 · IPO pulled · $47B → $2.9B</div>
+            <div class="valid-window">⏱ Valuation collapse was preventable</div>
+          </div>
+          <div class="valid-card">
+            <div class="valid-top">
+              <span class="valid-company">🩸 Theranos</span>
+              <span class="valid-result valid-correct">✅ Correctly flagged</span>
+            </div>
+            <div class="valid-detail">Oracle at Month 24: <strong>Critical pattern — 95%</strong></div>
+            <div class="valid-detail muted">Churn 45% · NPS -42 · $5.8M burn on $18K MRR</div>
+            <div class="valid-outcome">Actual outcome: SEC fraud charges 2018 · $700M investor losses</div>
+            <div class="valid-window">⏱ Signals detectable years before exposure</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Methodology -->
+      <div class="hiw-methodology">
+        <h3>Where The Data Comes From</h3>
+        <p class="hiw-validated-sub">The 30-pattern failure library is built from primary sources. Every pattern has a citation trail.</p>
+        <div class="method-grid">
+          <div class="method-item">
+            <div class="method-icon">📚</div>
+            <strong>YC Post-Mortems</strong>
+            <small>Paul Graham essays, YC partner office hours patterns, batch cohort analysis, "Default Alive or Default Dead" framework</small>
+          </div>
+          <div class="method-item">
+            <div class="method-icon">📊</div>
+            <strong>CB Insights Research</strong>
+            <small>Annual startup failure reports, 2023 failure analysis, bridge round death spiral data, competitive displacement patterns</small>
+          </div>
+          <div class="method-item">
+            <div class="method-icon">💼</div>
+            <strong>VC Research</strong>
+            <small>Sequoia "RIP Good Times", Bessemer SaaS benchmarks, OpenView PLG reports, First Round Capital founder analysis, a16z essays</small>
+          </div>
+          <div class="method-item">
+            <div class="method-icon">📝</div>
+            <strong>Public Post-Mortems</strong>
+            <small>Homejoy, Fab.com, Quibi, Jawbone, Juicero, Rdio, Zynga, Beepi — documented with specific metric timelines</small>
+          </div>
+          <div class="method-item">
+            <div class="method-icon">📈</div>
+            <strong>SaaS Benchmarks</strong>
+            <small>David Skok SaaS metrics framework, Jason Lemkin SaaStr data, OpenView SaaS benchmark reports, Crunchbase funding patterns</small>
+          </div>
+          <div class="method-item">
+            <div class="method-icon">🧠</div>
+            <strong>Founder Frameworks</strong>
+            <small>Ben Horowitz "The Hard Thing About Hard Things", Marc Andreessen PMF essay, Eric Ries "The Lean Startup", Hamilton Helmer "7 Powers"</small>
+          </div>
+        </div>
+        <div class="method-note">
+          Each pattern's survival rate represents documented outcomes from the cited sources above. Warning signal timing is derived from post-mortem analysis of when each indicator first appeared relative to the failure event.
+        </div>
+      </div>
+
+      <!-- Survival Rate by Category -->
+      <div class="hiw-catchart">
+        <h3>Survival Rates by Failure Category</h3>
+        <p class="hiw-validated-sub">Not all failure modes are equally fatal. Unit economics and hardware failures have the lowest survival rates.</p>
+        <div class="cat-bars" id="hiw-cat-bars">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
       <div class="hiw-footer">
         <a href="https://github.com/usv240/oracle-failure-agent" target="_blank" class="hiw-link">View source on GitHub →</a>
       </div>

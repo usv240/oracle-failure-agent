@@ -884,6 +884,103 @@ footer {
 .stack-item strong { display: block; color: var(--text); font-size: 0.9rem; margin-bottom: 0.3rem; }
 .stack-item small { color: var(--muted); font-size: 0.78rem; line-height: 1.4; }
 
+/* ── Validated Retrospectives ───────────────────────────────────── */
+.hiw-validated, .hiw-methodology, .hiw-catchart {
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+.hiw-validated h3, .hiw-methodology h3, .hiw-catchart h3 {
+  color: var(--text);
+  font-size: 1rem;
+  margin-bottom: 0.4rem;
+}
+.hiw-validated-sub {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+.valid-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+.valid-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.9rem;
+}
+.valid-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.valid-company { font-weight: 700; font-size: 0.9rem; color: var(--text); }
+.valid-result { font-size: 0.72rem; padding: 2px 7px; border-radius: 10px; }
+.valid-correct { background: rgba(16,185,129,0.1); color: var(--safe); border: 1px solid #065f46; }
+.valid-detail { font-size: 0.82rem; color: var(--text); margin-bottom: 0.2rem; }
+.valid-detail.muted { color: var(--muted); font-size: 0.78rem; }
+.valid-outcome { font-size: 0.78rem; color: var(--danger); margin-top: 0.4rem; }
+.valid-window { font-size: 0.75rem; color: #a78bfa; margin-top: 0.3rem; }
+
+/* ── Methodology ────────────────────────────────────────────────── */
+.method-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+.method-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+.method-icon { font-size: 1.2rem; margin-bottom: 0.3rem; }
+.method-item strong { display: block; color: var(--text); font-size: 0.85rem; margin-bottom: 0.2rem; }
+.method-item small { color: var(--muted); font-size: 0.75rem; line-height: 1.5; }
+.method-note {
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: var(--surface2);
+  border-left: 2px solid var(--accent);
+  padding: 0.6rem 0.8rem;
+  border-radius: 0 6px 6px 0;
+  line-height: 1.6;
+}
+
+/* ── Category chart ─────────────────────────────────────────────── */
+.cat-bar-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 44px 70px;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+.cat-bar-label { font-size: 0.8rem; color: var(--muted); text-align: right; }
+.cat-bar-track {
+  background: var(--surface2);
+  border-radius: 4px;
+  height: 10px;
+  overflow: hidden;
+}
+.cat-bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease; }
+.cat-bar-pct { font-size: 0.8rem; font-weight: 700; }
+.cat-bar-cases { font-size: 0.72rem; color: var(--muted); }
+
+/* ── Pattern card source tags ───────────────────────────────────── */
+.pc-sources { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.pc-source-tag {
+  font-size: 0.7rem;
+  background: rgba(99,102,241,0.1);
+  border: 1px solid rgba(99,102,241,0.2);
+  color: #a5b4fc;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
 .hiw-footer { text-align: center; padding-top: 1.5rem; border-top: 1px solid var(--border); }
 .hiw-link {
   color: var(--accent);
