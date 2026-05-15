@@ -29,13 +29,13 @@ async def seed_patterns():
         print(f"  [{i+1}/{len(patterns)}] {pattern['pattern_id']} embedded")
 
     result = await collection.insert_many(patterns)
-    print(f"✅ Seeded {len(result.inserted_ids)} failure patterns with embeddings")
+    print(f"[OK] Seeded {len(result.inserted_ids)} failure patterns with embeddings")
 
     # Create indexes
     await collection.create_index("pattern_id", unique=True)
     await collection.create_index("category")
     await collection.create_index([("stage_month_min", 1), ("stage_month_max", 1)])
-    print("✅ Indexes created")
+    print("[OK] Indexes created")
 
     await close()
 

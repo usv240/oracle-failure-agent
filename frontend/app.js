@@ -152,6 +152,13 @@ function fillDemo(type) {
   });
 }
 
+function toggleGlossary() {
+  const body = document.getElementById('glossary-body');
+  const toggle = document.getElementById('glossary-toggle');
+  body.classList.toggle('hidden');
+  toggle.textContent = body.classList.contains('hidden') ? 'Show ▾' : 'Hide ▴';
+}
+
 // ── Form Submit ─────────────────────────────────────────────────
 document.getElementById('metrics-form').addEventListener('submit', async (e) => {
   e.preventDefault();

@@ -17,11 +17,15 @@ from backend.db.schemas import MetricsInput
 
 MONGODB_URI = os.environ.get("MONGODB_URI", "")
 
-# MongoDB Atlas MCP server — provides direct MongoDB tool access
+# Pass URI via env var — avoids shell parsing issues with ? & in URI
+_mcp_env = {**os.environ, "MDB_MCP_CONNECTION_STRING": MONGODB_URI}
+
+# MongoDB Atlas MCP server — uses globally installed binary (mongodb-mcp-server@1.9.0)
 mongodb_mcp = MCPToolset(
     connection_params=StdioServerParameters(
-        command="npx",
-        args=["-y", "@mongodb-js/mcp-server-mongodb", "--connectionString", MONGODB_URI],
+        command="mongodb-mcp-server",
+        args=[],
+        env=_mcp_env,
     )
 )
 

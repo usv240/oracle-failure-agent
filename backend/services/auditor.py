@@ -1,16 +1,52 @@
-"""Decision auditor — evaluates a proposed decision against historical patterns."""
+"""Decision auditor — evaluates a proposed decision against historical patterns.
+
+Pattern fetch uses MongoDB MCP server (primary) with Motor fallback.
+"""
 import json
+import logging
 from backend.db.connection import get_db
 from backend.db.schemas import MetricsInput, AuditResponse
 from backend.services import gemini
 from backend.services.pattern_matcher import _burn_multiple, _ltv_cac_ratio
+from backend.services.mcp_client import mcp
+
+logger = logging.getLogger(__name__)
+
+
+async def _fetch_patterns_for_audit() -> list[dict]:
+    """
+    Fetch failure patterns for decision auditing.
+    Primary: MongoDB MCP (uses mcp_find / find tool).
+    Fallback: Motor direct driver.
+    """
+    if mcp.available:
+        try:
+            patterns = await mcp.find(
+                "failure_patterns",
+                projection={"_id": 0, "narrative_embedding": 0, "warning_signals": 0,
+                            "survival_playbook": 0, "famous_failures": 0},
+                limit=100,
+            )
+            logger.info("[MCP] audit fetched %d patterns via MCP", len(patterns))
+            return patterns
+        except Exception as e:
+            logger.warning("[MCP] audit pattern fetch failed: %s — falling back to Motor", e)
+
+    # Motor fallback
+    db = get_db()
+    patterns = await db["failure_patterns"].find(
+        {},
+        {"_id": 0, "narrative_embedding": 0, "warning_signals": 0,
+         "survival_playbook": 0, "famous_failures": 0}
+    ).to_list(length=100)
+    logger.info("[Motor] audit fetched %d patterns via Motor fallback", len(patterns))
+    return patterns
 
 
 async def audit_decision(decision: str, metrics: MetricsInput) -> AuditResponse:
-    db = get_db()
+    # Fetch patterns via MCP (or Motor fallback)
+    patterns = await _fetch_patterns_for_audit()
 
-    # Fetch all patterns to reason over
-    patterns = await db["failure_patterns"].find({}).to_list(length=50)
     pattern_names = [
         f"- {p['pattern_id']}: {p['name']} — {p['narrative'][:120]}..."
         for p in patterns
@@ -33,7 +69,7 @@ CURRENT STARTUP STATE:
 - LTV:CAC: {_ltv_cac_ratio(metrics):.1f}x
 - Burn multiple: {_burn_multiple(metrics):.1f}x
 
-KNOWN FAILURE PATTERNS (for context):
+KNOWN FAILURE PATTERNS ({len(patterns)} documented patterns):
 {chr(10).join(pattern_names)}
 
 Evaluate this decision and return JSON with exactly these fields:

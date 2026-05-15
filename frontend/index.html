@@ -267,9 +267,32 @@
 
   <main>
 
+    <!-- ── Welcome Banner ───────────────────────────────────────── -->
+    <section class="welcome-banner" id="welcome-banner">
+      <div class="wb-steps">
+        <div class="wb-step">
+          <div class="wb-num">1</div>
+          <div class="wb-text"><strong>Load a scenario</strong><br>Use a real company preset or enter your own metrics</div>
+        </div>
+        <div class="wb-arrow">→</div>
+        <div class="wb-step">
+          <div class="wb-num">2</div>
+          <div class="wb-text"><strong>Run Pattern Analysis</strong><br>AI agent searches 30 documented failure patterns</div>
+        </div>
+        <div class="wb-arrow">→</div>
+        <div class="wb-step">
+          <div class="wb-num">3</div>
+          <div class="wb-text"><strong>Read your playbook</strong><br>Get early warnings + the exact steps to survive</div>
+        </div>
+      </div>
+      <div class="wb-tip">💡 <strong>First time?</strong> Click <strong>💀 Quibi</strong> below to see the Oracle detect a $1.75B failure in real-time.</div>
+      <button class="wb-dismiss" onclick="document.getElementById('welcome-banner').style.display='none'">Got it, dismiss ✕</button>
+    </section>
+
     <!-- ── Metrics Input ────────────────────────────────────────── -->
     <section class="card" id="input-section">
       <h2>Your Current Metrics</h2>
+      <p class="section-desc" style="margin-bottom:1.2rem">Enter your startup's numbers below. Not sure what some mean? Hover the <span style="color:var(--accent)">ⓘ</span> icons. Or skip to the demo presets at the bottom.</p>
       <form id="metrics-form">
         <div class="form-grid">
           <div class="field">
@@ -382,14 +405,48 @@
         </button>
       </form>
 
-      <!-- Quick demo fill -->
-      <div class="demo-bar">
-        <span class="demo-label">Load real scenario:</span>
-        <button class="demo-btn demo-safe"    onclick="fillDemo('healthy')">✅ Healthy</button>
-        <button class="demo-btn demo-warn"    onclick="fillDemo('warning')">⚠️ Danger Zone</button>
-        <button class="demo-btn demo-dead"    onclick="fillDemo('quibi')">💀 Quibi</button>
-        <button class="demo-btn demo-dead"    onclick="fillDemo('wework')">🏢 WeWork</button>
-        <button class="demo-btn demo-dead"    onclick="fillDemo('theranos')">🩸 Theranos</button>
+      <!-- Demo presets with context -->
+      <div class="demo-section">
+        <div class="demo-section-header">
+          <span class="demo-label">⚡ Load a real scenario — see exactly what the Oracle would have said:</span>
+        </div>
+        <div class="demo-cards">
+          <button class="demo-card demo-card-safe" onclick="fillDemo('healthy')">
+            <div class="dc-icon">✅</div>
+            <div class="dc-body">
+              <div class="dc-name">Healthy Startup</div>
+              <div class="dc-desc">Good metrics — see what a safe result looks like</div>
+            </div>
+          </button>
+          <button class="demo-card demo-card-warn" onclick="fillDemo('warning')">
+            <div class="dc-icon">⚠️</div>
+            <div class="dc-body">
+              <div class="dc-name">Danger Zone</div>
+              <div class="dc-desc">Runway shrinking, churn rising — early warning</div>
+            </div>
+          </button>
+          <button class="demo-card demo-card-dead" onclick="fillDemo('quibi')">
+            <div class="dc-icon">💀</div>
+            <div class="dc-body">
+              <div class="dc-name">Quibi</div>
+              <div class="dc-desc">$1.75B raised · Shut down in 6 months · NPS 8</div>
+            </div>
+          </button>
+          <button class="demo-card demo-card-dead" onclick="fillDemo('wework')">
+            <div class="dc-icon">🏢</div>
+            <div class="dc-body">
+              <div class="dc-name">WeWork</div>
+              <div class="dc-desc">$22M/mo burn · $47B → $2.9B · Near-bankruptcy</div>
+            </div>
+          </button>
+          <button class="demo-card demo-card-dead" onclick="fillDemo('theranos')">
+            <div class="dc-icon">🩸</div>
+            <div class="dc-body">
+              <div class="dc-name">Theranos</div>
+              <div class="dc-desc">$700M raised · NPS -42 · Fraud collapse</div>
+            </div>
+          </button>
+        </div>
       </div>
 
       <!-- Agent Terminal (hidden by default) -->
@@ -398,6 +455,61 @@
           <span class="terminal-title">⚡ Agent Execution Log</span>
         </div>
         <div class="terminal-body" id="terminal-body"></div>
+      </div>
+    </section>
+
+    <!-- ── Glossary ──────────────────────────────────────────────── -->
+    <section class="card glossary-card" id="glossary-section">
+      <div class="glossary-header" onclick="toggleGlossary()">
+        <span>📖 Metrics Glossary — what do these numbers mean?</span>
+        <span class="glossary-toggle" id="glossary-toggle">Show ▾</span>
+      </div>
+      <div class="glossary-body hidden" id="glossary-body">
+        <div class="glossary-grid">
+          <div class="gloss-item">
+            <div class="gloss-term">MRR</div>
+            <div class="gloss-def">Monthly Recurring Revenue — your total subscription revenue per month. If 100 customers pay $100/mo, MRR = $10,000.</div>
+            <div class="gloss-bench">Healthy early-stage: growing 15%+ per month</div>
+          </div>
+          <div class="gloss-item">
+            <div class="gloss-term">Monthly Growth Rate</div>
+            <div class="gloss-def">How fast your MRR grows each month. Enter as decimal: 0.18 = 18% monthly growth. "Triple, triple, double, double" = ~15% monthly.</div>
+            <div class="gloss-bench">Good: &gt;15% · Warning: 8–15% · Danger: &lt;8%</div>
+          </div>
+          <div class="gloss-item">
+            <div class="gloss-term">Churn Rate</div>
+            <div class="gloss-def">The % of customers who cancel each month. If 100 customers and 5 cancel, churn = 5% (enter 0.05). High churn means a leaky bucket — you acquire and immediately lose customers.</div>
+            <div class="gloss-bench">Good: &lt;5% · Warning: 5–8% · Danger: &gt;8%</div>
+          </div>
+          <div class="gloss-item">
+            <div class="gloss-term">Burn Rate</div>
+            <div class="gloss-def">Net cash spent per month — your expenses minus revenue. If you spend $200K and earn $80K, burn = $120K/mo. This is how fast you're spending your funding.</div>
+            <div class="gloss-bench">Should decrease relative to MRR as you scale</div>
+          </div>
+          <div class="gloss-item">
+            <div class="gloss-term">Runway</div>
+            <div class="gloss-def">Months until you run out of cash = Cash in bank ÷ Monthly burn. 8 months means you have 8 months to raise, grow to profitability, or cut costs.</div>
+            <div class="gloss-bench">Good: &gt;18mo · Warning: 9–18mo · Danger: &lt;9mo</div>
+          </div>
+          <div class="gloss-item">
+            <div class="gloss-term">NPS (Net Promoter Score)</div>
+            <div class="gloss-def">Customer love metric (-100 to +100). Ask "How likely are you to recommend us?" Promoters (9-10) minus Detractors (0-6). Below 0 means more unhappy customers than happy ones.</div>
+            <div class="gloss-bench">Good: &gt;50 · Warning: 30–50 · Danger: &lt;30</div>
+          </div>
+          <div class="gloss-item">
+            <div class="gloss-term">CAC</div>
+            <div class="gloss-def">Customer Acquisition Cost — total sales + marketing spend ÷ new customers acquired that month. If you spend $50K and get 10 customers, CAC = $5,000.</div>
+            <div class="gloss-bench">CAC should be &lt;⅓ of LTV for healthy unit economics</div>
+          </div>
+          <div class="gloss-item">
+            <div class="gloss-term">LTV</div>
+            <div class="gloss-def">Lifetime Value — total revenue you'll earn from one customer. Simple formula: Average monthly revenue per customer ÷ Monthly churn rate. $200/mo ÷ 5% churn = $4,000 LTV.</div>
+            <div class="gloss-bench">LTV:CAC ratio should be &gt;3x for sustainable growth</div>
+          </div>
+        </div>
+        <div class="gloss-note">
+          💡 <strong>Don't have exact numbers?</strong> Use your best estimates. Even rough numbers trigger meaningful pattern matches. The Oracle is designed for directional accuracy, not accounting precision.
+        </div>
       </div>
     </section>
 
@@ -415,6 +527,18 @@
             <div class="bar-wrap"><div class="bar-fill" id="conf-bar"></div></div>
             <span id="conf-pct"></span>
           </div>
+        </div>
+      </div>
+
+      <!-- Result interpretation guide -->
+      <div class="result-guide">
+        <div class="rg-item">
+          <span class="rg-icon">🎯</span>
+          <div><strong>What does the confidence % mean?</strong> Of all startups in our database that matched this pattern, this % had the same outcome. 95% means 95 out of 100 similar startups followed this exact trajectory.</div>
+        </div>
+        <div class="rg-item">
+          <span class="rg-icon">⚠️</span>
+          <div><strong>Warning signals</strong> are already visible in your data right now — they were present in every startup that matched this pattern before failure. The sooner you act on these, the more time you have.</div>
         </div>
       </div>
 
@@ -460,6 +584,17 @@
       <div class="early-warning-banner hidden" id="early-warning-banner">
         <span class="ew-icon">⏱️</span>
         <span id="early-warning-text"></span>
+      </div>
+
+      <!-- What to do next -->
+      <div class="what-next">
+        <div class="wn-header">✅ What to do right now</div>
+        <div class="wn-steps">
+          <div class="wn-step"><span class="wn-num">1</span><span>Read the survival playbook above — these are the exact actions that worked for the 13% who survived</span></div>
+          <div class="wn-step"><span class="wn-num">2</span><span>Use the <strong>Decision Auditor</strong> below — before your next big decision, ask the Oracle if it's safe</span></div>
+          <div class="wn-step"><span class="wn-num">3</span><span>Download your report and share it with your co-founder or board today</span></div>
+          <div class="wn-step"><span class="wn-num">4</span><span>Re-run this analysis monthly — patterns escalate fast once they start</span></div>
+        </div>
       </div>
 
       <!-- Report actions -->

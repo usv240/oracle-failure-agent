@@ -7,16 +7,24 @@ from pathlib import Path
 from backend.db.connection import ping, close
 from backend.routes import metrics, audit, patterns
 from backend.config import OUTPUT_PATH
+from backend.services.mcp_client import mcp
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     await ping()
-    print("[OK] MongoDB connected")
+    print("[OK] MongoDB connected (Motor)")
     OUTPUT_PATH.mkdir(exist_ok=True)
+    # Start MongoDB MCP server in background
+    await mcp.start()
+    if mcp.available:
+        print(f"[OK] MongoDB MCP server ready ({len(mcp._tool_names)} tools)")
+    else:
+        print("[WARN] MongoDB MCP unavailable — Motor fallback active")
     yield
     # Shutdown
+    await mcp.stop()
     await close()
 
 
