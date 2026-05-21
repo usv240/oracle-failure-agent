@@ -9,4 +9,17 @@ outputs/
 .pytest_cache/
 plan/
 ORACLE_TODO.md
+DEVPOST_SUBMISSION.md
 gcloud
+# One-off dev scripts
+frontend/educate.py
+frontend/update.py
+frontend/ux_overhaul.py
+tests/test_oracle.py
+tests/reports/
+# Dev/exploratory scripts
+agent/
+# IDE
+.vscode/
+.idea/
+*.DS_Store

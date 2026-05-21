@@ -1,0 +1,314 @@
+"""
+ADK (Agent Development Kit) runner for startup failure analysis.
+
+The ADK agent orchestrates the analysis pipeline:
+  1. Calls analyze_startup_metrics tool → embed + vector search + Gemini scoring
+  2. Returns the highest-confidence failure pattern (or safe result)
+
+This makes Google ADK genuinely in the critical path for the /api/metrics/analyze
+endpoint. The SSE streaming endpoint uses the same underlying tools directly for
+real-time step-by-step visibility.
+"""
+import json
+import uuid
+import logging
+from typing import Optional
+
+from google.adk.agents import Agent
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.adk.tools import FunctionTool
+from google.genai import types
+
+from backend.db.schemas import MetricsInput, PatternMatch, WarningSig
+
+logger = logging.getLogger(__name__)
+
+# Configure ADK to use the Gemini API key for Gemini 3 models.
+# Gemini 3 (gemini-3-flash-preview) is only available via the public Gemini API,
+# not yet on Vertex AI for this project.
+# Note: gemini.py uses explicit genai.Client(vertexai=True, ...) so it is
+# completely unaffected by these env vars — it always hits Vertex AI directly.
+def _configure_adk_auth() -> None:
+    import os
+    try:
+        from backend.config import settings
+        if settings.GEMINI_API_KEY:
+            os.environ["GOOGLE_API_KEY"] = settings.GEMINI_API_KEY
+        # Do NOT set GOOGLE_GENAI_USE_VERTEXAI — Gemini 3 only available via API key
+        os.environ.pop("GOOGLE_GENAI_USE_VERTEXAI", None)
+    except Exception:
+        pass
+
+_configure_adk_auth()
+
+# ── Tool result capture ──────────────────────────────────────────────────────
+# The ADK agent calls our tool and we capture the structured result here.
+# Each run uses a unique key to avoid cross-request contamination.
+_results: dict[str, dict] = {}
+
+
+async def _analyze_startup_metrics(
+    startup_name: str,
+    current_month: int,
+    mrr: float,
+    mrr_growth_rate: float,
+    churn_rate: float,
+    burn_rate: float,
+    runway_months: int,
+    headcount: int,
+    nps: int,
+    cac: float,
+    ltv: float,
+    industry: str = "B2B SaaS",
+    _result_key: str = "",
+) -> str:
+    """
+    Analyze startup metrics against the failure pattern library.
+    Uses MongoDB Atlas Vector Search + Gemini 3 Flash scoring.
+    Orchestrated by Gemini 3 Flash (gemini-3-flash-preview) via Google ADK.
+    Returns the best-matching failure pattern with survival playbook, or safe result.
+    """
+    from backend.services.pattern_matcher import match_patterns
+
+    metrics = MetricsInput(
+        startup_name=startup_name, current_month=current_month,
+        mrr=mrr, mrr_growth_rate=mrr_growth_rate, churn_rate=churn_rate,
+        burn_rate=burn_rate, runway_months=runway_months, headcount=headcount,
+        nps=nps, cac=cac, ltv=ltv, industry=industry,
+    )
+    match = await match_patterns(metrics)
+
+    if match is None:
+        result = {"alert": False, "startup_name": startup_name,
+                  "message": "No dangerous failure patterns detected. Metrics look healthy."}
+    else:
+        result = {
+            "alert": True,
+            "startup_name": startup_name,
+            "pattern": match.model_dump(),
+            "message": f"Pattern detected: {match.pattern_name} at {int(match.confidence*100)}%",
+        }
+
+    if _result_key:
+        _results[_result_key] = result
+
+    return json.dumps({"status": "complete", "alert": result["alert"],
+                       "pattern_name": result.get("pattern", {}).get("pattern_name", "none"),
+                       "confidence": result.get("pattern", {}).get("confidence", 0)})
+
+
+async def _save_analysis_report(
+    startup_name: str,
+    alert: bool,
+    pattern_name: str = "",
+    confidence: float = 0.0,
+    recommendation: str = "",
+    category_insight: str = "",
+) -> str:
+    """
+    Save a structured analysis report to disk.
+    Called by the ADK agent after pattern analysis to persist findings.
+    Demonstrates action execution — the agent doesn't just answer, it writes artefacts.
+    """
+    from backend.config import OUTPUT_PATH
+    from datetime import datetime
+    import re
+
+    safe_name = re.sub(r'[^a-z0-9-]', '-', startup_name.lower())[:30]
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    fname = OUTPUT_PATH / f"report_{safe_name}_{ts}.md"
+    OUTPUT_PATH.mkdir(exist_ok=True)
+
+    status = "ALERT" if alert else "SAFE"
+    content = f"""# Oracle Analysis Report — {startup_name}
+Generated: {datetime.utcnow().isoformat()}Z
+Status: {status}
+"""
+    if alert and pattern_name:
+        content += f"""Pattern: {pattern_name}
+Confidence: {int(confidence*100)}%
+"""
+    if recommendation:
+        content += f"\n## Recommendation\n{recommendation}\n"
+    if category_insight:
+        content += f"\n## Category Intelligence\n{category_insight}\n"
+    content += "\n---\n*Generated by The Failure Oracle ADK Agent*\n"
+
+    fname.write_text(content, encoding="utf-8")
+    logger.info("[ADK] Report saved: %s", fname.name)
+    return json.dumps({"saved": True, "file": fname.name, "status": status})
+
+
+async def _fetch_category_benchmarks(category: str) -> str:
+    """
+    Fetch survival statistics for a failure pattern category from MongoDB.
+    Called by the ADK agent after analysis to enrich the report with category context.
+    Returns: total patterns in category, aggregate survival rate, most dangerous pattern.
+    """
+    from backend.db.connection import get_db
+    db = get_db()
+    try:
+        pipeline = [
+            {"$match": {"category": category}},
+            {"$group": {
+                "_id": "$category",
+                "pattern_count": {"$sum": 1},
+                "total_failures": {"$sum": "$failure_count"},
+                "total_survivals": {"$sum": "$survival_count"},
+                "avg_survival_rate": {"$avg": {
+                    "$cond": [
+                        {"$gt": [{"$add": ["$failure_count", "$survival_count"]}, 0]},
+                        {"$divide": ["$survival_count",
+                                     {"$add": ["$failure_count", "$survival_count"]}]},
+                        0
+                    ]
+                }},
+                "patterns": {"$push": {"name": "$name", "survival_count": "$survival_count",
+                                        "failure_count": "$failure_count"}},
+            }}
+        ]
+        results = await db["failure_patterns"].aggregate(pipeline).to_list(length=1)
+        if not results:
+            return json.dumps({"error": f"No patterns found for category: {category}"})
+
+        row = results[0]
+        total_cases = row["total_failures"] + row["total_survivals"]
+        survival_pct = round(row["avg_survival_rate"] * 100, 1)
+
+        # Find the most dangerous pattern (lowest survival rate)
+        worst = min(
+            row["patterns"],
+            key=lambda p: p["survival_count"] / max(p["failure_count"] + p["survival_count"], 1)
+        )
+
+        return json.dumps({
+            "category": category,
+            "pattern_count": row["pattern_count"],
+            "total_documented_cases": total_cases,
+            "category_survival_rate_pct": survival_pct,
+            "most_dangerous_pattern": worst["name"],
+            "summary": (
+                f"The '{category}' category has {row['pattern_count']} documented failure patterns "
+                f"across {total_cases} cases. Category survival rate: {survival_pct}%. "
+                f"Most dangerous pattern: '{worst['name']}'."
+            )
+        })
+    except Exception as e:
+        logger.warning("[ADK] fetch_category_benchmarks failed: %s", e)
+        return json.dumps({"error": str(e)})
+
+
+# ── Agent singleton ──────────────────────────────────────────────────────────
+
+_agent: Optional[Agent] = None
+_runner: Optional[Runner] = None
+_session_service: Optional[InMemorySessionService] = None
+
+_AGENT_INSTRUCTION = """You are the Failure Oracle — an AI agent that detects startup failure patterns
+before they become fatal. You have three tools:
+
+1. analyze_startup_metrics — analyzes metrics against the failure pattern library
+2. fetch_category_benchmarks — fetches survival statistics for a failure category from MongoDB
+3. save_analysis_report — saves a structured report to disk
+
+When given startup metrics:
+1. Call analyze_startup_metrics with ALL metric values provided
+2. If an alert was detected, call fetch_category_benchmarks with the matched pattern's category to get survival stats
+3. Call save_analysis_report with: startup_name, alert status, pattern_name, confidence, a 1-sentence recommendation, and the category_insight string from step 2
+
+Always call all three tools when an alert is detected. If no alert, skip step 2 and call save_analysis_report with alert=False."""
+
+
+def _get_runner() -> tuple[Runner, InMemorySessionService]:
+    global _agent, _runner, _session_service
+    if _runner is None:
+        _agent = Agent(
+            name="failure_oracle",
+            model="gemini-3-flash-preview",
+            description="Detects startup failure patterns using MongoDB Atlas Vector Search and Gemini 3, enriches with category benchmarks, then saves a report",
+            instruction=_AGENT_INSTRUCTION,
+            tools=[
+                FunctionTool(_analyze_startup_metrics),
+                FunctionTool(_fetch_category_benchmarks),
+                FunctionTool(_save_analysis_report),
+            ],
+        )
+        _session_service = InMemorySessionService()
+        _runner = Runner(
+            agent=_agent,
+            app_name="oracle",
+            session_service=_session_service,
+        )
+        logger.info("[ADK] Failure Oracle agent initialized (model: gemini-3-flash-preview)")
+    return _runner, _session_service
+
+
+# ── Public entry point ───────────────────────────────────────────────────────
+
+async def run_analysis_via_adk(metrics: MetricsInput) -> dict:
+    """
+    Run the failure pattern analysis through the ADK agent.
+    The agent calls analyze_startup_metrics tool, which uses MCP + Gemini internally.
+    Returns an AlertResponse-compatible dict.
+    """
+    runner, session_service = _get_runner()
+
+    result_key = str(uuid.uuid4())
+    session_id = f"oracle-{result_key[:8]}"
+    user_id = "oracle_api"
+
+    await session_service.create_session(
+        app_name="oracle",
+        user_id=user_id,
+        session_id=session_id,
+    )
+
+    # Pass raw decimal values to avoid the agent misinterpreting percentages
+    msg = (
+        f"Analyze startup '{metrics.startup_name}' for failure patterns. "
+        f"Call analyze_startup_metrics with exactly these values:\n"
+        f"startup_name={metrics.startup_name!r}, current_month={metrics.current_month}, "
+        f"mrr={metrics.mrr}, mrr_growth_rate={metrics.mrr_growth_rate}, "
+        f"churn_rate={metrics.churn_rate}, burn_rate={metrics.burn_rate}, "
+        f"runway_months={metrics.runway_months}, headcount={metrics.headcount}, "
+        f"nps={metrics.nps}, cac={metrics.cac}, ltv={metrics.ltv}, "
+        f"industry={metrics.industry!r}, _result_key={result_key!r}"
+    )
+
+    try:
+        # Drain the generator fully — breaking early causes OpenTelemetry context errors
+        async for _ in runner.run_async(
+            user_id=user_id,
+            session_id=session_id,
+            new_message=types.Content(role="user", parts=[types.Part(text=msg)]),
+        ):
+            pass
+    except Exception as e:
+        # ADK may throw on generator cleanup (OTel context) even after the tool ran
+        # successfully. Check _results FIRST before deciding to fall back.
+        err_type = type(e).__name__
+        err_msg  = str(e)
+        if result_key in _results:
+            # Tool ran and stored result before the exception — use it
+            result = _results.pop(result_key)
+            logger.info("[ADK] Analysis complete via ADK agent (cleanup exc: %s %s): alert=%s",
+                        err_type, err_msg, result.get("alert"))
+            return result
+        logger.warning("[ADK] Agent run failed (%s: %s) — falling back", err_type, err_msg)
+
+    # Check for tool result (normal success path)
+    if result_key in _results:
+        result = _results.pop(result_key)
+        logger.info("[ADK] Analysis complete via ADK agent: alert=%s", result.get("alert"))
+        return result
+
+    # Tool never ran — true fallback to match_patterns directly
+    logger.warning("[ADK] Tool result not captured — running direct match_patterns fallback")
+    from backend.services.pattern_matcher import match_patterns
+    match = await match_patterns(metrics)
+    if match is None:
+        return {"alert": False, "startup_name": metrics.startup_name,
+                "message": "No dangerous failure patterns detected."}
+    return {"alert": True, "startup_name": metrics.startup_name,
+            "pattern": match.model_dump(), "message": f"Pattern: {match.pattern_name}"}

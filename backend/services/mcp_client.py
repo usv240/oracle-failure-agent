@@ -20,14 +20,24 @@ from mcp import ClientSession, StdioServerParameters
 
 logger = logging.getLogger(__name__)
 
-MONGODB_URI = os.getenv("MONGODB_URI", "")
 DB_NAME = "oracle_db"
 
 # Global binary avoids npx download overhead on every request
 MCP_COMMAND = "mongodb-mcp-server"
 MCP_ARGS: list[str] = []
-# Pass URI via env var — avoids Windows shell ? & parsing issues
-MCP_ENV = {**os.environ, "MDB_MCP_CONNECTION_STRING": MONGODB_URI}
+
+
+def _get_mongodb_uri() -> str:
+    """Read MONGODB_URI from os.environ, falling back to .env file for local dev."""
+    uri = os.getenv("MONGODB_URI", "")
+    if not uri:
+        try:
+            # pydantic-settings reads .env but doesn't set os.environ — do it ourselves
+            from dotenv import dotenv_values
+            uri = dotenv_values(".env").get("MONGODB_URI", "")
+        except Exception:
+            pass
+    return uri
 
 
 def _parse_mcp_content(content) -> Any:
@@ -120,10 +130,11 @@ class MCPManager:
         Long-running background task owning the MCP stdio process.
         Signals _ready once initialised; stays alive until _shutdown.
         """
+        env = {**os.environ, "MDB_MCP_CONNECTION_STRING": _get_mongodb_uri()}
         params = StdioServerParameters(
             command=MCP_COMMAND,
             args=MCP_ARGS,
-            env=MCP_ENV,
+            env=env,
         )
         try:
             async with stdio_client(params) as (read, write):

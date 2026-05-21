@@ -1,4 +1,12 @@
-"""Gemini client using google-genai SDK — Vertex AI with API key fallback."""
+"""
+Gemini client — Gemini 3 as primary for all generation tasks.
+
+Primary chain (tried in order until one succeeds):
+  gemini-3-flash-preview → gemini-3.5-flash → gemini-3.1-flash-lite → gemini-3.1-flash-lite-preview
+
+Vertex AI 2.5 Flash fallback only when ALL Gemini 3 quota is exhausted.
+Embeddings: text-embedding-004 via Vertex AI (no Gemini 3 embedding model available).
+"""
 from google import genai
 from google.genai import types
 from backend.config import settings
@@ -6,8 +14,23 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Gemini 3 models tried in order — all via API key (not available on Vertex AI)
+_GEMINI3_CHAIN = [
+    "gemini-3-flash-preview",        # primary
+    "gemini-3.5-flash",              # fallback 1
+    "gemini-3.1-flash-lite",         # fallback 2
+    "gemini-3.1-flash-lite-preview", # fallback 3
+]
+
+# Tracks which Gemini 3 model is currently active (for /api/health reporting)
+active_gemini3_model: str = _GEMINI3_CHAIN[0]
+
 _vertex_client = None
 _api_key_client = None
+
+# Set to a reason string when any call falls back to Vertex AI 2.5.
+# stream.py reads + clears this after each scoring batch to emit a terminal event.
+last_fallback_reason: str | None = None
 
 
 def _get_vertex_client() -> genai.Client:
@@ -28,82 +51,142 @@ def _get_api_key_client() -> genai.Client:
     return _api_key_client
 
 
+def _try_gemini3(call_fn, config=None):
+    """
+    Try each Gemini 3 model in the chain until one succeeds.
+    Updates active_gemini3_model on success. Returns (response, model_used).
+    Raises the last exception if all models fail.
+    """
+    global active_gemini3_model
+    client = _get_api_key_client()
+    last_exc = None
+    for model in _GEMINI3_CHAIN:
+        try:
+            kwargs = {"model": model, "contents": None}  # contents injected by caller
+            response = call_fn(client, model, config)
+            active_gemini3_model = model
+            return response
+        except Exception as e:
+            logger.warning("Gemini 3 model %s failed (%s): %s", model, type(e).__name__, e)
+            last_exc = e
+    raise last_exc
+
+
 async def generate(prompt: str) -> str:
+    """Generate text. Tries all Gemini 3 models, falls back to Vertex AI 2.5."""
     try:
-        client = _get_vertex_client()
-        response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=prompt,
-        )
-        return response.text
-    except Exception as e:
-        logger.warning("Vertex AI failed (%s), falling back to API key", e)
         client = _get_api_key_client()
-        response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=prompt,
-        )
+        last_exc = None
+        for model in _GEMINI3_CHAIN:
+            try:
+                response = client.models.generate_content(model=model, contents=prompt)
+                active_gemini3_model = model
+                return response.text
+            except Exception as e:
+                logger.warning("Gemini 3 %s generate failed: %s", model, e)
+                last_exc = e
+        raise last_exc
+    except Exception as e:
+        global last_fallback_reason
+        last_fallback_reason = f"All Gemini 3 models exhausted — switching to Vertex AI 2.5 Flash"
+        logger.warning("Gemini 3 generate chain failed, falling back to Vertex AI 2.5: %s", e)
+        client = _get_vertex_client()
+        response = client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt)
         return response.text
 
 
 async def generate_json(prompt: str) -> str:
-    """Ask Gemini for a JSON response."""
-    config = types.GenerateContentConfig(response_mime_type="application/json")
+    """JSON generation. Tries all Gemini 3 models, falls back to Vertex AI 2.5."""
+    config3 = types.GenerateContentConfig(response_mime_type="application/json")
     try:
+        client = _get_api_key_client()
+        last_exc = None
+        for model in _GEMINI3_CHAIN:
+            try:
+                response = client.models.generate_content(model=model, contents=prompt, config=config3)
+                active_gemini3_model = model
+                return response.text
+            except Exception as e:
+                logger.warning("Gemini 3 %s generate_json failed: %s", model, e)
+                last_exc = e
+        raise last_exc
+    except Exception as e:
+        logger.warning("Gemini 3 generate_json chain failed, falling back to Vertex AI 2.5: %s", e)
         client = _get_vertex_client()
         response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=prompt,
-            config=config,
-        )
-        return response.text
-    except Exception as e:
-        logger.warning("Vertex AI failed (%s), falling back to API key", e)
-        client = _get_api_key_client()
-        response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=prompt,
-            config=config,
-        )
+            model=settings.GEMINI_MODEL, contents=prompt, config=config3)
         return response.text
 
 
 async def embed(text: str) -> list[float]:
-    """Generate a 768-dim embedding using text-embedding-004 via Vertex AI."""
+    """Generate 768-dim embedding via Vertex AI text-embedding-004."""
     try:
         client = _get_vertex_client()
-        response = client.models.embed_content(
-            model="text-embedding-004",
-            contents=text,
-        )
+        response = client.models.embed_content(model="text-embedding-004", contents=text)
         return response.embeddings[0].values
     except Exception as e:
         logger.warning("Vertex AI embed failed (%s), falling back to API key", e)
         client = _get_api_key_client()
-        response = client.models.embed_content(
-            model="text-embedding-004",
-            contents=text,
-        )
+        response = client.models.embed_content(model="text-embedding-004", contents=text)
         return response.embeddings[0].values
 
 
 async def generate_json_fast(prompt: str) -> str:
-    """Ask Gemini for a JSON response with thinking disabled (fast scoring path)."""
-    config = types.GenerateContentConfig(
+    """Fast JSON scoring — Gemini 3 chain primary, Vertex AI 2.5 fallback.
+    thinking_budget=0 on all Gemini 3 models for maximum speed."""
+    config_fast = types.GenerateContentConfig(
         response_mime_type="application/json",
         thinking_config=types.ThinkingConfig(thinking_budget=0),
     )
     try:
+        client = _get_api_key_client()
+        last_exc = None
+        for model in _GEMINI3_CHAIN:
+            try:
+                response = client.models.generate_content(
+                    model=model, contents=prompt, config=config_fast)
+                active_gemini3_model = model
+                return response.text
+            except Exception as e:
+                logger.warning("Gemini 3 %s fast failed: %s", model, e)
+                last_exc = e
+        raise last_exc
+    except Exception as e:
+        global last_fallback_reason
+        last_fallback_reason = f"Gemini 3 quota exhausted ({type(e).__name__}) — switching to Vertex AI 2.5 Flash"
+        logger.warning("Gemini 3 fast chain failed, falling back to Vertex AI 2.5: %s", e)
         client = _get_vertex_client()
         response = client.models.generate_content(
             model=settings.GEMINI_MODEL,
             contents=prompt,
-            config=config,
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
         )
         return response.text
-    except Exception as e:
-        logger.warning("Vertex AI fast call failed (%s), falling back to API key", e)
+
+
+async def generate_json_reasoned(prompt: str) -> str:
+    """Deliberate JSON reasoning — Gemini 3 chain with thinking enabled.
+    Used for decision auditing where deeper reasoning improves quality."""
+    config_think = types.GenerateContentConfig(
+        response_mime_type="application/json",
+        thinking_config=types.ThinkingConfig(thinking_budget=1024),
+    )
+    try:
         client = _get_api_key_client()
+        last_exc = None
+        for model in _GEMINI3_CHAIN:
+            try:
+                response = client.models.generate_content(
+                    model=model, contents=prompt, config=config_think)
+                active_gemini3_model = model
+                return response.text
+            except Exception as e:
+                logger.warning("Gemini 3 %s reasoned failed: %s", model, e)
+                last_exc = e
+        raise last_exc
+    except Exception as e:
+        logger.warning("Gemini 3 reasoned chain failed, falling back to Vertex AI 2.5: %s", e)
+        client = _get_vertex_client()
         response = client.models.generate_content(
             model=settings.GEMINI_MODEL,
             contents=prompt,

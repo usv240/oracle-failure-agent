@@ -8,7 +8,13 @@ _client: AsyncIOMotorClient = None
 def get_client() -> AsyncIOMotorClient:
     global _client
     if _client is None:
-        _client = AsyncIOMotorClient(settings.MONGODB_URI, server_api=ServerApi("1"))
+        _client = AsyncIOMotorClient(
+            settings.MONGODB_URI,
+            server_api=ServerApi("1"),
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=10000,
+            socketTimeoutMS=30000,
+        )
     return _client
 
 

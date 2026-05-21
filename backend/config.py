@@ -8,9 +8,11 @@ class Settings(BaseSettings):
     GOOGLE_PROJECT_ID: str
     GOOGLE_LOCATION: str = "us-central1"
     GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-1.5-pro"
+    GEMINI_MODEL: str = "gemini-2.5-flash"  # Vertex AI fallback model
     APP_PORT: int = 8080
     OUTPUT_DIR: str = "outputs"
+    SLACK_WEBHOOK_URL: str = ""  # Optional — Slack incoming webhook for monitoring alerts
+    APP_URL: str = "http://localhost:8080"  # Public URL of the deployed app (used in Slack alerts)
 
     class Config:
         env_file = ".env"

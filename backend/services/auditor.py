@@ -74,28 +74,24 @@ KNOWN FAILURE PATTERNS ({len(patterns)} documented patterns):
 
 Evaluate this decision and return JSON with exactly these fields:
 {{
-  "total_cases": <int — estimated historical cases with similar decision at similar stage>,
-  "success_cases": <int>,
-  "failure_cases": <int>,
-  "key_differentiator": "<what separated success cases from failure cases — 1 sentence>",
-  "recommendation": "<specific recommendation — 2-3 sentences>",
+  "key_differentiator": "<what separates successful from failed companies at this stage with this decision — 1 sentence based on the patterns above>",
+  "recommendation": "<specific actionable recommendation — 2-3 sentences citing the most relevant pattern>",
   "risk_level": "<LOW|MEDIUM|HIGH|CRITICAL>",
   "related_pattern": "<pattern_id of most relevant failure pattern, or null>",
-  "rationale": "<1 paragraph explaining the risk assessment>"
+  "rationale": "<1 paragraph explaining the risk assessment, referencing specific patterns>"
 }}
 
-Be honest. If the decision is risky given the current metrics, say so clearly.
+Be honest. Cite specific pattern names from the library above. Do not invent statistics.
 """
 
-    raw = await gemini.generate_json_fast(prompt)
+    raw = await gemini.generate_json_reasoned(prompt)
     result = json.loads(raw)
 
     return AuditResponse(
         decision=decision,
-        total_cases=result.get("total_cases", 0),
-        success_cases=result.get("success_cases", 0),
-        failure_cases=result.get("failure_cases", 0),
         key_differentiator=result.get("key_differentiator", ""),
         recommendation=result.get("recommendation", ""),
         risk_level=result.get("risk_level", "MEDIUM"),
+        related_pattern=result.get("related_pattern"),
+        rationale=result.get("rationale", ""),
     )

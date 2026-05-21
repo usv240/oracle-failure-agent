@@ -3,10 +3,63 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🔮 The Failure Oracle</title>
+  <title>The Failure Oracle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script>
+    // Apply saved theme before render to avoid flash
+    (function(){
+      const t = localStorage.getItem('oracle_theme') || 'light';
+      if (t === 'dark') document.documentElement.setAttribute('data-theme','dark');
+    })();
+  </script>
 </head>
 <body>
+
+  <!-- Offline banner — shown when backend is unreachable -->
+  <div id="offline-banner" class="offline-banner hidden">
+    <span>⚠ Oracle backend is unreachable. Check your connection or try refreshing.</span>
+    <button onclick="document.getElementById('offline-banner').classList.add('hidden')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1rem;margin-left:0.5rem">✕</button>
+  </div>
+
+  <!-- Fixed theme toggle -->
+  <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle light/dark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></button>
+
+  <!-- Impact stats bar -->
+  <div class="impact-bar">
+    <span><strong>150M+</strong> startups worldwide</span>
+    <span><strong>90%</strong> fail for known, preventable reasons</span>
+    <span><strong>100</strong> documented failure patterns</span>
+    <span><strong>3–6 months</strong> early warning window</span>
+  </div>
+
+  <!-- Live stats bar — populated from MongoDB on page load -->
+  <div id="live-stats-bar" class="live-stats-bar hidden">
+    <span class="ls-live-dot"><span class="ls-dot"></span>LIVE</span>
+    <span class="ls-divider"></span>
+    <span class="ls-stat">
+      <strong id="ls-analyses">—</strong>
+      <span>analyses run</span>
+    </span>
+    <span class="ls-divider"></span>
+    <span class="ls-stat">
+      <strong id="ls-monitored">—</strong>
+      <span>startups monitored</span>
+    </span>
+    <span class="ls-divider"></span>
+    <span class="ls-stat">
+      <strong id="ls-alerts">—</strong>
+      <span>alerts fired today</span>
+    </span>
+    <span class="ls-divider"></span>
+    <span class="ls-stat">
+      <strong id="ls-patterns">—</strong>
+      <span>patterns in library</span>
+    </span>
+  </div>
 
   <header>
     <div class="logo">
@@ -15,20 +68,23 @@
         <rect width="72" height="72" rx="18" fill="url(#bg)" opacity="0.6"/>
         <!-- Pulse / heartbeat line -->
         <path d="M10 38 L20 38 L26 22 L32 52 L38 32 L44 42 L50 38 L62 38"
-          stroke="#a78bfa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          stroke="#93c5fd" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         <!-- Warning dot -->
         <circle cx="62" cy="38" r="4" fill="#ef4444"/>
         <defs>
           <linearGradient id="bg" x1="0" y1="0" x2="72" y2="72" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#7c3aed"/>
-            <stop offset="100%" stop-color="#4c1d95"/>
+            <stop offset="0%" stop-color="#2563eb"/>
+            <stop offset="100%" stop-color="#1e3a8a"/>
           </linearGradient>
         </defs>
       </svg>
     </div>
     <h1>The Failure Oracle</h1>
-    <p class="tagline">90% of startups fail for known, preventable reasons.<br>Know yours — before it's too late.</p>
-    <button class="how-btn" onclick="openHowItWorks()">How it works ↗</button>
+    <p class="tagline">
+      90% of startups fail for known, preventable reasons.<br>
+      <strong>The Failure Oracle</strong> is an AI agent that uses <strong>Gemini 3 Flash</strong> and <strong>MongoDB Atlas Vector Search</strong> to detect fatal startup patterns months before they happen.
+    </p>
+    <button class="how-btn" onclick="openHowItWorks()">See how it works ↗</button>
   </header>
 
   <!-- ── How It Works Modal ──────────────────────────────────────── -->
@@ -41,9 +97,9 @@
           <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:56px;height:56px;border-radius:14px;">
             <rect width="72" height="72" rx="18" fill="#1a0533"/>
             <rect width="72" height="72" rx="18" fill="url(#bg2)" opacity="0.6"/>
-            <path d="M10 38 L20 38 L26 22 L32 52 L38 32 L44 42 L50 38 L62 38" stroke="#a78bfa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10 38 L20 38 L26 22 L32 52 L38 32 L44 42 L50 38 L62 38" stroke="#93c5fd" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
             <circle cx="62" cy="38" r="4" fill="#ef4444"/>
-            <defs><linearGradient id="bg2" x1="0" y1="0" x2="72" y2="72" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="#4c1d95"/></linearGradient></defs>
+            <defs><linearGradient id="bg2" x1="0" y1="0" x2="72" y2="72" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#2563eb"/><stop offset="100%" stop-color="#1e3a8a"/></linearGradient></defs>
           </svg>
         </span>
         <h2>How The Failure Oracle Works</h2>
@@ -62,7 +118,7 @@
           <div class="step-num">2</div>
           <div class="step-body">
             <h4>Semantic search via MongoDB Atlas Vector Search</h4>
-            <p>Your metrics are converted into a text description and embedded using <strong>Google's text-embedding-004</strong> model. MongoDB Atlas Vector Search performs cosine similarity search across 30 failure pattern narratives — finding patterns that <em>semantically</em> match your situation, not just numeric thresholds.</p>
+            <p>Your metrics are converted into a text description and embedded using <strong>Google's text-embedding-004</strong> model. MongoDB Atlas Vector Search performs cosine similarity search across 100 failure pattern narratives — finding patterns that <em>semantically</em> match your situation, not just numeric thresholds.</p>
             <div class="tech-tag">MongoDB Atlas Vector Search</div>
             <div class="tech-tag">Gemini text-embedding-004</div>
           </div>
@@ -70,9 +126,9 @@
         <div class="hiw-step">
           <div class="step-num">3</div>
           <div class="step-body">
-            <h4>Gemini 2.5 Flash scores each candidate</h4>
-            <p>The top candidate patterns are scored in parallel by <strong>Gemini 2.5 Flash</strong> running on Vertex AI. For each pattern, Gemini evaluates: how closely do the metrics match the documented trigger conditions? It returns a confidence score (0–100%), detected warning signals, and estimated days to crisis.</p>
-            <div class="tech-tag">Gemini 2.5 Flash (Vertex AI)</div>
+            <h4>Gemini 3 Flash scores each candidate</h4>
+            <p>The top candidate patterns are scored in parallel by <strong>Gemini 3 Flash</strong>. For each pattern, Gemini evaluates: how closely do the metrics match the documented trigger conditions? It returns a confidence score (0–100%), detected warning signals, and estimated days to crisis.</p>
+            <div class="tech-tag">Gemini 3 Flash</div>
             <div class="tech-tag">Parallel async scoring</div>
           </div>
         </div>
@@ -104,7 +160,7 @@
           <div class="arch-arrow">→</div>
           <div class="arch-box">MongoDB Atlas<br><small>Vector Search</small></div>
           <div class="arch-arrow">→</div>
-          <div class="arch-box">Gemini 2.5 Flash<br><small>Vertex AI</small></div>
+          <div class="arch-box">Gemini 3 Flash<br><small>primary model</small></div>
           <div class="arch-arrow">→</div>
           <div class="arch-box">Alert +<br>Playbook</div>
         </div>
@@ -112,7 +168,7 @@
 
       <div class="hiw-library">
         <h3>The Failure Pattern Library</h3>
-        <p>30 documented failure patterns built from public post-mortems, YC batch data, CB Insights reports, and founder interviews. Each pattern contains:</p>
+        <p>100 documented failure patterns built from public post-mortems, YC batch data, CB Insights reports, and founder interviews. Each pattern contains:</p>
         <div class="library-grid">
           <div class="lib-item"><strong>Narrative</strong><br>The story of how this failure unfolds</div>
           <div class="lib-item"><strong>Trigger Conditions</strong><br>The numeric thresholds that signal the pattern</div>
@@ -139,32 +195,32 @@
         <h3>Technology Stack</h3>
         <div class="stack-grid">
           <div class="stack-item">
-            <div class="stack-icon">🤖</div>
-            <strong>Gemini 2.5 Flash</strong>
-            <small>Pattern scoring, decision auditing, embeddings — via Vertex AI</small>
+            <div class="stack-icon"></div>
+            <strong>Gemini 3 Flash</strong>
+            <small>Pattern scoring and decision auditing (primary model)</small>
           </div>
           <div class="stack-item">
-            <div class="stack-icon">🗄️</div>
+            <div class="stack-icon"></div>
             <strong>MongoDB Atlas</strong>
             <small>Failure pattern library with Vector Search index for semantic retrieval</small>
           </div>
           <div class="stack-item">
-            <div class="stack-icon">🔧</div>
+            <div class="stack-icon"></div>
             <strong>Google ADK</strong>
             <small>Agent Development Kit — 3 tools: analyze, audit, list patterns</small>
           </div>
           <div class="stack-item">
-            <div class="stack-icon">☁️</div>
+            <div class="stack-icon"></div>
             <strong>Cloud Run</strong>
             <small>Serverless deployment on Google Cloud with auto-scaling</small>
           </div>
           <div class="stack-item">
-            <div class="stack-icon">🔌</div>
+            <div class="stack-icon"></div>
             <strong>MongoDB MCP</strong>
             <small>Model Context Protocol server for direct agent database access</small>
           </div>
           <div class="stack-item">
-            <div class="stack-icon">⚡</div>
+            <div class="stack-icon"></div>
             <strong>FastAPI + Motor</strong>
             <small>Async Python backend with parallel Gemini calls for 2-4s responses</small>
           </div>
@@ -178,33 +234,33 @@
         <div class="valid-grid">
           <div class="valid-card">
             <div class="valid-top">
-              <span class="valid-company">💀 Quibi</span>
-              <span class="valid-result valid-correct">✅ Correctly flagged</span>
+              <span class="valid-company">Quibi</span>
+              <span class="valid-result valid-correct">Correctly flagged</span>
             </div>
             <div class="valid-detail">Oracle at Month 4: <strong>Product-Market Fit Mirage — 95%</strong></div>
             <div class="valid-detail muted">NPS 8 · Churn 22% · CAC $48K vs LTV $12K (0.25x)</div>
             <div class="valid-outcome">Actual outcome: Shut down Month 10 · $1.75B lost</div>
-            <div class="valid-window">⏱ 6 months of warning available</div>
+            <div class="valid-window">6 months of warning available</div>
           </div>
           <div class="valid-card">
             <div class="valid-top">
-              <span class="valid-company">🏢 WeWork</span>
-              <span class="valid-result valid-correct">✅ Correctly flagged</span>
+              <span class="valid-company">WeWork</span>
+              <span class="valid-result valid-correct">Correctly flagged</span>
             </div>
             <div class="valid-detail">Oracle at Month 20: <strong>Distribution Without Retention — 90%</strong></div>
             <div class="valid-detail muted">Burn $22M/mo · Churn 16% · NPS 18 · Runway 7mo</div>
             <div class="valid-outcome">Actual outcome: Near-bankruptcy 2019 · IPO pulled · $47B → $2.9B</div>
-            <div class="valid-window">⏱ Valuation collapse was preventable</div>
+            <div class="valid-window">Valuation collapse was preventable</div>
           </div>
           <div class="valid-card">
             <div class="valid-top">
-              <span class="valid-company">🩸 Theranos</span>
-              <span class="valid-result valid-correct">✅ Correctly flagged</span>
+              <span class="valid-company">Theranos</span>
+              <span class="valid-result valid-correct">Correctly flagged</span>
             </div>
             <div class="valid-detail">Oracle at Month 24: <strong>Critical pattern — 95%</strong></div>
             <div class="valid-detail muted">Churn 45% · NPS -42 · $5.8M burn on $18K MRR</div>
             <div class="valid-outcome">Actual outcome: SEC fraud charges 2018 · $700M investor losses</div>
-            <div class="valid-window">⏱ Signals detectable years before exposure</div>
+            <div class="valid-window">Signals detectable years before exposure</div>
           </div>
         </div>
       </div>
@@ -215,32 +271,32 @@
         <p class="hiw-validated-sub">The 30-pattern failure library is built from primary sources. Every pattern has a citation trail.</p>
         <div class="method-grid">
           <div class="method-item">
-            <div class="method-icon">📚</div>
+            <div class="method-icon"></div>
             <strong>YC Post-Mortems</strong>
             <small>Paul Graham essays, YC partner office hours patterns, batch cohort analysis, "Default Alive or Default Dead" framework</small>
           </div>
           <div class="method-item">
-            <div class="method-icon">📊</div>
+            <div class="method-icon"></div>
             <strong>CB Insights Research</strong>
             <small>Annual startup failure reports, 2023 failure analysis, bridge round death spiral data, competitive displacement patterns</small>
           </div>
           <div class="method-item">
-            <div class="method-icon">💼</div>
+            <div class="method-icon"></div>
             <strong>VC Research</strong>
             <small>Sequoia "RIP Good Times", Bessemer SaaS benchmarks, OpenView PLG reports, First Round Capital founder analysis, a16z essays</small>
           </div>
           <div class="method-item">
-            <div class="method-icon">📝</div>
+            <div class="method-icon"></div>
             <strong>Public Post-Mortems</strong>
             <small>Homejoy, Fab.com, Quibi, Jawbone, Juicero, Rdio, Zynga, Beepi — documented with specific metric timelines</small>
           </div>
           <div class="method-item">
-            <div class="method-icon">📈</div>
+            <div class="method-icon"></div>
             <strong>SaaS Benchmarks</strong>
             <small>David Skok SaaS metrics framework, Jason Lemkin SaaStr data, OpenView SaaS benchmark reports, Crunchbase funding patterns</small>
           </div>
           <div class="method-item">
-            <div class="method-icon">🧠</div>
+            <div class="method-icon"></div>
             <strong>Founder Frameworks</strong>
             <small>Ben Horowitz "The Hard Thing About Hard Things", Marc Andreessen PMF essay, Eric Ries "The Lean Startup", Hamilton Helmer "7 Powers"</small>
           </div>
@@ -277,7 +333,7 @@
         <div class="wb-arrow">→</div>
         <div class="wb-step">
           <div class="wb-num">2</div>
-          <div class="wb-text"><strong>Run Pattern Analysis</strong><br>AI agent searches 30 documented failure patterns</div>
+          <div class="wb-text"><strong>Run Pattern Analysis</strong><br>AI agent searches 100 documented failure patterns</div>
         </div>
         <div class="wb-arrow">→</div>
         <div class="wb-step">
@@ -285,162 +341,186 @@
           <div class="wb-text"><strong>Read your playbook</strong><br>Get early warnings + the exact steps to survive</div>
         </div>
       </div>
-      <div class="wb-tip">💡 <strong>First time?</strong> Click <strong>💀 Quibi</strong> below to see the Oracle detect a $1.75B failure in real-time.</div>
+      <div class="wb-tip"><strong>First time?</strong> Click <strong>Quibi</strong> below to see the Oracle detect a $1.75B failure in real-time.</div>
       <button class="wb-dismiss" onclick="document.getElementById('welcome-banner').style.display='none'">Got it, dismiss ✕</button>
     </section>
 
-    <!-- ── Metrics Input ────────────────────────────────────────── -->
-    <section class="card" id="input-section">
-      <h2>Your Current Metrics</h2>
-      <p class="section-desc" style="margin-bottom:1.2rem">Enter your startup's numbers below. Not sure what some mean? Hover the <span style="color:var(--accent)">ⓘ</span> icons. Or skip to the demo presets at the bottom.</p>
-      <form id="metrics-form">
-        <div class="form-grid">
-          <div class="field">
-            <label>Startup Name</label>
-            <input type="text" id="startup_name" placeholder="Acme SaaS" required />
-          </div>
-          <div class="field">
-            <label>Current Month
-              <div class="tooltip-container">
-                <svg class="tooltip-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <div class="tooltip-content">Months since the company was founded</div>
-              </div>
-            </label>
-            <input type="number" id="current_month" min="1" max="120" placeholder="14" required />
-          </div>
-          <div class="field">
-            <label>MRR
-              <div class="tooltip-container">
-                <svg class="tooltip-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <div class="tooltip-content">Monthly Recurring Revenue (USD)</div>
-              </div>
-            </label>
-            <input type="number" id="mrr" min="0" placeholder="85000" required />
-          </div>
-          <div class="field">
-            <label>Monthly Growth Rate
-              <div class="tooltip-container">
-                <svg class="tooltip-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <div class="tooltip-content">E.g. 0.18 for 18% growth month-over-month</div>
-              </div>
-            </label>
-            <input type="number" id="mrr_growth_rate" step="0.01" min="0" placeholder="0.18" required />
-          </div>
-          <div class="field">
-            <label>Monthly Churn Rate
-              <div class="tooltip-container">
-                <svg class="tooltip-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <div class="tooltip-content">E.g. 0.09 for 9% customer churn per month</div>
-              </div>
-            </label>
-            <input type="number" id="churn_rate" step="0.01" min="0" max="1" placeholder="0.09" required />
-          </div>
-          <div class="field">
-            <label>Monthly Burn
-              <div class="tooltip-container">
-                <svg class="tooltip-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <div class="tooltip-content">Net cash burned per month (USD)</div>
-              </div>
-            </label>
-            <input type="number" id="burn_rate" min="0" placeholder="120000" required />
-          </div>
-          <div class="field">
-            <label>Runway
-              <div class="tooltip-container">
-                <svg class="tooltip-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <div class="tooltip-content">Cash in bank divided by monthly burn (in months)</div>
-              </div>
-            </label>
-            <input type="number" id="runway_months" min="0" placeholder="8" required />
-          </div>
-          <div class="field">
-            <label>Headcount</label>
-            <input type="number" id="headcount" min="1" placeholder="12" required />
-          </div>
-          <div class="field">
-            <label>NPS Score
-              <div class="tooltip-container">
-                <svg class="tooltip-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <div class="tooltip-content">Net Promoter Score (-100 to +100)</div>
-              </div>
-            </label>
-            <input type="number" id="nps" min="-100" max="100" placeholder="31" required />
-          </div>
-          <div class="field">
-            <label>CAC
-              <div class="tooltip-container">
-                <svg class="tooltip-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <div class="tooltip-content">Customer Acquisition Cost (USD)</div>
-              </div>
-            </label>
-            <input type="number" id="cac" min="0" placeholder="1800" required />
-          </div>
-          <div class="field">
-            <label>LTV
-              <div class="tooltip-container">
-                <svg class="tooltip-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <div class="tooltip-content">Lifetime Value of a customer (USD)</div>
-              </div>
-            </label>
-            <input type="number" id="ltv" min="0" placeholder="9200" required />
-          </div>
-          <div class="field">
-            <label>Industry</label>
-            <select id="industry">
-              <option value="B2B SaaS">B2B SaaS</option>
-              <option value="B2C">B2C</option>
-              <option value="Marketplace">Marketplace</option>
-              <option value="E-commerce">E-commerce</option>
-              <option value="Consumer">Consumer</option>
-              <option value="Enterprise">Enterprise</option>
-              <option value="Fintech">Fintech</option>
-              <option value="Healthtech">Healthtech</option>
-            </select>
+        <div class="metrics-layout">
+      <!-- ── Metrics Input ────────────────────────────────────────── -->
+      <section class="card" id="input-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+        <h2 style="margin-bottom:0">Your Current Metrics</h2>
+        <button class="stripe-btn" onclick="openStripeModal()" title="Auto-fill from Stripe">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-right:0.35rem"><path d="M13.479 9.883c-2.516-.426-3.326-.901-3.326-1.674 0-.895.845-1.374 2.401-1.374 1.601 0 2.748.582 3.312 1.666l2.986-1.255C17.85 5.148 16.006 4 13.572 4c-3.127 0-5.339 1.585-5.339 4.061 0 2.366 1.569 3.474 5.043 4.083 2.703.461 3.498.943 3.498 1.774 0 .948-.896 1.528-2.508 1.528-1.8 0-3.154-.727-3.835-2.034L7.42 14.718C8.503 16.771 10.555 18 13.302 18c3.29 0 5.58-1.578 5.58-4.212 0-2.473-1.666-3.62-5.403-3.905z"/></svg>
+          Import from Stripe
+        </button>
+      </div>
+      <p class="section-desc" style="margin-bottom:1rem">Enter your startup's numbers below. Or let Oracle extract them automatically from any text.</p>
+
+      <!-- Transcript extraction -->
+      <div class="transcript-panel">
+        <button class="transcript-toggle" onclick="toggleTranscript()" id="transcript-toggle-btn">
+          ✦ Extract metrics from text (pitch deck, investor update, YC app...)
+        </button>
+        <div class="transcript-body hidden" id="transcript-body">
+          <textarea id="transcript-input" placeholder="Paste any startup text — pitch deck, investor update, YC application, board memo... Oracle will extract all 11 metrics automatically using Gemini 3 Flash." rows="5"></textarea>
+          <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem">
+            <button type="button" class="transcript-btn" id="transcript-btn" onclick="extractFromTranscript()">Extract Metrics</button>
+            <span class="transcript-note hidden" id="transcript-note"></span>
           </div>
         </div>
+      </div>
 
-        <button type="submit" id="analyze-btn">
-          <span id="btn-text">🔍 Run Pattern Analysis</span>
-          <span id="btn-spinner" class="hidden">⏳ Analysing…</span>
+      <form id="metrics-form">
+
+        <div class="field-group">
+          <div class="field-group-title">Company & Capital</div>
+          <div class="form-grid" style="margin-bottom:0">
+            <div class="field">
+<label>Startup Name</label>
+<input id="startup_name" placeholder="Acme SaaS" required="" type="text"/>
+</div><div class="field">
+<label>Current Month
+              <div class="tooltip-container">
+<svg class="tooltip-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<div class="tooltip-content">Months since the company was founded</div>
+</div>
+</label>
+<input id="current_month" max="120" min="1" placeholder="14" required="" type="number"/>
+</div><div class="field">
+<label>Monthly Burn
+              <div class="tooltip-container">
+<svg class="tooltip-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<div class="tooltip-content">Net cash burned per month (USD)</div>
+</div>
+</label>
+<input id="burn_rate" min="0" placeholder="120000" required="" type="number"/>
+</div><div class="field">
+<label>Runway
+              <div class="tooltip-container">
+<svg class="tooltip-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<div class="tooltip-content">Cash in bank divided by monthly burn (in months)</div>
+</div>
+</label>
+<input id="runway_months" min="0" placeholder="8" required="" type="number"/>
+</div><div class="field">
+<label>Headcount</label>
+<input id="headcount" min="1" placeholder="12" required="" type="number"/>
+</div><div class="field">
+<label>NPS Score
+              <div class="tooltip-container">
+<svg class="tooltip-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<div class="tooltip-content">Net Promoter Score (-100 to +100)</div>
+</div>
+</label>
+<input id="nps" max="100" min="-100" placeholder="31" required="" type="number"/>
+</div>
+          </div>
+        </div>
+        <div class="field-group">
+          <div class="field-group-title">Revenue & Unit Economics</div>
+          <div class="form-grid" style="margin-bottom:0">
+            <div class="field">
+<label>MRR
+              <div class="tooltip-container">
+<svg class="tooltip-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<div class="tooltip-content">Monthly Recurring Revenue (USD)</div>
+</div>
+</label>
+<input id="mrr" min="0" placeholder="85000" required="" type="number"/>
+</div><div class="field">
+<label>Monthly Growth Rate
+              <div class="tooltip-container">
+<svg class="tooltip-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<div class="tooltip-content">E.g. 0.18 for 18% growth month-over-month</div>
+</div>
+</label>
+<input id="mrr_growth_rate" min="0" placeholder="0.18" required="" step="0.01" type="number"/>
+</div><div class="field">
+<label>Monthly Churn Rate
+              <div class="tooltip-container">
+<svg class="tooltip-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<div class="tooltip-content">E.g. 0.09 for 9% customer churn per month</div>
+</div>
+</label>
+<input id="churn_rate" max="1" min="0" placeholder="0.09" required="" step="0.01" type="number"/>
+</div><div class="field">
+<label>CAC
+              <div class="tooltip-container">
+<svg class="tooltip-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<div class="tooltip-content">Customer Acquisition Cost (USD)</div>
+</div>
+</label>
+<input id="cac" min="0" placeholder="1800" required="" type="number"/>
+</div><div class="field">
+<label>LTV
+              <div class="tooltip-container">
+<svg class="tooltip-icon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="16" y2="12"></line><line x1="12" x2="12.01" y1="8" y2="8"></line></svg>
+<div class="tooltip-content">Lifetime Value of a customer (USD)</div>
+</div>
+</label>
+<input id="ltv" min="0" placeholder="9200" required="" type="number"/>
+</div><div class="field">
+<label>Industry</label>
+<select id="industry">
+<option value="B2B SaaS">B2B SaaS</option>
+<option value="B2C">B2C</option>
+<option value="Marketplace">Marketplace</option>
+<option value="E-commerce">E-commerce</option>
+<option value="Consumer">Consumer</option>
+<option value="Enterprise">Enterprise</option>
+<option value="Fintech">Fintech</option>
+<option value="Healthtech">Healthtech</option>
+</select>
+</div>
+          </div>
+        </div>
+        <button type="submit" id="analyze-btn" style="margin-top: 0.5rem; padding: 1.1rem; font-size: 1.1rem;">
+          <span id="btn-text">Run Pattern Analysis</span>
+          <span id="btn-spinner" class="hidden" style="display:flex;align-items:center;justify-content:center;gap:0.5rem">
+            <svg class="spinner-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>
+            Analysing…
+          </span>
         </button>
+    
       </form>
 
       <!-- Demo presets with context -->
       <div class="demo-section">
         <div class="demo-section-header">
-          <span class="demo-label">⚡ Load a real scenario — see exactly what the Oracle would have said:</span>
+          <span class="demo-label">Load a real scenario — see exactly what the Oracle would have said:</span>
         </div>
         <div class="demo-cards">
           <button class="demo-card demo-card-safe" onclick="fillDemo('healthy')">
-            <div class="dc-icon">✅</div>
+            <div class="dc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--safe)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div>
             <div class="dc-body">
               <div class="dc-name">Healthy Startup</div>
               <div class="dc-desc">Good metrics — see what a safe result looks like</div>
             </div>
           </button>
           <button class="demo-card demo-card-warn" onclick="fillDemo('warning')">
-            <div class="dc-icon">⚠️</div>
+            <div class="dc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div>
             <div class="dc-body">
               <div class="dc-name">Danger Zone</div>
               <div class="dc-desc">Runway shrinking, churn rising — early warning</div>
             </div>
           </button>
           <button class="demo-card demo-card-dead" onclick="fillDemo('quibi')">
-            <div class="dc-icon">💀</div>
+            <div class="dc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></div>
             <div class="dc-body">
               <div class="dc-name">Quibi</div>
               <div class="dc-desc">$1.75B raised · Shut down in 6 months · NPS 8</div>
             </div>
           </button>
           <button class="demo-card demo-card-dead" onclick="fillDemo('wework')">
-            <div class="dc-icon">🏢</div>
+            <div class="dc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M9 21v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path></svg></div>
             <div class="dc-body">
               <div class="dc-name">WeWork</div>
               <div class="dc-desc">$22M/mo burn · $47B → $2.9B · Near-bankruptcy</div>
             </div>
           </button>
           <button class="demo-card demo-card-dead" onclick="fillDemo('theranos')">
-            <div class="dc-icon">🩸</div>
+            <div class="dc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg></div>
             <div class="dc-body">
               <div class="dc-name">Theranos</div>
               <div class="dc-desc">$700M raised · NPS -42 · Fraud collapse</div>
@@ -450,18 +530,52 @@
       </div>
 
       <!-- Agent Terminal (hidden by default) -->
-      <div id="agent-terminal" class="agent-terminal hidden">
+      <div id="agent-terminal" class="agent-terminal hidden" style="margin-top:1.5rem">
         <div class="terminal-header">
-          <span class="terminal-title">⚡ Agent Execution Log</span>
+          <span class="terminal-title">Agent Execution Log</span>
         </div>
         <div class="terminal-body" id="terminal-body"></div>
       </div>
-    </section>
+      </section>
+
+      <!-- ── Live Education Panel ─────────────────────────────────── -->
+      <aside class="live-education-panel">
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+          <h2 style="margin-bottom:0;color:var(--text);font-size:1.1rem">Live Health Pulse</h2>
+        </div>
+        <p class="section-desc" style="font-size:0.85rem;margin-bottom:0">See how the Oracle interprets your numbers in real-time.</p>
+        
+        <div class="live-metric">
+          <div class="lm-top">
+            <span class="lm-label">Net Burn Multiple</span>
+            <span class="lm-value" id="live-burn">--</span>
+          </div>
+          <div class="lm-desc">Burn / Net New MRR. How much cash you burn to generate $1 of new revenue. <br><strong>Healthy:</strong> &lt;1.5x</div>
+        </div>
+
+        <div class="live-metric">
+          <div class="lm-top">
+            <span class="lm-label">LTV:CAC Ratio</span>
+            <span class="lm-value" id="live-ltvcac">--</span>
+          </div>
+          <div class="lm-desc">Lifetime Value / Customer Acquisition Cost. Are your customers profitable? <br><strong>Healthy:</strong> &gt;3.0x</div>
+        </div>
+
+        <div class="live-metric">
+          <div class="lm-top">
+            <span class="lm-label">Runway</span>
+            <span class="lm-value" id="live-runway">--</span>
+          </div>
+          <div class="lm-desc">How long until you run out of cash. <br><strong>Healthy:</strong> &gt;18 months</div>
+        </div>
+      </aside>
+    </div>
 
     <!-- ── Glossary ──────────────────────────────────────────────── -->
     <section class="card glossary-card" id="glossary-section">
       <div class="glossary-header" onclick="toggleGlossary()">
-        <span>📖 Metrics Glossary — what do these numbers mean?</span>
+        <span>Metrics Glossary — what do these numbers mean?</span>
         <span class="glossary-toggle" id="glossary-toggle">Show ▾</span>
       </div>
       <div class="glossary-body hidden" id="glossary-body">
@@ -508,22 +622,33 @@
           </div>
         </div>
         <div class="gloss-note">
-          💡 <strong>Don't have exact numbers?</strong> Use your best estimates. Even rough numbers trigger meaningful pattern matches. The Oracle is designed for directional accuracy, not accounting precision.
+          <strong>Don't have exact numbers?</strong> Use your best estimates. Even rough numbers trigger meaningful pattern matches. The Oracle is designed for directional accuracy, not accounting precision.
         </div>
       </div>
     </section>
 
     <!-- ── Alert Panel ───────────────────────────────────────────── -->
     <section class="card alert-card hidden" id="alert-section">
+
+      <!-- Risk level banner — populated by renderResult() -->
+      <div id="risk-banner" class="risk-banner risk-banner-high hidden">
+        <span class="risk-banner-icon" id="risk-banner-icon"></span>
+        <div>
+          <div class="risk-banner-label" id="risk-banner-label"></div>
+          <div id="risk-banner-text"></div>
+        </div>
+      </div>
+
       <div class="alert-header">
-        <span class="alert-icon">⚠️</span>
+        <span class="alert-icon"></span>
         <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem">
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.3rem">
             <div class="alert-title" id="alert-title"></div>
             <span class="alert-pid" id="alert-pattern-id"></span>
+            <button class="lib-link hidden" id="alert-lib-link"></button>
           </div>
           <div class="confidence-row">
-            <span>Confidence:</span>
+            <span>Pattern Match Score:</span>
             <div class="bar-wrap"><div class="bar-fill" id="conf-bar"></div></div>
             <span id="conf-pct"></span>
           </div>
@@ -533,33 +658,103 @@
       <!-- Result interpretation guide -->
       <div class="result-guide">
         <div class="rg-item">
-          <span class="rg-icon">🎯</span>
-          <div><strong>What does the confidence % mean?</strong> Of all startups in our database that matched this pattern, this % had the same outcome. 95% means 95 out of 100 similar startups followed this exact trajectory.</div>
+          <span class="rg-icon"></span>
+          <div><strong>What does the match score mean?</strong> This score measures how closely your metrics align with the documented trigger conditions for this failure pattern — based on semantic similarity across 100 real-world failure cases. Higher score = stronger signal.</div>
         </div>
         <div class="rg-item">
-          <span class="rg-icon">⚠️</span>
-          <div><strong>Warning signals</strong> are already visible in your data right now — they were present in every startup that matched this pattern before failure. The sooner you act on these, the more time you have.</div>
+          <span class="rg-icon"></span>
+          <div><strong>Warning signals</strong> are already visible in your data right now — they appeared in startups that matched this pattern before failure. The sooner you act, the more runway you have to course-correct.</div>
         </div>
       </div>
 
       <p class="narrative" id="alert-narrative"></p>
 
+      <!-- Gemini reasoning block -->
+      <div class="reasoning-block hidden" id="reasoning-block">
+        <div class="reasoning-label">Gemini 3 Flash analysis</div>
+        <p id="reasoning-text"></p>
+      </div>
+
+      <!-- Multi-agent Challenger panel -->
+      <div class="challenger-panel hidden" id="challenger-panel">
+        <div class="chp-header">
+          <span class="chp-icon" id="chp-icon"></span>
+          <span class="chp-title" id="chp-title"></span>
+          <span class="chp-badge" id="chp-badge"></span>
+        </div>
+        <p class="chp-reasoning" id="chp-reasoning"></p>
+        <p class="chp-counter hidden" id="chp-counter-wrap">
+          <span class="chp-counter-label">Strongest counter-evidence:</span>
+          <span id="chp-counter"></span>
+        </p>
+        <div class="chp-scores">
+          <div class="chp-agent">
+            <div class="chp-agent-label">Investigator</div>
+            <div class="chp-agent-bar-wrap">
+              <div class="chp-agent-bar chp-bar-inv" id="chp-bar-inv"></div>
+            </div>
+            <div class="chp-agent-pct" id="chp-inv-pct"></div>
+          </div>
+          <div class="chp-agent">
+            <div class="chp-agent-label">Challenger</div>
+            <div class="chp-agent-bar-wrap">
+              <div class="chp-agent-bar chp-bar-chall" id="chp-bar-chall"></div>
+            </div>
+            <div class="chp-agent-pct" id="chp-chall-pct"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category intelligence block -->
+      <div class="cat-intel hidden" id="cat-intel">
+        <div class="ci-label">Category Intelligence</div>
+        <div class="ci-body">
+          <div class="ci-stat" id="ci-surv-rate"></div>
+          <div class="ci-stat" id="ci-pattern-count"></div>
+          <div class="ci-stat" id="ci-worst"></div>
+        </div>
+      </div>
+
+      <!-- Crisis trajectory timeline -->
+      <div class="crisis-timeline hidden" id="crisis-timeline">
+        <div class="ct-header">
+          <span class="ct-title">Crisis Trajectory</span>
+          <span class="ct-subtitle" id="ct-subtitle"></span>
+        </div>
+        <div class="ct-track-wrap">
+          <div class="ct-track">
+            <div class="ct-past-fill" id="ct-past-fill"></div>
+            <div class="ct-today-marker" id="ct-today-marker">
+              <div class="ct-today-flag">TODAY</div>
+            </div>
+          </div>
+          <div class="ct-labels">
+            <span class="ct-label-left" id="ct-label-left"></span>
+            <span class="ct-label-right" id="ct-label-right"></span>
+          </div>
+        </div>
+        <div class="ct-anchors">
+          <span class="ct-anchor ct-anchor-signal">◆ Signal first detectable</span>
+          <span class="ct-anchor ct-anchor-crisis">⚠ Projected crisis</span>
+        </div>
+      </div>
+
       <!-- Metric breakdown table -->
       <div class="match-table-wrap">
-        <h3>📐 Your Metrics vs. Healthy Benchmarks</h3>
+        <h3>Your Metrics vs. Pattern Trigger Thresholds</h3>
         <table class="match-table">
-          <thead><tr><th>Metric</th><th>Your Value</th><th>Healthy Target</th></tr></thead>
+          <thead><tr><th>Metric</th><th>Your Value</th><th>Pattern Trigger</th><th></th></tr></thead>
           <tbody id="match-table"></tbody>
         </table>
       </div>
 
       <div class="two-col">
         <div>
-          <h3>⚡ Warning Signals Detected</h3>
+          <h3>Warning Signals Detected</h3>
           <ul id="signals-list"></ul>
         </div>
         <div>
-          <h3>📊 Historical Outcomes</h3>
+          <h3>Historical Outcomes</h3>
           <div class="outcome-stats">
             <div class="stat red"><span id="fail-pct"></span><small>Failed</small></div>
             <div class="stat green"><span id="surv-pct"></span><small>Survived</small></div>
@@ -570,91 +765,251 @@
       </div>
 
       <div class="playbook">
-        <h3>🛡️ Survival Playbook</h3>
+        <h3>Survival Playbook</h3>
         <p class="playbook-sub">Used by every startup that survived this pattern</p>
         <ol id="playbook-list"></ol>
       </div>
 
       <div class="famous">
-        <h3>🏢 Companies That Matched This Pattern</h3>
+        <h3>Companies That Matched This Pattern</h3>
         <div id="famous-list"></div>
+      </div>
+
+      <!-- Pattern accuracy showcase -->
+      <div class="accuracy-showcase hidden" id="accuracy-showcase">
+        <div class="as-icon">⏱</div>
+        <div class="as-body">
+          <div class="as-headline" id="as-headline"></div>
+          <div class="as-sub" id="as-sub"></div>
+        </div>
       </div>
 
       <!-- Early warning banner -->
       <div class="early-warning-banner hidden" id="early-warning-banner">
-        <span class="ew-icon">⏱️</span>
+        <span class="ew-icon"></span>
         <span id="early-warning-text"></span>
       </div>
 
       <!-- What to do next -->
       <div class="what-next">
-        <div class="wn-header">✅ What to do right now</div>
+        <div class="wn-header">What to do right now</div>
         <div class="wn-steps">
           <div class="wn-step"><span class="wn-num">1</span><span>Read the survival playbook above — these are the exact actions that worked for the 13% who survived</span></div>
           <div class="wn-step"><span class="wn-num">2</span><span>Use the <strong>Decision Auditor</strong> below — before your next big decision, ask the Oracle if it's safe</span></div>
           <div class="wn-step"><span class="wn-num">3</span><span>Download your report and share it with your co-founder or board today</span></div>
-          <div class="wn-step"><span class="wn-num">4</span><span>Re-run this analysis monthly — patterns escalate fast once they start</span></div>
+          <div class="wn-step"><span class="wn-num">4</span><span><strong>Run this monthly.</strong> Patterns escalate fast — most crises have a 3-6 month warning window. Catching the pattern earlier means more options.</span></div>
         </div>
+      </div>
+
+      <!-- Continuous monitoring -->
+      <div class="monitor-panel" id="monitor-panel">
+        <div class="mp-icon">👁</div>
+        <div class="mp-body">
+          <div class="mp-title">Enable Continuous Monitoring</div>
+          <div class="mp-desc">The Oracle will re-analyse your metrics every 6 hours and alert you if the pattern worsens. Results stored in MongoDB.</div>
+        </div>
+        <button class="mp-btn" id="monitor-btn" onclick="enableMonitoring()">Watch My Startup</button>
+      </div>
+      <div class="monitor-active hidden" id="monitor-active">
+        <span class="ma-dot"></span>
+        <span id="ma-text">Oracle is watching — re-analysis every 6 hours</span>
       </div>
 
       <!-- Report actions -->
       <div class="report-actions">
-        <button class="action-btn download-btn" onclick="downloadReport()">⬇️ Download Report</button>
-        <button class="action-btn share-btn" onclick="shareAnalysis()">🔗 Share Analysis</button>
-        <span class="share-confirm hidden" id="share-confirm">✅ Link copied!</span>
+        <button class="action-btn download-btn" onclick="downloadReport()">Download Report</button>
+        <button class="action-btn share-btn" onclick="shareAnalysis()">Share Analysis</button>
+        <button class="action-btn slides-btn" id="slides-btn" onclick="exportSlides()" title="Download board-ready HTML deck powered by Gemini 3 Flash">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.3rem;vertical-align:-2px"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Export Board Deck
+        </button>
+        <button class="action-btn slack-share-btn" id="slack-share-btn" onclick="shareToSlack()" title="Post this alert to your Slack channel">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="margin-right:0.3rem;vertical-align:-2px"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg>
+          Share to Slack
+        </button>
+        <span class="share-confirm hidden" id="share-confirm">Link copied!</span>
+        <span class="share-confirm hidden" id="slack-confirm">Posted to Slack!</span>
       </div>
     </section>
 
     <!-- ── Safe Panel ────────────────────────────────────────────── -->
     <section class="card safe-card hidden" id="safe-section">
-      <div class="safe-icon">✅</div>
+      <div class="safe-icon"></div>
       <h2>No Dangerous Patterns Detected</h2>
-      <p>Your current metrics don't match any known high-risk failure patterns. Keep monitoring — things change fast.</p>
-      <p class="safe-tip">💡 Tip: Run this analysis every month. Patterns emerge gradually.</p>
+      <p>Your current metrics don't match any of the 100 documented high-risk failure patterns. Your trajectory looks healthy for this stage.</p>
+      <p class="safe-tip"><strong>Run this monthly.</strong> Failure patterns don't appear overnight — they build over 3-6 months. Early detection is the entire point.</p>
     </section>
 
     <!-- ── Decision Auditor ──────────────────────────────────────── -->
     <section class="card" id="audit-section">
       <h2>Decision Auditor</h2>
-      <p class="section-desc">Describe a decision you're considering. The Oracle will evaluate it against historical failure cases.</p>
+      <p class="section-desc">Before you make a major decision, ask the Oracle. It will evaluate your decision against 100 documented failure patterns and tell you if founders in similar situations succeeded or failed — and why.</p>
+      <p class="section-desc" style="font-size:0.82rem;color:var(--muted);margin-top:-0.5rem">Try: "Should I hire 3 engineers this month?" · "Should I raise prices by 20%?" · "Should I expand to Europe?"</p>
       <div class="audit-form">
         <textarea id="decision-text" rows="3"
           placeholder="e.g. Hire 3 engineers this month, Increase pricing by 20%, Expand to Europe..."></textarea>
-        <button id="audit-btn" onclick="runAudit()">📋 Audit This Decision</button>
+        <button id="audit-btn" onclick="runAudit()">Audit This Decision</button>
       </div>
       <div id="audit-result" class="hidden"></div>
     </section>
 
-    <!-- ── Pattern Library ──────────────────────────────────────── -->
+    <!-- ── VC Portfolio Mode ──────────────────────────────────────── -->
+    <section class="card" id="portfolio-section">
+      <h2>VC Portfolio Mode</h2>
+      <p class="section-desc">Analyze multiple startups at once. Paste your portfolio companies — the Oracle will run parallel analysis and return a risk-ranked dashboard.</p>
+      <div id="portfolio-entries">
+        <!-- Startup rows injected by JS -->
+      </div>
+      <div class="pf-controls">
+        <button class="pf-add-btn" onclick="addPortfolioRow()">+ Add Company</button>
+        <button class="pf-run-btn" id="pf-run-btn" onclick="runPortfolio()">
+          <span id="pf-btn-text">Analyze Portfolio</span>
+          <span id="pf-btn-spinner" class="hidden">Analyzing…</span>
+        </button>
+      </div>
+      <div id="portfolio-result" class="hidden">
+        <div class="pf-summary" id="pf-summary"></div>
+        <div class="pf-grid" id="pf-grid"></div>
+      </div>
+    </section>
+
+        <!-- ── Pattern Library ──────────────────────────────────────── -->
     <section class="card" id="patterns-section">
-      <div class="patterns-header">
+      <div class="patterns-header" style="flex-direction: column;">
         <div>
           <h2>Pattern Library</h2>
-          <p class="section-desc">30 documented failure patterns from post-mortems, YC data, and CB Insights research.</p>
+          <p class="section-desc">100 documented failure patterns from YC post-mortems, CB Insights, Sequoia, a16z, and public founder post-mortems.</p>
         </div>
-        <span class="patterns-count" id="patterns-count">Loading…</span>
       </div>
-      <div class="patterns-filter" id="patterns-filter">
-        <button class="pf-btn active" onclick="filterPatterns('')">All</button>
-        <button class="pf-btn" onclick="filterPatterns('premature_scaling')">Premature Scaling</button>
-        <button class="pf-btn" onclick="filterPatterns('product_market_fit')">PMF</button>
-        <button class="pf-btn" onclick="filterPatterns('unit_economics')">Unit Economics</button>
-        <button class="pf-btn" onclick="filterPatterns('fundraising')">Fundraising</button>
-        <button class="pf-btn" onclick="filterPatterns('team')">Team</button>
-        <button class="pf-btn" onclick="filterPatterns('go_to_market')">Go-To-Market</button>
-        <button class="pf-btn" onclick="filterPatterns('competition')">Competition</button>
+      
+      <button id="toggle-patterns-btn" class="action-btn" style="width:100%; margin-bottom: 1rem; padding: 0.8rem; font-weight: 600; font-family: var(--font-secondary);" onclick="togglePatterns()">View Pattern Library (<span id="patterns-count">Loading...</span>)</button>
+      
+      <div id="patterns-container" class="hidden">
+        <div class="patterns-filter" id="patterns-filter">
+          <button class="pf-btn active" onclick="filterPatterns('')">All</button>
+          <button class="pf-btn" onclick="filterPatterns('premature_scaling')">Premature Scaling</button>
+          <button class="pf-btn" onclick="filterPatterns('product_market_fit')">PMF</button>
+          <button class="pf-btn" onclick="filterPatterns('unit_economics')">Unit Economics</button>
+          <button class="pf-btn" onclick="filterPatterns('fundraising')">Fundraising</button>
+          <button class="pf-btn" onclick="filterPatterns('team')">Team</button>
+          <button class="pf-btn" onclick="filterPatterns('go_to_market')">Go-To-Market</button>
+          <button class="pf-btn" onclick="filterPatterns('competition')">Competition</button>
+        </div>
+        <div class="patterns-grid" id="patterns-grid">
+          <div class="patterns-loading">Loading pattern library…</div>
+        </div>
       </div>
-      <div class="patterns-grid" id="patterns-grid">
-        <div class="patterns-loading">Loading pattern library…</div>
+    </section>
+
+    <!-- ── Monthly Tracking ────────────────────────────────────── -->
+    <div id="history-panel" class="hidden"></div>
+
+    <!-- ── Metric Trend Chart ────────────────────────────────────── -->
+    <div id="trend-chart-section" class="card trend-chart-section hidden">
+      <h2>Metric Trend</h2>
+      <p class="section-desc">Your tracked metrics over time — MRR growth rate vs. churn rate. Pattern detection dates shown as vertical markers.</p>
+      <div class="trend-chart-wrap">
+        <canvas id="trend-chart" height="260"></canvas>
+      </div>
+    </div>
+
+    <!-- ── Pattern Submission ─────────────────────────────────────── -->
+    <section class="card" id="submit-section">
+      <h2>Submit a Failure Pattern</h2>
+      <p class="section-desc">Witnessed a startup failure pattern not in our library? Share it — reviewed submissions are added to the pattern library and help all founders. Your story could save someone else's company.</p>
+      <div class="submit-form">
+        <div class="sf-row">
+          <div class="sf-field">
+            <label>Pattern Name <span class="sf-req">*</span></label>
+            <input type="text" id="sf-name" maxlength="120" placeholder="e.g. Dependency on Single Enterprise Customer">
+          </div>
+          <div class="sf-field">
+            <label>Category <span class="sf-req">*</span></label>
+            <select id="sf-category">
+              <option value="">Select category</option>
+              <option value="unit_economics">Unit Economics</option>
+              <option value="product_market_fit">Product-Market Fit</option>
+              <option value="premature_scaling">Premature Scaling</option>
+              <option value="fundraising">Fundraising</option>
+              <option value="team">Team</option>
+              <option value="go_to_market">Go-To-Market</option>
+              <option value="competition">Competition</option>
+              <option value="product">Product</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="sf-field">
+          <label>What happened? <span class="sf-req">*</span></label>
+          <textarea id="sf-narrative" rows="4" maxlength="1500"
+            placeholder="Describe the failure pattern — what were the early warning signs, how did it escalate, and what was the final outcome?"></textarea>
+        </div>
+        <div class="sf-row">
+          <div class="sf-field">
+            <label>Company (optional)</label>
+            <input type="text" id="sf-company" maxlength="100" placeholder="Real company or 'Anonymous'">
+          </div>
+          <div class="sf-field">
+            <label>Your role (optional)</label>
+            <input type="text" id="sf-role" maxlength="100" placeholder="e.g. Founder, Investor, Operator">
+          </div>
+        </div>
+        <button class="sf-submit-btn" id="sf-submit-btn" onclick="submitPattern()">
+          <span id="sf-btn-text">Submit Pattern for Review</span>
+          <span id="sf-btn-spinner" class="hidden">Submitting…</span>
+        </button>
+        <div id="sf-status" class="sf-status hidden"></div>
       </div>
     </section>
 
   </main>
 
   <footer>
-    <p>Built with Gemini 2.5 Flash · MongoDB Atlas · Google Cloud &nbsp;·&nbsp; <button class="footer-link" onclick="openHowItWorks()">How it works</button></p>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.5rem;margin-bottom:0.75rem">
+      <span class="tech-badge">Google ADK</span>
+      <span class="tech-badge">Gemini 3 Flash</span>
+      <span class="tech-badge">Gemini 2.5 Flash</span>
+      <span class="tech-badge">MongoDB Atlas</span>
+      <span class="tech-badge">Atlas Vector Search</span>
+      <span class="tech-badge">MongoDB MCP</span>
+      <span class="tech-badge">Vertex AI</span>
+    </div>
+    <p style="color:var(--muted);font-size:0.8rem">
+      <button class="footer-link" onclick="openHowItWorks()">How it works</button>
+      &nbsp;·&nbsp; Apache 2.0 &nbsp;·&nbsp;
+      <a href="https://github.com/usv240/oracle-failure-agent" target="_blank" style="color:var(--accent);text-decoration:none">GitHub</a>
+    </p>
   </footer>
 
+  <!-- ── Stripe Modal ──────────────────────────────────────────── -->
+  <div id="stripe-modal" class="hiw-overlay hidden" onclick="if(event.target===this)closeStripeModal()">
+    <div class="hiw-modal" style="max-width:480px">
+      <button class="hiw-close" onclick="closeStripeModal()">✕</button>
+      <div style="text-align:center;margin-bottom:1.5rem">
+        <div style="font-size:2rem;margin-bottom:0.5rem">💳</div>
+        <h2 style="font-size:1.3rem;margin-bottom:0.5rem">Import from Stripe</h2>
+        <p style="color:var(--muted);font-size:0.88rem">Connect your Stripe account to auto-fill MRR, growth rate, and churn from real data.</p>
+      </div>
+      <div style="margin-bottom:1rem">
+        <label style="display:block;font-size:0.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.5rem">Stripe API Key</label>
+        <input id="stripe-key-input" type="password" placeholder="sk_test_... or sk_live_..."
+          style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:0.75rem;color:var(--text);font-size:0.95rem"
+          onkeydown="if(event.key==='Enter')fetchStripeMetrics()"/>
+      </div>
+      <button id="stripe-fetch-btn" onclick="fetchStripeMetrics()"
+        style="width:100%;padding:0.85rem;background:linear-gradient(135deg,#635bff,#0a2540);color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;margin-bottom:0.75rem">
+        Import Metrics
+      </button>
+      <p style="font-size:0.75rem;color:var(--muted);text-align:center">
+        Read-only access. We fetch subscription and revenue data only. Your key is never stored.
+      </p>
+    </div>
+  </div>
+
   <script src="app.js"></script>
+  <script>
+    // Initialize monthly tracking on page load
+    window.addEventListener('load', () => { renderHistory(); });
+  </script>
 </body>
 </html>

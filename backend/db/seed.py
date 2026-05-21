@@ -31,11 +31,23 @@ async def seed_patterns():
     result = await collection.insert_many(patterns)
     print(f"[OK] Seeded {len(result.inserted_ids)} failure patterns with embeddings")
 
-    # Create indexes
+    # Indexes on failure_patterns
     await collection.create_index("pattern_id", unique=True)
     await collection.create_index("category")
     await collection.create_index([("stage_month_min", 1), ("stage_month_max", 1)])
-    print("[OK] Indexes created")
+    print("[OK] failure_patterns indexes created")
+
+    # Indexes on watched_startups (monitoring)
+    watched = db["watched_startups"]
+    await watched.create_index("startup_name", unique=True)
+    await watched.create_index([("watching", 1), ("last_checked", 1)])
+    print("[OK] watched_startups indexes created")
+
+    # Indexes on startup_analyses (session memory)
+    analyses = db["startup_analyses"]
+    await analyses.create_index([("startup_name", 1), ("checked_at", -1)])
+    await analyses.create_index("checked_at")
+    print("[OK] startup_analyses indexes created")
 
     await close()
 

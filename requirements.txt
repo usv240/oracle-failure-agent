@@ -10,3 +10,4 @@ google-adk>=1.0.0
 python-dotenv==1.0.1
 httpx>=0.28.1
 aiofiles==23.2.1
+mcp==1.27.1
