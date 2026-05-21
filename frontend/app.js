@@ -293,7 +293,7 @@ async function runAnalysis() {
     termBody.scrollTop = termBody.scrollHeight;
   }
 
-  addTermLine('>', 'Starting Oracle pipeline — Gemini 3 Flash ADK Agent → Atlas Vector Search → MongoDB MCP → Gemini 3 Flash scoring...');
+  addTermLine('>', 'Starting Oracle pipeline — MongoDB Voyage AI (embed) → Atlas Vector Search + BM25 RRF → MongoDB MCP → Gemini 3 Flash scoring...');
 
   try {
     const response = await fetch(`${API}/api/metrics/analyze/stream`, {

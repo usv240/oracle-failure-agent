@@ -1215,6 +1215,36 @@ textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3
 [data-theme="dark"] .slides-btn { color: #34d399; border-color: rgba(52,211,153,0.3); background: rgba(52,211,153,0.08); }
 .slides-btn:hover { background: rgba(16,185,129,0.15); }
 .slides-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Data Provenance Strip ───────────────────────────────────────── */
+.provenance-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.prov-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+.prov-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.prov-mongo  { background: #00ed64; }
+.prov-google { background: #4285f4; }
+.prov-sep    { color: var(--border); }
 .share-confirm {
   font-size: 0.82rem;
   color: var(--safe);

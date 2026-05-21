@@ -50,8 +50,10 @@ async def _run_agent_stream(metrics: MetricsInput):
     db = get_db()
 
     # ── Step 1: Embed ────────────────────────────────────────────────
-    yield _evt("step", icon="🤖", message="Oracle pipeline initializing — Gemini text-embedding-004 → Atlas Vector Search → MongoDB MCP → Gemini 3 Flash scoring")
-    yield _evt("step", icon="🔢", message="Generating 768-dimensional embedding from 11 startup metrics via Gemini text-embedding-004...")
+    from backend.config import settings
+    embed_model = "MongoDB Voyage AI voyage-4-large (1024-dim)" if settings.VOYAGE_API_KEY else "Google text-embedding-004 (768-dim)"
+    yield _evt("step", icon="🤖", message=f"Oracle pipeline initializing — {embed_model} → Atlas Vector Search + BM25 → MongoDB MCP → Gemini 3 Flash scoring")
+    yield _evt("step", icon="🔢", message=f"Generating embedding from 11 startup metrics via {embed_model}...")
 
     query_text = (
         f"startup failure: month {metrics.current_month}, "
@@ -65,7 +67,8 @@ async def _run_agent_stream(metrics: MetricsInput):
         yield _evt("error", message=f"Embedding failed: {e}")
         return
 
-    yield _evt("step", icon="✅", message=f"768-dimensional embedding ready.")
+    dim = 1024 if settings.VOYAGE_API_KEY else 768
+    yield _evt("step", icon="✅", message=f"{dim}-dimensional embedding ready — stored in MongoDB Atlas for vector similarity search.")
 
     # ── Step 2: MongoDB Atlas Vector Search ─────────────────────────
     yield _evt("step", icon="🔍", message="Hybrid retrieval: MongoDB Atlas Vector Search (cosine similarity) + Atlas Search (BM25) — merging via Reciprocal Rank Fusion...")

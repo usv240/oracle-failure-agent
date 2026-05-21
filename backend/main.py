@@ -139,6 +139,8 @@ async def health():
         "gemini_active": active_gemini3_model,
         "gemini3_chain": _GEMINI3_CHAIN,
         "gemini_fallback": f"{settings.GEMINI_MODEL} (vertex-ai)",
+        "embedding_model": "voyage-4-large (1024-dim)" if settings.VOYAGE_API_KEY else "text-embedding-004 (768-dim)",
+        "embedding_source": "MongoDB Voyage AI" if settings.VOYAGE_API_KEY else "Google Vertex AI",
     }
 
 

@@ -117,10 +117,12 @@
         <div class="hiw-step">
           <div class="step-num">2</div>
           <div class="step-body">
-            <h4>Semantic search via MongoDB Atlas Vector Search</h4>
-            <p>Your metrics are converted into a text description and embedded using <strong>Google's text-embedding-004</strong> model. MongoDB Atlas Vector Search performs cosine similarity search across 100 failure pattern narratives — finding patterns that <em>semantically</em> match your situation, not just numeric thresholds.</p>
-            <div class="tech-tag">MongoDB Atlas Vector Search</div>
-            <div class="tech-tag">Gemini text-embedding-004</div>
+            <h4>Hybrid semantic search via MongoDB Atlas</h4>
+            <p>Your metrics are converted into a text description and embedded using <strong>MongoDB Voyage AI <code>voyage-4-large</code></strong> (1024-dim, asymmetric retrieval). Two searches run in parallel: <strong>Atlas Vector Search</strong> (cosine similarity) and <strong>Atlas Search</strong> (BM25 full-text) — both results merged via <strong>Reciprocal Rank Fusion</strong> for higher recall than either alone.</p>
+            <div class="tech-tag">MongoDB Voyage AI</div>
+            <div class="tech-tag">Atlas Vector Search</div>
+            <div class="tech-tag">Atlas Search (BM25)</div>
+            <div class="tech-tag">Reciprocal Rank Fusion</div>
           </div>
         </div>
         <div class="hiw-step">
@@ -201,8 +203,13 @@
           </div>
           <div class="stack-item">
             <div class="stack-icon"></div>
+            <strong>MongoDB Voyage AI</strong>
+            <small>voyage-4-large generates 1024-dim embeddings for all 100 patterns and every query</small>
+          </div>
+          <div class="stack-item">
+            <div class="stack-icon"></div>
             <strong>MongoDB Atlas</strong>
-            <small>Failure pattern library with Vector Search index for semantic retrieval</small>
+            <small>Vector Search (cosine) + Atlas Search (BM25) merged via Reciprocal Rank Fusion</small>
           </div>
           <div class="stack-item">
             <div class="stack-icon"></div>
@@ -816,6 +823,25 @@
       </div>
 
       <!-- Report actions -->
+      <!-- Data provenance strip -->
+      <div class="provenance-strip">
+        <span class="prov-item" title="Query embedded via MongoDB Voyage AI voyage-4-large">
+          <span class="prov-dot prov-mongo"></span>MongoDB Voyage AI · voyage-4-large · 1024-dim
+        </span>
+        <span class="prov-sep">·</span>
+        <span class="prov-item" title="Pattern matched via MongoDB Atlas Vector Search + BM25 RRF">
+          <span class="prov-dot prov-mongo"></span>Atlas Vector Search + BM25 RRF
+        </span>
+        <span class="prov-sep">·</span>
+        <span class="prov-item" title="Scored by Gemini 3 Flash via Google ADK">
+          <span class="prov-dot prov-google"></span>Gemini 3 Flash · Google ADK
+        </span>
+        <span class="prov-sep">·</span>
+        <span class="prov-item" title="Pattern data stored in MongoDB Atlas">
+          <span class="prov-dot prov-mongo"></span>MongoDB Atlas
+        </span>
+      </div>
+
       <div class="report-actions">
         <button class="action-btn download-btn" onclick="downloadReport()">Download Report</button>
         <button class="action-btn share-btn" onclick="shareAnalysis()">Share Analysis</button>
@@ -968,11 +994,11 @@
     <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.5rem;margin-bottom:0.75rem">
       <span class="tech-badge">Google ADK</span>
       <span class="tech-badge">Gemini 3 Flash</span>
-      <span class="tech-badge">Gemini 2.5 Flash</span>
-      <span class="tech-badge">MongoDB Atlas</span>
+      <span class="tech-badge">MongoDB Voyage AI</span>
       <span class="tech-badge">Atlas Vector Search</span>
+      <span class="tech-badge">Atlas Search</span>
       <span class="tech-badge">MongoDB MCP</span>
-      <span class="tech-badge">Vertex AI</span>
+      <span class="tech-badge">Cloud Run</span>
     </div>
     <p style="color:var(--muted);font-size:0.8rem">
       <button class="footer-link" onclick="openHowItWorks()">How it works</button>
