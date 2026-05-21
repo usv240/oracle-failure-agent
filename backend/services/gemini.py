@@ -118,14 +118,43 @@ async def generate_json(prompt: str) -> str:
         return response.text
 
 
-async def embed(text: str) -> list[float]:
-    """Generate 768-dim embedding via Vertex AI text-embedding-004."""
+_voyage_client = None
+
+def _get_voyage_client():
+    global _voyage_client
+    if _voyage_client is None:
+        import voyageai
+        from backend.config import settings
+        _voyage_client = voyageai.AsyncClient(api_key=settings.VOYAGE_API_KEY)
+    return _voyage_client
+
+
+async def embed(text: str, input_type: str = "query") -> list[float]:
+    """
+    Generate 1024-dim embedding via MongoDB Voyage AI (voyage-4-large).
+    input_type='document' when indexing patterns, 'query' when searching.
+    Falls back to Google text-embedding-004 if VOYAGE_API_KEY not configured.
+    """
+    from backend.config import settings
+    if settings.VOYAGE_API_KEY:
+        try:
+            client = _get_voyage_client()
+            result = await client.embed(
+                texts=[text],
+                model="voyage-4-large",
+                input_type=input_type,
+            )
+            return result.embeddings[0]
+        except Exception as e:
+            logger.warning("Voyage AI embed failed (%s), falling back to text-embedding-004", e)
+
+    # Fallback: Google text-embedding-004 via Vertex AI
     try:
         client = _get_vertex_client()
         response = client.models.embed_content(model="text-embedding-004", contents=text)
         return response.embeddings[0].values
     except Exception as e:
-        logger.warning("Vertex AI embed failed (%s), falling back to API key", e)
+        logger.warning("Vertex AI embed failed (%s), falling back to API key client", e)
         client = _get_api_key_client()
         response = client.models.embed_content(model="text-embedding-004", contents=text)
         return response.embeddings[0].values

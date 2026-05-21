@@ -21,12 +21,40 @@ async def seed_patterns():
     # Drop existing and re-seed for idempotency
     await collection.drop()
 
-    # Generate embeddings for each pattern's narrative
-    print(f"Generating embeddings for {len(patterns)} patterns...")
-    for i, pattern in enumerate(patterns):
-        embed_text = f"{pattern['name']}: {pattern['narrative']}"
-        pattern["narrative_embedding"] = await embed(embed_text)
-        print(f"  [{i+1}/{len(patterns)}] {pattern['pattern_id']} embedded")
+    # Generate embeddings using Voyage AI batch API to stay within free-tier limits:
+    # 3 RPM + 10K TPM → batch 30 patterns per call, 65s sleep between batches
+    print(f"Generating embeddings for {len(patterns)} patterns via Voyage AI (batched)...")
+    from backend.config import settings
+    batch_size = 30
+
+    if settings.VOYAGE_API_KEY:
+        import voyageai
+        import time
+        vo = voyageai.AsyncClient(api_key=settings.VOYAGE_API_KEY)
+        batches = [patterns[i:i+batch_size] for i in range(0, len(patterns), batch_size)]
+
+        for b_idx, batch in enumerate(batches):
+            if b_idx > 0:
+                print(f"  [Rate limit] Waiting 65s before next batch...")
+                await asyncio.sleep(65)
+            texts = [f"{p['name']}: {p['narrative']}" for p in batch]
+            try:
+                result = await vo.embed(texts=texts, model="voyage-4-large", input_type="document")
+                for p, emb in zip(batch, result.embeddings):
+                    p["narrative_embedding"] = emb
+                start = b_idx * batch_size
+                print(f"  [Voyage AI] Batch {b_idx+1}/{len(batches)}: F-{start+1:03d}–F-{start+len(batch):03d} embedded (1024-dim)")
+            except Exception as e:
+                print(f"  [Voyage AI] Batch {b_idx+1} failed ({e}), falling back to text-embedding-004")
+                for i, p in enumerate(batch):
+                    embed_text = f"{p['name']}: {p['narrative']}"
+                    p["narrative_embedding"] = await embed(embed_text, input_type="document")
+                    print(f"    [{b_idx*batch_size+i+1}/{len(patterns)}] {p['pattern_id']} embedded (768-dim fallback)")
+    else:
+        for i, pattern in enumerate(patterns):
+            embed_text = f"{pattern['name']}: {pattern['narrative']}"
+            pattern["narrative_embedding"] = await embed(embed_text, input_type="document")
+            print(f"  [{i+1}/{len(patterns)}] {pattern['pattern_id']} embedded")
 
     result = await collection.insert_many(patterns)
     print(f"[OK] Seeded {len(result.inserted_ids)} failure patterns with embeddings")
