@@ -115,7 +115,10 @@ async def _run_agent_stream(metrics: MetricsInput):
         candidates = await _candidate_patterns(metrics)
 
     if not candidates:
-        yield _evt("safe", message="No patterns matched your metrics. Your trajectory looks healthy.")
+        from backend.services.pattern_matcher import compute_oracle_score as _cos1
+        s1, b1 = _cos1(metrics, 0.0)
+        yield _evt("safe", message="No patterns matched your metrics. Your trajectory looks healthy.",
+                   oracle_score=s1, score_band=b1)
         return
 
     names = [p["name"] for p in candidates]
@@ -209,7 +212,11 @@ async def _run_agent_stream(metrics: MetricsInput):
     # ── Step 6: Result ────────────────────────────────────────────────
     if best_score < 0.60 or best_match is None:
         yield _evt("step", icon="✅", message=f"Best match score: {int(best_score*100)}% — below 60% threshold. No dangerous pattern confirmed.")
-        yield _evt("safe", message="No dangerous failure patterns detected. Your metrics look healthy for this stage.")
+        from backend.services.pattern_matcher import compute_oracle_score as _cos2
+        s2, b2 = _cos2(metrics, best_score)
+        yield _evt("step", icon="📊", message=f"Oracle Score: {s2}/100 ({b2.upper()})")
+        yield _evt("safe", message="No dangerous failure patterns detected. Your metrics look healthy for this stage.",
+                   oracle_score=s2, score_band=b2)
         return
 
     yield _evt("step", icon="⚠️", message=f"Pattern confirmed: {best_match['name']} at {int(best_score*100)}% match score. Generating full alert...")
@@ -270,11 +277,26 @@ async def _run_agent_stream(metrics: MetricsInput):
     except Exception as e:
         yield _evt("step", icon="⚠️", message=f"Challenger Agent skipped: {e}")
 
+    # ── Step 8: Oracle Score + Recovery Scenario ─────────────────────
+    from backend.services.pattern_matcher import compute_oracle_score, build_recovery_scenario
+    oracle_score, score_band = compute_oracle_score(metrics, match.confidence)
+    recovery = build_recovery_scenario(metrics, match.confidence)
+    yield _evt("step", icon="📊", message=f"Oracle Score: {oracle_score}/100 ({score_band.upper()})")
+
     yield _evt("result",
                alert=True,
                startup_name=metrics.startup_name,
                message=f"Pattern detected: {match.pattern_name} at {int(match.confidence*100)}% match score.",
-               pattern=match.model_dump())
+               pattern=match.model_dump(),
+               oracle_score=oracle_score,
+               score_band=score_band,
+               recovery_scenario={
+                   "pattern_name": match.pattern_name,
+                   "confidence": recovery["confidence"],
+                   "survival_rate": match.survival_rate,
+                   "improvements": recovery["improvements"],
+                   "score_delta": recovery["score_delta"],
+               })
 
 
 @router.post("/analyze/stream")

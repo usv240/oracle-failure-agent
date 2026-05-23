@@ -1205,6 +1205,144 @@ textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3
 }
 [data-theme="dark"] .slack-share-btn { color: #c084fc; border-color: rgba(192,132,252,0.3); background: rgba(192,132,252,0.08); }
 .slack-share-btn:hover { background: rgba(74,21,75,0.15); }
+
+/* ── Public Share Button ─────────────────────────────────────────── */
+.public-share-btn {
+  background: rgba(37,99,235,0.08);
+  border-color: rgba(37,99,235,0.3);
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+}
+[data-theme="dark"] .public-share-btn { color: #60a5fa; border-color: rgba(96,165,250,0.3); background: rgba(96,165,250,0.08); }
+.public-share-btn:hover { background: rgba(37,99,235,0.15); }
+.public-share-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Oracle Score™ Card ──────────────────────────────────────────── */
+.oracle-score-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.5rem;
+  align-items: center;
+  padding: 1.1rem 1.3rem;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  transition: border-color 0.3s;
+}
+.oracle-score-card[data-band="strong"]   { border-color: rgba(16,185,129,0.45); background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.04)); }
+.oracle-score-card[data-band="watch"]    { border-color: rgba(245,158,11,0.4);  background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(217,119,6,0.04)); }
+.oracle-score-card[data-band="warning"]  { border-color: rgba(249,115,22,0.45); background: linear-gradient(135deg, rgba(249,115,22,0.10), rgba(234,88,12,0.04)); }
+.oracle-score-card[data-band="critical"] { border-color: rgba(239,68,68,0.5);   background: linear-gradient(135deg, rgba(239,68,68,0.10), rgba(220,38,38,0.04)); }
+.osc-left { text-align: center; min-width: 100px; }
+.osc-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 0.2rem;
+}
+.osc-value {
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.osc-value[data-band="strong"]   { color: #10b981; }
+.osc-value[data-band="watch"]    { color: #f59e0b; }
+.osc-value[data-band="warning"]  { color: #f97316; }
+.osc-value[data-band="critical"] { color: #ef4444; }
+.osc-band {
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-top: 0.35rem;
+  letter-spacing: 0.04em;
+}
+.osc-band[data-band="strong"]   { color: #10b981; }
+.osc-band[data-band="watch"]    { color: #f59e0b; }
+.osc-band[data-band="warning"]  { color: #f97316; }
+.osc-band[data-band="critical"] { color: #ef4444; }
+.osc-right { display: flex; flex-direction: column; gap: 0.5rem; }
+.osc-bar-wrap {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--border);
+  overflow: hidden;
+}
+.osc-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  width: 0%;
+  transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+}
+.osc-bar-fill[data-band="strong"]   { background: #10b981; }
+.osc-bar-fill[data-band="watch"]    { background: #f59e0b; }
+.osc-bar-fill[data-band="warning"]  { background: #f97316; }
+.osc-bar-fill[data-band="critical"] { background: #ef4444; }
+.osc-tip { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+
+/* ── Recovery Path Card ──────────────────────────────────────────── */
+.recovery-card {
+  padding: 1rem 1.2rem;
+  margin: 0.5rem 0 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(16,185,129,0.3);
+  background: linear-gradient(135deg, rgba(16,185,129,0.06), rgba(5,150,105,0.03));
+}
+.rec-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.rec-icon { font-size: 1.1rem; color: #10b981; }
+.rec-title {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+.rec-delta {
+  margin-left: auto;
+  font-weight: 700;
+  color: #10b981;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+.rec-list {
+  margin: 0 0 0.5rem;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+.rec-list li { margin-bottom: 0.2rem; }
+.rec-sub {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ── Shared Snapshot Banner ──────────────────────────────────────── */
+.shared-banner {
+  display: flex;
+  justify-content: center;
+  padding: 0.55rem 1rem;
+  background: rgba(37,99,235,0.12);
+  border-bottom: 1px solid rgba(37,99,235,0.3);
+  font-size: 0.82rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+.shared-banner a {
+  color: var(--accent);
+  font-weight: 600;
+  margin-left: 0.4rem;
+  text-decoration: none;
+}
+.shared-banner a:hover { text-decoration: underline; }
+
 .slides-btn {
   background: rgba(16,185,129,0.08);
   border-color: rgba(16,185,129,0.3);

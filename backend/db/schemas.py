@@ -70,10 +70,21 @@ class PatternMatch(BaseModel):
     output_file: Optional[str] = None
 
 
+class RecoveryScenario(BaseModel):
+    pattern_name: Optional[str] = None
+    confidence: float = 0.0
+    survival_rate: float = 0.0
+    improvements: list[str] = []   # e.g. ["Cut churn from 22% to 5%", "Improve LTV:CAC to 3x"]
+    score_delta: int = 0           # how many points the Oracle Score would gain
+
+
 class AlertResponse(BaseModel):
     alert: bool
     startup_name: str
     pattern: Optional[PatternMatch] = None
+    oracle_score: Optional[int] = None
+    score_band: Optional[str] = None
+    recovery_scenario: Optional[RecoveryScenario] = None
     message: str = ""
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 

@@ -23,6 +23,97 @@ def _ltv_cac_ratio(metrics: MetricsInput) -> float:
     return metrics.ltv / metrics.cac
 
 
+def compute_oracle_score(metrics: MetricsInput, match_confidence: float = 0.0) -> tuple[int, str]:
+    """
+    Composite startup health score 0-100. Higher = healthier.
+
+    Formula (transparent, deterministic):
+      Start at 100. Subtract penalties for unhealthy metrics + matched pattern confidence.
+      Add bonuses for strong signals (high NPS, good unit economics).
+
+    Returns (score, band) where band ∈ {"strong", "watch", "warning", "critical"}.
+    """
+    score = 100.0
+
+    # Pattern match penalty — up to -60 if 100% match
+    score -= match_confidence * 60
+
+    # Churn penalty — every 1% over 5% loses 2 points
+    churn_pct = metrics.churn_rate * 100
+    if churn_pct > 5:
+        score -= min((churn_pct - 5) * 2, 30)
+
+    # LTV:CAC penalty — if below 3, lose up to 15
+    ltv_cac = (metrics.ltv / metrics.cac) if metrics.cac > 0 else 0
+    if ltv_cac < 3:
+        score -= min((3 - ltv_cac) * 5, 15)
+
+    # Runway penalty — under 12 months loses up to 15
+    if metrics.runway_months < 12:
+        score -= min((12 - metrics.runway_months) * 1.5, 15)
+
+    # Burn multiple penalty — over 2x loses up to 10
+    bm = _burn_multiple(metrics)
+    if bm > 2:
+        score -= min((bm - 2) * 2, 10)
+
+    # NPS bonus — over 30 adds up to +10
+    if metrics.nps > 30:
+        score += min((metrics.nps - 30) / 7, 10)
+
+    # Growth bonus — over 10%/mo adds up to +5
+    if metrics.mrr_growth_rate > 0.10:
+        score += min((metrics.mrr_growth_rate - 0.10) * 50, 5)
+
+    score = max(0, min(100, round(score)))
+
+    if score >= 75:    band = "strong"
+    elif score >= 50:  band = "watch"
+    elif score >= 25:  band = "warning"
+    else:              band = "critical"
+
+    return int(score), band
+
+
+def build_recovery_scenario(metrics: MetricsInput, current_match_confidence: float) -> dict:
+    """
+    Project the Oracle Score under healthier counterfactual metrics.
+    Returns the score delta + a list of suggested improvements.
+    Does NOT call Gemini — pure math, runs instantly.
+    """
+    improvements = []
+    recovered = metrics.model_copy()
+
+    if metrics.churn_rate > 0.05:
+        recovered.churn_rate = 0.05
+        improvements.append(f"Reduce churn from {metrics.churn_rate*100:.1f}% to 5%")
+
+    ltv_cac = (metrics.ltv / metrics.cac) if metrics.cac > 0 else 0
+    if ltv_cac < 3 and metrics.cac > 0:
+        recovered.cac = metrics.ltv / 3
+        improvements.append(f"Improve LTV:CAC from {ltv_cac:.1f}x to 3x")
+
+    if metrics.runway_months < 12:
+        recovered.runway_months = 12
+        improvements.append(f"Extend runway from {metrics.runway_months} to 12 months")
+
+    if metrics.nps < 30:
+        recovered.nps = 30
+        improvements.append(f"Lift NPS from {metrics.nps} to 30")
+
+    # Lower match confidence proportional to how much we improved (rough heuristic)
+    recovered_confidence = current_match_confidence * 0.4 if improvements else current_match_confidence
+
+    current_score, _ = compute_oracle_score(metrics, current_match_confidence)
+    recovered_score, _ = compute_oracle_score(recovered, recovered_confidence)
+
+    return {
+        "improvements": improvements,
+        "score_delta": max(0, recovered_score - current_score),
+        "confidence": round(recovered_confidence, 2),
+    }
+
+
 def _reciprocal_rank_fusion(lists: list[list[dict]], k: int = 60) -> list[dict]:
     """
     Reciprocal Rank Fusion — merges multiple ranked lists into one.

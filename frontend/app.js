@@ -143,6 +143,7 @@ window.addEventListener('load', () => {
   renderHistory();
   renderTrendChart();
   initPortfolio();
+  loadSharedReport();
 });
 
 async function loadLiveStats() {
@@ -263,6 +264,8 @@ async function runAnalysis() {
   hide('challenger-panel');
   hide('accuracy-showcase');
   hide('alert-lib-link');
+  hide('oracle-score-card');
+  hide('recovery-card');
 
   const payload = {
     startup_name:    val('startup_name'),
@@ -330,10 +333,24 @@ async function runAnalysis() {
             addTermLine(evt.icon || '>', evt.message);
           } else if (evt.type === 'result') {
             addTermLine('', `Pattern confirmed: <span class="highlight">${evt.pattern?.pattern_name}</span> — ${Math.round((evt.pattern?.confidence||0)*100)}% match score`, 'terminal-alert');
-            finalData = { alert: true, startup_name: evt.startup_name, pattern: evt.pattern, message: evt.message };
+            finalData = {
+              alert: true,
+              startup_name: evt.startup_name,
+              pattern: evt.pattern,
+              message: evt.message,
+              oracle_score: evt.oracle_score,
+              score_band: evt.score_band,
+              recovery_scenario: evt.recovery_scenario,
+            };
           } else if (evt.type === 'safe') {
             addTermLine('', evt.message, 'terminal-safe');
-            finalData = { alert: false, startup_name: payload.startup_name, message: evt.message };
+            finalData = {
+              alert: false,
+              startup_name: payload.startup_name,
+              message: evt.message,
+              oracle_score: evt.oracle_score,
+              score_band: evt.score_band,
+            };
           } else if (evt.type === 'challenger') {
             challengerData = evt;
           } else if (evt.type === 'error') {
@@ -474,7 +491,57 @@ function animateCounter(el, target, suffix = '', duration = 1200) {
 }
 
 // ── Result Rendering ─────────────────────────────────────────────
+function renderOracleScore(score, band) {
+  const card = document.getElementById('oracle-score-card');
+  if (!card || typeof score !== 'number') return;
+
+  const valEl  = document.getElementById('osc-value');
+  const bandEl = document.getElementById('osc-band');
+  const barEl  = document.getElementById('osc-bar-fill');
+  const tipEl  = document.getElementById('osc-tip');
+
+  // Band labels and tips come from backend's score_band field
+  const bandText = {
+    strong:   'STRONG · Healthy trajectory',
+    watch:    'WATCH · Monitor weekly',
+    warning:  'WARNING · Course correct now',
+    critical: 'CRITICAL · Take action this week',
+  }[band] || band.toUpperCase();
+
+  if (valEl)  { valEl.textContent = score; valEl.dataset.band = band; }
+  if (bandEl) { bandEl.textContent = bandText; bandEl.dataset.band = band; }
+  if (barEl)  { barEl.dataset.band = band; barEl.style.width = '0%'; setTimeout(() => barEl.style.width = `${score}%`, 80); }
+  if (tipEl)  { tipEl.textContent = `Composite of all 11 metrics + pattern match. ${score}/100.`; }
+
+  card.dataset.band = band;
+  card.classList.remove('hidden');
+}
+
+function renderRecovery(scenario) {
+  const card = document.getElementById('recovery-card');
+  if (!card || !scenario || !scenario.improvements?.length) {
+    if (card) card.classList.add('hidden');
+    return;
+  }
+
+  const deltaEl = document.getElementById('rec-delta');
+  const listEl  = document.getElementById('rec-list');
+  const subEl   = document.getElementById('rec-sub');
+
+  if (deltaEl) deltaEl.textContent = `+${scenario.score_delta}`;
+  if (subEl)   subEl.textContent   = `Match confidence would drop to ${Math.round((scenario.confidence || 0) * 100)}%`;
+  if (listEl) {
+    listEl.innerHTML = scenario.improvements.map(s => `<li>${s}</li>`).join('');
+  }
+  card.classList.remove('hidden');
+}
+
 function renderResult(data) {
+  // Render Oracle Score on both paths (alert and safe)
+  if (typeof data.oracle_score === 'number') {
+    renderOracleScore(data.oracle_score, data.score_band || 'watch');
+  }
+
   if (!data.alert) {
     hide('risk-banner');
     show('safe-section');
@@ -482,6 +549,9 @@ function renderResult(data) {
   }
 
   switchResultTab('result-tab-overview');
+
+  // Recovery scenario only meaningful on alert
+  if (data.recovery_scenario) renderRecovery(data.recovery_scenario);
 
   const p = data.pattern;
   const pct = Math.round(p.confidence * 100);
@@ -909,6 +979,77 @@ ${failures}
 }
 
 // ── 5. Share Analysis ────────────────────────────────────────────
+// ── Public Share Link ────────────────────────────────────────────
+async function createPublicShare() {
+  if (!_lastResult || !_lastPayload) return;
+  const btn = document.getElementById('public-share-btn');
+  const confirmEl = document.getElementById('public-share-confirm');
+  const origText = btn?.innerHTML;
+  if (btn) { btn.textContent = 'Generating link…'; btn.disabled = true; }
+
+  try {
+    const res = await fetch(`${API}/api/share/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        startup_name: _lastPayload.startup_name,
+        payload: _lastPayload,
+        result: _lastResult,
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const url = `${window.location.origin}${data.url_path}`;
+    await navigator.clipboard.writeText(url);
+    if (confirmEl) {
+      confirmEl.textContent = `Public link copied — ${url.length > 50 ? url.slice(0, 50) + '…' : url}`;
+      confirmEl.classList.remove('hidden');
+      setTimeout(() => confirmEl.classList.add('hidden'), 4000);
+    }
+  } catch (err) {
+    alert(`Could not create public link: ${err.message}`);
+  } finally {
+    if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+  }
+}
+
+// On page load, if URL has ?share=XXX, load that shared report
+async function loadSharedReport() {
+  const params = new URLSearchParams(window.location.search);
+  const shareId = params.get('share');
+  if (!shareId) return;
+
+  try {
+    const res = await fetch(`${API}/api/share/${shareId}`);
+    if (!res.ok) return;
+    const doc = await res.json();
+    if (!doc?.result) return;
+
+    // Pre-fill form fields from saved payload
+    if (doc.payload) {
+      Object.keys(doc.payload).forEach(k => {
+        const el = document.getElementById(k);
+        if (el && doc.payload[k] !== undefined) el.value = doc.payload[k];
+      });
+      updateLiveMetrics();
+    }
+    _lastResult  = doc.result;
+    _lastPayload = doc.payload;
+
+    // Render the saved result directly (skip running new analysis)
+    renderResult(doc.result);
+    saveSnapshot(doc.result, doc.payload);
+
+    // Banner: viewing a shared snapshot
+    const banner = document.createElement('div');
+    banner.className = 'shared-banner';
+    banner.innerHTML = `<span>Viewing a shared Oracle analysis snapshot · <a href="/">Run your own →</a></span>`;
+    document.body.prepend(banner);
+  } catch (err) {
+    console.warn('Failed to load shared report', err);
+  }
+}
+
 function shareAnalysis() {
   if (!_lastPayload) return;
   const params = new URLSearchParams();

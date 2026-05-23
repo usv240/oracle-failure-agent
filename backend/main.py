@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from backend.db.connection import ping, close
-from backend.routes import metrics, audit, patterns, stream, integrations, monitor, extract, portfolio, export
+from backend.routes import metrics, audit, patterns, stream, integrations, monitor, extract, portfolio, export, share
 from backend.config import OUTPUT_PATH, settings
 from backend.services.mcp_client import mcp
 from backend.services.monitor import start_monitor, stop_monitor
@@ -31,6 +31,9 @@ async def lifespan(app: FastAPI):
         await _db["watched_startups"].create_index("startup_name", unique=True)
         await _db["startup_analyses"].create_index([("startup_name", 1), ("checked_at", -1)])
         await _db["startup_analyses"].create_index([("alert", 1), ("checked_at", -1)])
+        # Shared reports: unique ID + TTL 90 days
+        await _db["shared_reports"].create_index("share_id", unique=True)
+        await _db["shared_reports"].create_index("created_at", expireAfterSeconds=60*60*24*90)
     except Exception as e:
         logger.warning("Index creation warning (may already exist): %s", e)
 
@@ -89,6 +92,7 @@ app.include_router(monitor.router, prefix="/api/metrics", tags=["monitoring"])
 app.include_router(extract.router, prefix="/api/metrics", tags=["extraction"])
 app.include_router(portfolio.router, prefix="/api/portfolio", tags=["portfolio"])
 app.include_router(export.router, prefix="/api/export", tags=["export"])
+app.include_router(share.router, prefix="/api/share", tags=["share"])
 
 
 @app.get("/api/stats")

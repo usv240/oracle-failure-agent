@@ -4,7 +4,7 @@ const BASE = 'http://localhost:8080';
 
 async function goToPortfolio(page: Page) {
   await page.goto(BASE);
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   await page.click('[data-tab="tab-portfolio"]');
   await expect(page.locator('#tab-portfolio')).not.toHaveClass(/hidden/);
 }

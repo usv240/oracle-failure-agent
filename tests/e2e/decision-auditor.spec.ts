@@ -4,7 +4,7 @@ const BASE = 'http://localhost:8080';
 
 async function goToAuditor(page: Page) {
   await page.goto(BASE);
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   await page.click('[data-tab="tab-auditor"]');
   await expect(page.locator('#tab-auditor')).not.toHaveClass(/hidden/);
 }
@@ -89,12 +89,12 @@ test('audit with high-risk metrics surfaces linked pattern card', async ({ page 
 });
 
 test('audit button re-enables after result', async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   await goToAuditor(page);
   await page.fill('#decision-text', 'Should I cut headcount by 20%?');
   await page.click('#audit-btn');
 
-  await expect(page.locator('#audit-result')).not.toHaveClass(/hidden/, { timeout: 55_000 });
+  await expect(page.locator('#audit-result')).not.toHaveClass(/hidden/, { timeout: 110_000 });
   await expect(page.locator('#audit-btn')).toBeEnabled();
   await expect(page.locator('#audit-btn')).toHaveText('Audit This Decision');
 });

@@ -869,6 +869,22 @@
         </div>
       </div>
     </section>
+
+      <!-- Oracle Score™ — single composite startup-health number (shown for both alert and safe paths) -->
+      <div class="oracle-score-card hidden" id="oracle-score-card">
+        <div class="osc-left">
+          <div class="osc-label">ORACLE SCORE</div>
+          <div class="osc-value" id="osc-value">—</div>
+          <div class="osc-band" id="osc-band">—</div>
+        </div>
+        <div class="osc-right">
+          <div class="osc-bar-wrap">
+            <div class="osc-bar-fill" id="osc-bar-fill"></div>
+          </div>
+          <div class="osc-tip" id="osc-tip">Composite of all 11 metrics + matched pattern.</div>
+        </div>
+      </div>
+
       <section class="card alert-card hidden" id="alert-section">
 
       <!-- Risk level banner — populated by renderResult() -->
@@ -1110,9 +1126,24 @@
         </span>
       </div>
 
+      <!-- Counterfactual Recovery Scenario — populated from backend response -->
+      <div class="recovery-card hidden" id="recovery-card">
+        <div class="rec-header">
+          <span class="rec-icon">↗</span>
+          <span class="rec-title">Recovery Path</span>
+          <span class="rec-delta" id="rec-delta"></span>
+        </div>
+        <ul class="rec-list" id="rec-list"></ul>
+        <div class="rec-sub" id="rec-sub"></div>
+      </div>
+
       <div class="report-actions">
         <button class="action-btn download-btn" onclick="downloadReport()">Download Report</button>
         <button class="action-btn share-btn" onclick="shareAnalysis()">Share Analysis</button>
+        <button class="action-btn public-share-btn" id="public-share-btn" onclick="createPublicShare()" title="Generate a public link anyone can view">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.3rem;vertical-align:-2px"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Public Link
+        </button>
         <button class="action-btn slides-btn" id="slides-btn" onclick="exportSlides()" title="Download board-ready HTML deck powered by Gemini 3">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.3rem;vertical-align:-2px"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
           Export Board Deck
@@ -1123,6 +1154,7 @@
         </button>
         <span class="share-confirm hidden" id="share-confirm">Link copied!</span>
         <span class="share-confirm hidden" id="slack-confirm">Posted to Slack!</span>
+        <span class="share-confirm hidden" id="public-share-confirm">Public link copied!</span>
       </div>
     </section>
       <section class="card safe-card hidden" id="safe-section">
