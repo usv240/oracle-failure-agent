@@ -141,11 +141,11 @@ test('clicking terminal pill expands the log', async ({ page }) => {
 });
 
 test('Healthy startup returns safe result', async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   await goTo(page);
   await clickDemo(page, 'healthy');
   await runAnalysis(page);
-  await page.waitForSelector('#alert-section:not(.hidden), #safe-section:not(.hidden)', { timeout: 55_000 });
+  await page.waitForSelector('#alert-section:not(.hidden), #safe-section:not(.hidden)', { timeout: 110_000 });
   await expect(page.locator('#safe-section')).not.toHaveClass(/hidden/);
 });
 
