@@ -26,13 +26,17 @@ class MetricsInput(BaseModel):
 
 
 class DecisionAuditInput(BaseModel):
+    startup_name: str = Field(..., min_length=1, max_length=100)
+    current_month: int = Field(..., ge=1, le=120)
     decision: str = Field(..., min_length=5, max_length=2000)
     metrics: MetricsInput
 
-    @field_validator("decision", mode="before")
+    @field_validator("decision", "startup_name", mode="before")
     @classmethod
-    def strip_decision(cls, v):
-        return str(v).strip() if v else v
+    def strip_decision_and_name(cls, v):
+        if isinstance(v, str):
+            return v.strip()
+        return v
 
 
 class CounterfactualInput(BaseModel):

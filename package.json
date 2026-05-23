@@ -1,0 +1,30 @@
+{
+  "name": "oracle",
+  "version": "1.0.0",
+  "description": "> 90% of startups fail for the same documented reasons. The warning signals appear 3–6 months before the crisis. Most founders never see them coming.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:api": "playwright test --grep @api"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/usv240/oracle-failure-agent.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/usv240/oracle-failure-agent/issues"
+  },
+  "homepage": "https://github.com/usv240/oracle-failure-agent#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}

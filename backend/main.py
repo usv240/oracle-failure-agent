@@ -60,8 +60,8 @@ app = FastAPI(
     description="AI agent that detects startup failure patterns before they become fatal",
     version="1.0.0",
     lifespan=lifespan,
-    docs_url=None,   # hide Swagger UI in production
-    redoc_url=None,  # hide ReDoc in production
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 app.add_middleware(

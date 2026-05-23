@@ -102,13 +102,22 @@ async def _analyze_single(metrics: MetricsInput) -> PortfolioCompanyResult:
         )
 
 
+async def _analyze_with_stagger(metrics: MetricsInput, idx: int) -> PortfolioCompanyResult:
+    """Stagger concurrent embed calls by 300ms per company to avoid Voyage AI rate limits."""
+    if idx > 0:
+        await asyncio.sleep(idx * 0.3)
+    return await _analyze_single(metrics)
+
+
 @router.post("/analyze", response_model=PortfolioResponse)
 async def analyze_portfolio(body: PortfolioRequest):
     """
-    Analyze a portfolio of startups in parallel.
+    Analyze a portfolio of startups in parallel (staggered to respect embed rate limits).
     Returns each company's risk level, matched pattern, and days to crisis — ranked by risk.
     """
-    results = await asyncio.gather(*[_analyze_single(m) for m in body.startups])
+    results = await asyncio.gather(
+        *[_analyze_with_stagger(m, i) for i, m in enumerate(body.startups)]
+    )
     results = sorted(results, key=lambda r: r.confidence, reverse=True)
 
     risk_order = {"CRITICAL": 0, "HIGH": 1, "MODERATE": 2, "SAFE": 3}

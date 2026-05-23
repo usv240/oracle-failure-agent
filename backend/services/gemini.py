@@ -129,6 +129,14 @@ def _get_voyage_client():
     return _voyage_client
 
 
+def _adjust_dimension(vector: list[float], target_dim: int = 1024) -> list[float]:
+    if len(vector) < target_dim:
+        return vector + [0.0] * (target_dim - len(vector))
+    elif len(vector) > target_dim:
+        return vector[:target_dim]
+    return vector
+
+
 async def embed(text: str, input_type: str = "query") -> list[float]:
     """
     Generate 1024-dim embedding via MongoDB Voyage AI (voyage-4-large).
@@ -138,13 +146,13 @@ async def embed(text: str, input_type: str = "query") -> list[float]:
     from backend.config import settings
     if settings.VOYAGE_API_KEY:
         try:
+            import asyncio as _asyncio
             client = _get_voyage_client()
-            result = await client.embed(
-                texts=[text],
-                model="voyage-4-large",
-                input_type=input_type,
+            result = await _asyncio.wait_for(
+                client.embed(texts=[text], model="voyage-4-large", input_type=input_type),
+                timeout=15.0,
             )
-            return result.embeddings[0]
+            return _adjust_dimension(result.embeddings[0])
         except Exception as e:
             logger.warning("Voyage AI embed failed (%s), falling back to text-embedding-004", e)
 
@@ -152,12 +160,12 @@ async def embed(text: str, input_type: str = "query") -> list[float]:
     try:
         client = _get_vertex_client()
         response = client.models.embed_content(model="text-embedding-004", contents=text)
-        return response.embeddings[0].values
+        return _adjust_dimension(response.embeddings[0].values)
     except Exception as e:
         logger.warning("Vertex AI embed failed (%s), falling back to API key client", e)
         client = _get_api_key_client()
         response = client.models.embed_content(model="text-embedding-004", contents=text)
-        return response.embeddings[0].values
+        return _adjust_dimension(response.embeddings[0].values)
 
 
 async def generate_json_fast(prompt: str) -> str:
