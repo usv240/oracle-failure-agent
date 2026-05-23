@@ -49,7 +49,7 @@ async def seed_patterns():
                 for i, p in enumerate(batch):
                     embed_text = f"{p['name']}: {p['narrative']}"
                     p["narrative_embedding"] = await embed(embed_text, input_type="document")
-                    print(f"    [{b_idx*batch_size+i+1}/{len(patterns)}] {p['pattern_id']} embedded (768-dim fallback)")
+                    print(f"    [{b_idx*batch_size+i+1}/{len(patterns)}] {p['pattern_id']} embedded (1024-dim)")
     else:
         for i, pattern in enumerate(patterns):
             embed_text = f"{pattern['name']}: {pattern['narrative']}"

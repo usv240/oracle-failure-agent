@@ -95,6 +95,7 @@ async def _analyze_startup_metrics(
 
     return json.dumps({"status": "complete", "alert": result["alert"],
                        "pattern_name": result.get("pattern", {}).get("pattern_name", "none"),
+                       "pattern_id": result.get("pattern", {}).get("pattern_id", "none"),
                        "confidence": result.get("pattern", {}).get("confidence", 0)})
 
 
@@ -199,6 +200,57 @@ async def _fetch_category_benchmarks(category: str) -> str:
         return json.dumps({"error": str(e)})
 
 
+async def _challenge_pattern_match(
+    startup_name: str,
+    current_month: int,
+    mrr: float,
+    mrr_growth_rate: float,
+    churn_rate: float,
+    burn_rate: float,
+    runway_months: int,
+    headcount: int,
+    nps: int,
+    cac: float,
+    ltv: float,
+    pattern_id: str,
+    investigator_confidence: float,
+    industry: str = "B2B SaaS",
+) -> str:
+    """
+    Challenger Agent — a second Gemini 3 instance that independently stress-tests
+    the Investigator's pattern match with deliberate skepticism.
+
+    Call this when alert=True and 0.60 <= confidence <= 0.92.
+    Skip when confidence >= 0.93 (evidence is overwhelming) or alert=False.
+
+    Returns: verdict (CONFIRM|DISPUTE), challenger_confidence, reasoning, strongest_counter.
+    """
+    from backend.services.pattern_matcher import _challenger_evaluate
+    from backend.db.schemas import MetricsInput
+    from backend.db.connection import get_db
+
+    metrics = MetricsInput(
+        startup_name=startup_name, current_month=current_month,
+        mrr=mrr, mrr_growth_rate=mrr_growth_rate, churn_rate=churn_rate,
+        burn_rate=burn_rate, runway_months=runway_months, headcount=headcount,
+        nps=nps, cac=cac, ltv=ltv, industry=industry,
+    )
+
+    # Fetch the full pattern to give the Challenger real trigger conditions and signals
+    db = get_db()
+    full_pattern = await db["failure_patterns"].find_one(
+        {"pattern_id": pattern_id},
+        {"_id": 0, "narrative_embedding": 0},
+    )
+    if not full_pattern:
+        return json.dumps({"error": f"Pattern {pattern_id} not found — skipping Challenger"})
+
+    result = await _challenger_evaluate(metrics, full_pattern, investigator_confidence)
+    logger.info("[ADK] Challenger: %s (Δ%.0fpp) — %s",
+                result["verdict"], result["delta_pp"], result.get("reasoning", "")[:80])
+    return json.dumps(result)
+
+
 # ── Agent singleton ──────────────────────────────────────────────────────────
 
 _agent: Optional[Agent] = None
@@ -206,18 +258,20 @@ _runner: Optional[Runner] = None
 _session_service: Optional[InMemorySessionService] = None
 
 _AGENT_INSTRUCTION = """You are the Failure Oracle — an AI agent that detects startup failure patterns
-before they become fatal. You have three tools:
+before they become fatal. You have four tools:
 
 1. analyze_startup_metrics — analyzes metrics against the failure pattern library
-2. fetch_category_benchmarks — fetches survival statistics for a failure category from MongoDB
-3. save_analysis_report — saves a structured report to disk
+2. challenge_pattern_match — Challenger Agent: a second Gemini 3 instance that stress-tests the Investigator's finding
+3. fetch_category_benchmarks — fetches survival statistics for a failure category from MongoDB
+4. save_analysis_report — saves a structured report to disk
 
 When given startup metrics:
 1. Call analyze_startup_metrics with ALL metric values provided
-2. If an alert was detected, call fetch_category_benchmarks with the matched pattern's category to get survival stats
-3. Call save_analysis_report with: startup_name, alert status, pattern_name, confidence, a 1-sentence recommendation, and the category_insight string from step 2
+2. If alert=True and 0.60 <= confidence <= 0.92, call challenge_pattern_match with all the same metric values plus the pattern_id and investigator_confidence returned from step 1. Skip if confidence >= 0.93 or alert=False.
+3. If an alert was detected, call fetch_category_benchmarks with the matched pattern's category to get survival stats
+4. Call save_analysis_report with: startup_name, alert status, pattern_name, confidence, a 1-sentence recommendation, and the category_insight string from step 3
 
-Always call all three tools when an alert is detected. If no alert, skip step 2 and call save_analysis_report with alert=False."""
+Always call all relevant tools when an alert is detected. If no alert, skip steps 2-3 and call save_analysis_report with alert=False."""
 
 
 def _get_runner() -> tuple[Runner, InMemorySessionService]:
@@ -226,10 +280,11 @@ def _get_runner() -> tuple[Runner, InMemorySessionService]:
         _agent = Agent(
             name="failure_oracle",
             model="gemini-3-flash-preview",
-            description="Detects startup failure patterns using MongoDB Atlas Vector Search and Gemini 3, enriches with category benchmarks, then saves a report",
+            description="Detects startup failure patterns using MongoDB Atlas Vector Search and Gemini 3, stress-tests findings with a Challenger Agent, enriches with category benchmarks, then saves a report",
             instruction=_AGENT_INSTRUCTION,
             tools=[
                 FunctionTool(_analyze_startup_metrics),
+                FunctionTool(_challenge_pattern_match),
                 FunctionTool(_fetch_category_benchmarks),
                 FunctionTool(_save_analysis_report),
             ],

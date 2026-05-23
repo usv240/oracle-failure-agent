@@ -59,8 +59,8 @@ Load any of these with one click. Results are deterministic because they're base
  FastAPI  ──────►  Google ADK Agent  (gemini-3-flash-preview)
                        │
                        ├─ Tool 1: analyze_startup_metrics
-                       │     ├─► text-embedding-004 (Vertex AI)
-                       │     │       └─ 768-dim vector from 11 metrics
+                       │     ├─► MongoDB Voyage AI voyage-4-large (primary)
+                       │     │       └─ 1024-dim vector from 11 metrics
                        │     ├─► MongoDB Atlas Vector Search
                        │     │       └─ cosine similarity, 100 patterns
                        │     ├─► MongoDB MCP  (category enrichment)
@@ -68,15 +68,19 @@ Load any of these with one click. Results are deterministic because they're base
                        │     └─► Gemini 3 Flash  (parallel scoring)
                        │             └─ confidence, signals, reasoning
                        │
-                       ├─ Tool 2: fetch_category_benchmarks
+                       ├─ Tool 2: challenge_pattern_match  (60–92% confidence)
+                       │     └─► Gemini 3 Flash  (Challenger Agent)
+                       │             └─ independent stress-test of Investigator's finding
+                       │
+                       ├─ Tool 3: fetch_category_benchmarks
                        │     └─► MongoDB aggregation pipeline
                        │             └─ avg survival rate, worst pattern
                        │
-                       └─ Tool 3: save_analysis_report
+                       └─ Tool 4: save_analysis_report
                              └─► markdown report written to disk
 ```
 
-**Step 1 — Embed.** The 11 metrics are composed into a natural-language description and embedded into a 768-dimensional vector using Google's `text-embedding-004` model via Vertex AI.
+**Step 1 — Embed.** The 11 metrics are composed into a natural-language description and embedded into a 1024-dimensional vector. Primary model: MongoDB Voyage AI `voyage-4-large` (1024-dim, asymmetric retrieval). Fallback: Google `text-embedding-004` via Vertex AI, padded to 1024-dim via `_adjust_dimension`.
 
 **Step 2 — Vector Search.** The embedding queries MongoDB Atlas Vector Search (`$vectorSearch`, cosine similarity) across 100 failure pattern narratives. This finds patterns that *conceptually* match the startup's situation — semantic matching that pure numeric thresholds miss. Quibi's metrics find "Product-Market Fit Mirage" because the narrative matches, not because a churn threshold fires.
 
@@ -86,9 +90,11 @@ Load any of these with one click. Results are deterministic because they're base
 
 **Step 5 — Re-evaluation Loop.** If the best match scores below 70%, the agent re-queries MongoDB MCP for a broader pattern set and runs a second round of scoring. This is genuine agent behaviour — a second pass on low-confidence results, not a fallback.
 
-**Step 6 — Category Benchmarks.** The ADK agent calls `fetch_category_benchmarks` — a MongoDB aggregation pipeline that computes the average survival rate, total documented cases, and most dangerous pattern across the matched category. This context appears directly in the result UI.
+**Step 6 — Challenger Agent.** If a pattern is detected at 60–92% confidence, the ADK agent calls `challenge_pattern_match` — a second Gemini 3 Flash instance with a deliberately skeptical prompt. It independently scores the same pattern looking for counter-evidence ("which metrics CONTRADICT this match?"). If the Challenger's confidence differs by more than 10pp, it issues a DISPUTE verdict. Both the verdict and the strongest counter-metric appear in the result UI. This is genuine multi-agent adversarial verification, not a UI layer.
 
-**Step 7 — Alert or Safe.** Patterns above 60% confidence fire a full alert. Below 60%: safe result. The ADK agent saves a structured markdown report to disk regardless.
+**Step 7 — Category Benchmarks.** The ADK agent calls `fetch_category_benchmarks` — a MongoDB aggregation pipeline that computes the average survival rate, total documented cases, and most dangerous pattern across the matched category. This context appears directly in the result UI.
+
+**Step 8 — Alert or Safe.** Patterns above 60% confidence fire a full alert. Below 60%: safe result. The ADK agent saves a structured markdown report to disk regardless.
 
 ---
 
@@ -98,20 +104,28 @@ The `/api/metrics/analyze/stream` endpoint streams every agent step as Server-Se
 
 ```
 > Oracle pipeline initializing — Gemini 3 Flash ADK Agent → Atlas Vector Search → MongoDB MCP → Gemini 3 Flash scoring...
-🔢 Generating 768-dimensional embedding from 11 startup metrics...
-✅ 768-dimensional embedding ready.
-🔍 Querying MongoDB Atlas Vector Search across 100 failure pattern narratives...
-✅ Vector search found 3 candidate patterns: Product-Market Fit Mirage, Hidden Churn Spiral, Premature Scaling
-🗄️  Fetching category context via MongoDB MCP: querying all 'product_market_fit' patterns...
-✅ MongoDB MCP returned 10 'product_market_fit' patterns for context.
-🤖 Gemini 3 Flash scoring 3 candidates in parallel...
-⚡ Evaluating [1/3] Product-Market Fit Mirage...
-⚡ Evaluating [2/3] Hidden Churn Spiral...
-⚡ Evaluating [3/3] Premature Scaling...
+🔢 Generating 1024-dimensional embedding from 11 startup metrics...
+✅ 1024-dimensional embedding ready — stored in MongoDB Atlas for vector similarity search.
+🔍 Hybrid retrieval: MongoDB Atlas Vector Search (cosine similarity) + Atlas Search (BM25) — merging via Reciprocal Rank Fusion...
+✅ Vector Search + BM25 RRF: 10 vector + 8 BM25 results merged → top 5 candidates
+✅ Candidates: Product-Market Fit Mirage, Hidden Churn Spiral, Premature Scaling, Capital Efficiency Collapse, Talent Drain Crisis
+🗄️  MongoDB MCP → find('failure_patterns', {category: 'product_market_fit'}, limit=10)
+✅ MCP returned 10 'product_market_fit' patterns for context.
+🤖 Gemini 3 Flash scoring 5 candidates in parallel...
+⚡ Evaluating [1/5] Product-Market Fit Mirage...
+⚡ Evaluating [2/5] Hidden Churn Spiral...
+⚡ Evaluating [3/5] Premature Scaling...
+⚡ Evaluating [4/5] Capital Efficiency Collapse...
+⚡ Evaluating [5/5] Talent Drain Crisis...
 📊  → Product-Market Fit Mirage: 95% match score
 📊  → Hidden Churn Spiral: 41% match score
 📊  → Premature Scaling: 38% match score
+📊  → Capital Efficiency Collapse: 31% match score
+📊  → Talent Drain Crisis: 22% match score
 ⚠️  Pattern confirmed: Product-Market Fit Mirage at 95% match score. Generating full alert...
+⚖️  Challenger Agent independently evaluating Investigator's finding...
+✅  Challenger Agent CONFIRMS at 92% (Δ3pp) — CAC:LTV inversion is the dominant signal; I find no structural counter
+📊  Oracle Score: 18/100 (CRITICAL)
 ```
 
 If Gemini 3 is rate-limited during scoring, the terminal emits an amber notice and falls back transparently to Vertex AI 2.5 Flash.
@@ -131,7 +145,7 @@ Every alert result includes, in order:
 
 The track is colour-coded by urgency: grey for the past warning window, deepening red toward the crisis point. This makes the abstract "days to crisis" number visceral.
 
-**Category intelligence** — pulled from a live MongoDB aggregation: "In the Product-Market Fit category, only 11% survival rate across 847 documented cases. Most fatal pattern: Hidden Churn Spiral."
+**Category intelligence** — pulled from a live MongoDB aggregation: "In the Product-Market Fit category, only 11% survival rate across all curated cases. Most fatal pattern: Hidden Churn Spiral."
 
 **Gemini's match reasoning** — the model's own explanation of *why* the metrics match this pattern. Not a template. An actual sentence like "Your $48K CAC against a $12K LTV means you're spending 4x to acquire customers who will never pay you back — the same structural trap that killed Quibi."
 
@@ -190,7 +204,7 @@ The result shows:
 
 MongoDB is genuinely in the critical path — not a side store.
 
-**Atlas Vector Search.** Each of the 100 failure pattern narratives is embedded at seed time into a 768-dimensional vector using `text-embedding-004`. At query time, `$vectorSearch` (cosine similarity, `vector_index`) retrieves semantically similar patterns. This is why Quibi's metrics find "Product-Market Fit Mirage" — the narrative matches semantically, not because a numeric threshold fires.
+**Atlas Vector Search.** Each of the 100 failure pattern narratives is embedded at seed time into a 1024-dimensional vector using MongoDB Voyage AI `voyage-4-large` (falling back to `text-embedding-004` padded to 1024-dim). At query time, `$vectorSearch` (cosine similarity, `vector_index`) retrieves semantically similar patterns. This is why Quibi's metrics find "Product-Market Fit Mirage" — the narrative matches semantically, not because a numeric threshold fires.
 
 **MongoDB MCP — verifiable in production.** A persistent `mongodb-mcp-server@1.9.0` process starts at app startup over stdio. Three API endpoints use MCP as the primary data access layer:
 - `GET /api/patterns/` → MCP `find` — every response includes `"source": "mcp"`
@@ -209,7 +223,7 @@ The `"source": "mcp"` field in every patterns response is verifiable proof.
 
 ## Google ADK Agent
 
-The `/api/metrics/analyze` endpoint routes through a formal Google ADK agent:
+Google ADK (`google-adk`) is the official open-source agent framework from Google — the code-first developer layer that underpins Google Cloud Agent Builder. The `/api/metrics/analyze` endpoint routes through a formal ADK agent:
 
 ```python
 from google.adk.agents import Agent
@@ -219,14 +233,15 @@ agent = Agent(
     name="failure_oracle",
     model="gemini-3-flash-preview",
     tools=[
-        FunctionTool(analyze_startup_metrics),    # embed + vector search + score
+        FunctionTool(analyze_startup_metrics),    # embed + vector search + Gemini score
+        FunctionTool(challenge_pattern_match),    # Challenger Agent — second Gemini 3 instance
         FunctionTool(fetch_category_benchmarks),  # MongoDB aggregation for category stats
         FunctionTool(save_analysis_report),       # write markdown report to disk
     ],
 )
 ```
 
-The agent receives the startup's metrics, calls `analyze_startup_metrics` (which runs the full Atlas Vector Search + Gemini scoring pipeline), then calls `fetch_category_benchmarks` to enrich the result with category survival data, then calls `save_analysis_report` to persist the findings. Three tools. Real orchestration.
+The agent receives the startup's metrics and orchestrates four tools: `analyze_startup_metrics` runs the full Atlas Vector Search + Gemini scoring pipeline; if a pattern is detected at 60–92% confidence, `challenge_pattern_match` spins up a second Gemini 3 Flash instance that independently stress-tests the finding; `fetch_category_benchmarks` enriches the result with MongoDB aggregation-derived survival statistics; `save_analysis_report` persists the findings to disk. Four tools. Real orchestration with adversarial verification.
 
 The SSE streaming endpoint exposes the same underlying pipeline with real-time step-by-step visibility.
 
@@ -239,9 +254,9 @@ Gemini 3 Flash (`gemini-3-flash-preview`) is the primary model for all generatio
 | Technology | Role |
 |---|---|
 | **Gemini 3 Flash (`gemini-3-flash-preview`)** | ADK agent orchestration, parallel pattern scoring, decision auditing |
-| **Google ADK** | Agent framework — 3 FunctionTools, `Runner`, `InMemorySessionService` |
+| **Google ADK (`google-adk`)** | Official Google agent framework (the code-first layer of Google Cloud Agent Builder) — 4 FunctionTools (incl. Challenger Agent), `Runner`, `InMemorySessionService` |
 | **Gemini 2.5 Flash (Vertex AI)** | Fallback for generation under rate limits |
-| **text-embedding-004 (Vertex AI)** | 768-dim embeddings for patterns and queries |
+| **text-embedding-004 (Vertex AI)** | Fallback embeddings — padded to 1024-dim via `_adjust_dimension` |
 | **MongoDB Atlas** | Primary data store — 100 failure patterns, flexible schema |
 | **MongoDB Atlas Vector Search** | Semantic retrieval via cosine similarity (`vector_index`, READY) |
 | **MongoDB MCP (`mongodb-mcp-server@1.9.0`)** | Persistent stdio MCP server — 28 tools, in critical path |
@@ -270,7 +285,7 @@ oracle/
 │   │   └── integrations.py  # POST /api/integrations/stripe
 │   └── services/
 │       ├── gemini.py        # Gemini 3 Flash primary, Vertex AI 2.5 fallback
-│       ├── adk_runner.py    # ADK agent with 3 FunctionTools
+│       ├── adk_runner.py    # ADK agent with 4 FunctionTools (incl. Challenger Agent)
 │       ├── mcp_client.py    # Persistent MCP stdio connection manager
 │       ├── pattern_matcher.py  # Vector search + parallel Gemini scoring
 │       ├── auditor.py       # MCP fetch + Gemini 3 deliberate reasoning
@@ -279,9 +294,6 @@ oracle/
 │   ├── index.html           # Single-page app
 │   ├── style.css            # Light/dark theme, all component styles
 │   └── app.js               # All UI logic — streaming, rendering, charts
-├── agent/
-│   ├── agent.py             # Standalone ADK agent for CLI use
-│   └── agent_with_mcp.py    # ADK agent + MongoDB MCP toolset
 ├── data/
 │   └── failure_patterns_seed.json  # 100 patterns, F-001 to F-100
 ├── tests/
@@ -312,12 +324,17 @@ Health check response:
 ```json
 {
   "status": "ok",
+  "service": "failure-oracle",
+  "mongodb": "connected",
   "mcp": "ready",
   "mcp_tools": 28,
   "adk_agent": "initialized",
   "pattern_count": 100,
-  "gemini_primary": "gemini-3-flash-preview",
-  "gemini_fallback": "gemini-2.5-flash (vertex-ai)"
+  "gemini_active": "gemini-3-flash-preview",
+  "gemini3_chain": ["gemini-3-flash-preview", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-flash-lite-preview"],
+  "gemini_fallback": "gemini-2.5-flash (vertex-ai)",
+  "embedding_model": "voyage-4-large (1024-dim)",
+  "embedding_source": "MongoDB Voyage AI"
 }
 ```
 
@@ -325,7 +342,7 @@ Health check response:
 
 ## The Pattern Library
 
-100 documented failure patterns across 12 categories, built from primary sources: YC batch post-mortems, CB Insights startup failure reports, Paul Graham and Ben Horowitz essays, Sequoia / a16z / Bessemer research, and public founder post-mortems (Quibi, Theranos, WeWork, Homejoy, Jawbone, Juicero, Vine).
+100 curated failure archetypes across 12 categories, synthesized from public sources: YC batch post-mortems, CB Insights startup failure reports, Paul Graham and Ben Horowitz essays, Sequoia / a16z / Bessemer research, and public founder post-mortems (Quibi, Theranos, WeWork, Homejoy, Jawbone, Juicero, Vine). Each pattern's failure/survival counts and trigger thresholds are derived from these public records.
 
 | Category | Count | What's inside |
 |---|---|---|
@@ -383,8 +400,8 @@ GEMINI_MODEL=gemini-2.5-flash        # Vertex AI fallback model
 
 ```bash
 python -m backend.db.seed
-# Generating embeddings for 100 patterns via text-embedding-004...
-# [OK] Seeded 100 failure patterns with 768-dim embeddings
+# Generating embeddings for 100 patterns via Voyage AI (batched)...
+# [OK] Seeded 100 failure patterns with 1024-dim embeddings
 # [OK] Atlas Vector Search index created (vector_index, cosine)
 ```
 

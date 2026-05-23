@@ -20,7 +20,14 @@ from mcp import ClientSession, StdioServerParameters
 
 logger = logging.getLogger(__name__)
 
-DB_NAME = "oracle_db"
+def _get_db_name() -> str:
+    try:
+        from backend.config import settings
+        return settings.MONGODB_DB_NAME
+    except Exception:
+        return "oracle_db"
+
+DB_NAME = _get_db_name()
 
 # Global binary avoids npx download overhead on every request
 MCP_COMMAND = "mongodb-mcp-server"

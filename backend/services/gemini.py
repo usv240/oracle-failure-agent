@@ -74,6 +74,7 @@ def _try_gemini3(call_fn, config=None):
 
 async def generate(prompt: str) -> str:
     """Generate text. Tries all Gemini 3 models, falls back to Vertex AI 2.5."""
+    global active_gemini3_model, last_fallback_reason
     try:
         client = _get_api_key_client()
         last_exc = None
@@ -87,8 +88,7 @@ async def generate(prompt: str) -> str:
                 last_exc = e
         raise last_exc
     except Exception as e:
-        global last_fallback_reason
-        last_fallback_reason = f"All Gemini 3 models exhausted — switching to Vertex AI 2.5 Flash"
+        last_fallback_reason = "All Gemini 3 models exhausted — switching to Vertex AI 2.5 Flash"
         logger.warning("Gemini 3 generate chain failed, falling back to Vertex AI 2.5: %s", e)
         client = _get_vertex_client()
         response = client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt)
@@ -97,6 +97,7 @@ async def generate(prompt: str) -> str:
 
 async def generate_json(prompt: str) -> str:
     """JSON generation. Tries all Gemini 3 models, falls back to Vertex AI 2.5."""
+    global active_gemini3_model, last_fallback_reason
     config3 = types.GenerateContentConfig(response_mime_type="application/json")
     try:
         client = _get_api_key_client()
@@ -111,6 +112,7 @@ async def generate_json(prompt: str) -> str:
                 last_exc = e
         raise last_exc
     except Exception as e:
+        last_fallback_reason = f"Gemini 3 quota exhausted ({type(e).__name__}) — switching to Vertex AI 2.5 Flash"
         logger.warning("Gemini 3 generate_json chain failed, falling back to Vertex AI 2.5: %s", e)
         client = _get_vertex_client()
         response = client.models.generate_content(
@@ -171,6 +173,7 @@ async def embed(text: str, input_type: str = "query") -> list[float]:
 async def generate_json_fast(prompt: str) -> str:
     """Fast JSON scoring — Gemini 3 chain primary, Vertex AI 2.5 fallback.
     thinking_budget=0 on all Gemini 3 models for maximum speed."""
+    global active_gemini3_model, last_fallback_reason
     config_fast = types.GenerateContentConfig(
         response_mime_type="application/json",
         thinking_config=types.ThinkingConfig(thinking_budget=0),
@@ -189,7 +192,6 @@ async def generate_json_fast(prompt: str) -> str:
                 last_exc = e
         raise last_exc
     except Exception as e:
-        global last_fallback_reason
         last_fallback_reason = f"Gemini 3 quota exhausted ({type(e).__name__}) — switching to Vertex AI 2.5 Flash"
         logger.warning("Gemini 3 fast chain failed, falling back to Vertex AI 2.5: %s", e)
         client = _get_vertex_client()
@@ -204,6 +206,7 @@ async def generate_json_fast(prompt: str) -> str:
 async def generate_json_reasoned(prompt: str) -> str:
     """Deliberate JSON reasoning — Gemini 3 chain with thinking enabled.
     Used for decision auditing where deeper reasoning improves quality."""
+    global active_gemini3_model, last_fallback_reason
     config_think = types.GenerateContentConfig(
         response_mime_type="application/json",
         thinking_config=types.ThinkingConfig(thinking_budget=1024),
@@ -222,6 +225,7 @@ async def generate_json_reasoned(prompt: str) -> str:
                 last_exc = e
         raise last_exc
     except Exception as e:
+        last_fallback_reason = f"Gemini 3 quota exhausted ({type(e).__name__}) — switching to Vertex AI 2.5 Flash"
         logger.warning("Gemini 3 reasoned chain failed, falling back to Vertex AI 2.5: %s", e)
         client = _get_vertex_client()
         response = client.models.generate_content(

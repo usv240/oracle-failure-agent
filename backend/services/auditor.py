@@ -87,6 +87,9 @@ Be honest. Cite specific pattern names from the library above. Do not invent sta
     raw = await gemini.generate_json_reasoned(prompt)
     result = json.loads(raw)
 
+    total_failures = sum(p.get("failure_count", 0) for p in patterns)
+    total_survivals = sum(p.get("survival_count", 0) for p in patterns)
+
     return AuditResponse(
         decision=decision,
         key_differentiator=result.get("key_differentiator", ""),
@@ -94,4 +97,7 @@ Be honest. Cite specific pattern names from the library above. Do not invent sta
         risk_level=result.get("risk_level", "MEDIUM"),
         related_pattern=result.get("related_pattern"),
         rationale=result.get("rationale", ""),
+        total_cases=total_failures + total_survivals,
+        success_cases=total_survivals,
+        failure_cases=total_failures,
     )
