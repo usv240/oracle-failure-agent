@@ -23,3 +23,8 @@ agent/
 .vscode/
 .idea/
 *.DS_Store
+*.bak
+# Playwright
+node_modules/
+playwright-report/
+test-results/

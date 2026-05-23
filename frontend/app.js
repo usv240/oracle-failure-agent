@@ -153,6 +153,8 @@ async function loadLiveStats() {
     const bar = document.getElementById('live-stats-bar');
     if (!bar) return;
     bar.classList.remove('hidden');
+    const fallback = document.getElementById('fallback-stats-bar');
+    if (fallback) fallback.classList.add('hidden');
 
     const fmt = n => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 
@@ -280,7 +282,9 @@ async function runAnalysis() {
 
   const terminal = document.getElementById('agent-terminal');
   const termBody = document.getElementById('terminal-body');
+  const pill     = document.getElementById('terminal-pill');
   terminal.classList.remove('hidden');
+  if (pill) pill.classList.add('hidden');
   termBody.innerHTML = '';
 
   function addTermLine(icon, msg, cls = '') {
@@ -293,7 +297,7 @@ async function runAnalysis() {
     termBody.scrollTop = termBody.scrollHeight;
   }
 
-  addTermLine('>', 'Starting Oracle pipeline — MongoDB Voyage AI (embed) → Atlas Vector Search + BM25 RRF → MongoDB MCP → Gemini 3 Flash scoring...');
+  addTermLine('>', 'Starting Oracle pipeline — MongoDB Voyage AI (embed) → Atlas Vector Search + BM25 RRF → MongoDB MCP → Gemini 3 scoring...');
 
   try {
     const response = await fetch(`${API}/api/metrics/analyze/stream`, {
@@ -340,7 +344,7 @@ async function runAnalysis() {
     }
 
     await new Promise(r => setTimeout(r, 800));
-    terminal.classList.add('hidden');
+    collapseTerminal();
 
     if (finalData) {
       _lastResult = finalData;
@@ -358,18 +362,49 @@ async function runAnalysis() {
         body: JSON.stringify(payload),
       });
       const data = await res.json();
-      terminal.classList.add('hidden');
+      collapseTerminal();
       _lastResult = data;
       renderResult(data);
       saveSnapshot(data, payload);
     } catch (err2) {
-      terminal.classList.add('hidden');
+      collapseTerminal();
       alert('Error connecting to Oracle API. Is the server running?');
       console.error(err2);
     }
   } finally {
     btnText.classList.remove('hidden');
     btnSpinner.classList.add('hidden');
+  }
+}
+
+// ── Terminal collapse / expand ───────────────────────────────────
+function collapseTerminal() {
+  const terminal = document.getElementById('agent-terminal');
+  const pill     = document.getElementById('terminal-pill');
+  const body     = document.getElementById('terminal-body');
+  const lineCount = body ? body.children.length : 0;
+  if (terminal) terminal.classList.add('hidden');
+  if (pill) {
+    document.getElementById('tp-label').textContent =
+      `View agent execution log (${lineCount} steps)`;
+    pill.classList.remove('hidden');
+  }
+}
+
+function toggleTerminal() {
+  const terminal = document.getElementById('agent-terminal');
+  const pill     = document.getElementById('terminal-pill');
+  const btn      = document.getElementById('terminal-collapse-btn');
+  if (!terminal) return;
+  const isHidden = terminal.classList.contains('hidden');
+  if (isHidden) {
+    terminal.classList.remove('hidden');
+    if (pill) pill.classList.add('hidden');
+    // Scroll terminal into view
+    terminal.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } else {
+    terminal.classList.add('hidden');
+    if (pill) pill.classList.remove('hidden');
   }
 }
 
@@ -446,6 +481,8 @@ function renderResult(data) {
     return;
   }
 
+  switchResultTab('result-tab-overview');
+
   const p = data.pattern;
   const pct = Math.round(p.confidence * 100);
 
@@ -489,14 +526,41 @@ function renderResult(data) {
 
   // 2. Confidence bar — animate from 0 + 8. color coding
   const bar = document.getElementById('conf-bar');
-  bar.style.width = '0%';
-  bar.className = 'bar-fill ' + (pct >= 85 ? 'bar-danger' : pct >= 70 ? 'bar-warning' : 'bar-safe');
-  setTimeout(() => { bar.style.width = `${pct}%`; }, 80);
+  if (bar) {
+    bar.style.width = '0%';
+    bar.className = 'bar-fill ' + (pct >= 85 ? 'bar-danger' : pct >= 70 ? 'bar-warning' : 'bar-safe');
+    setTimeout(() => { bar.style.width = `${pct}%`; }, 80);
+  }
 
   // Confidence pct — count up
   const confEl = document.getElementById('conf-pct');
-  confEl.textContent = '0%';
-  setTimeout(() => animateCounter(confEl, pct, '%'), 80);
+  if (confEl) {
+    confEl.textContent = '0%';
+    setTimeout(() => animateCounter(confEl, pct, '%'), 80);
+  }
+
+  // SVGRadial Gauge update
+  const gaugeCircle = document.getElementById('gauge-fill-circle');
+  if (gaugeCircle) {
+    const radius = parseFloat(gaugeCircle.getAttribute('r')) || 40;
+    const circumference = 2 * Math.PI * radius; // ~251.2
+    gaugeCircle.style.strokeDasharray = circumference;
+    const offset = circumference - (pct / 100) * circumference;
+    gaugeCircle.style.strokeDashoffset = circumference; // reset first
+    
+    // Set gauge fill colors based on confidence level
+    const fillClass = pct >= 85 ? 'gauge-danger' : pct >= 70 ? 'gauge-warning' : 'gauge-safe';
+    gaugeCircle.className.baseVal = `radial-gauge-fill ${fillClass}`;
+    
+    setTimeout(() => {
+      gaugeCircle.style.strokeDashoffset = offset;
+    }, 80);
+  }
+  const confGaugeEl = document.getElementById('conf-pct-gauge');
+  if (confGaugeEl) {
+    confGaugeEl.textContent = '0%';
+    setTimeout(() => animateCounter(confGaugeEl, pct, '%'), 80);
+  }
 
   // Pattern ID badge
   setText('alert-pattern-id', p.pattern_id);
@@ -904,13 +968,16 @@ async function exportSlides() {
 // ── Decision Audit ───────────────────────────────────────────────
 async function runAudit() {
   const decision = document.getElementById('decision-text').value.trim();
-  if (!decision) return alert('Please describe the decision first.');
+  if (!decision) {
+    showAuditError('Please describe the decision first.');
+    return;
+  }
 
   const btn = document.getElementById('audit-btn');
   btn.disabled = true;
   // Animate the button text to show Gemini is reasoning
   const reasoningMsgs = [
-    'Gemini 3 Flash is reasoning…',
+    'Gemini 3 is reasoning…',
     'Cross-referencing 100 patterns…',
     'Evaluating risk vectors…',
     'Forming recommendation…',
@@ -942,12 +1009,26 @@ async function runAudit() {
     const res  = await fetch(`${API}/api/audit/evaluate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision, metrics }),
+      body: JSON.stringify({
+        decision,
+        startup_name: metrics.startup_name,
+        current_month: metrics.current_month,
+        metrics
+      }),
     });
+    
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      const details = Array.isArray(errData.detail)
+        ? errData.detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join(', ')
+        : (errData.detail || `HTTP Error ${res.status}`);
+      throw new Error(details);
+    }
+    
     const data = await res.json();
     renderAudit(data);
   } catch (err) {
-    alert('Error connecting to API.');
+    showAuditError(`Audit Failed: ${err.message}`);
     console.error(err);
   } finally {
     clearInterval(msgInterval);
@@ -956,31 +1037,52 @@ async function runAudit() {
   }
 }
 
+function showAuditError(message) {
+  const el = document.getElementById('audit-result');
+  if (!el) return;
+  el.className = 'audit-error-card';
+  el.innerHTML = `
+    <div class="audit-error-title">⚠ Analysis Interrupted</div>
+    <p class="audit-error-message">${message}</p>
+    <div style="font-size:0.75rem;color:var(--muted);margin-top:0.5rem">Ensure all numeric input fields (like MRR, Burn, LTV:CAC, Runway) are valid.</div>
+  `;
+  el.classList.remove('hidden');
+  el.scrollIntoView({ behavior: 'smooth' });
+}
+
 function renderAudit(data) {
   const el  = document.getElementById('audit-result');
   const cls = `risk-${data.risk_level.toLowerCase()}`;
 
-  // Find the linked pattern in the already-loaded library
   const linked = data.related_pattern
     ? _allPatterns.find(p => p.pattern_id === data.related_pattern)
     : null;
 
-  const patternCard = linked ? `
-    <div class="audit-pattern-card">
-      <div class="apc-label">Closest matching failure pattern</div>
-      <div class="apc-name">${linked.name}</div>
-      <div class="apc-meta">
-        <span class="apc-id">${linked.pattern_id}</span>
-        <span class="apc-cat">${linked.category}</span>
-        <span class="apc-surv ${(linked.survival_rate || 0) < 0.2 ? 'apc-surv-low' : 'apc-surv-ok'}">
-          ${Math.round((linked.survival_rate || 0) * 100)}% survival rate
-        </span>
+  let patternCard = '';
+  if (linked) {
+    const totalCases = (linked.survival_count || 0) + (linked.failure_count || 0);
+    const computedSurvRate = linked.survival_rate != null ? linked.survival_rate : (totalCases > 0 ? (linked.survival_count / totalCases) : 0);
+    const survRatePct = Math.round(computedSurvRate * 100);
+    const survClass = survRatePct < 25 ? 'apc-surv-low' : 'apc-surv-ok';
+    const catLabel = CAT_LABELS[linked.category] || (linked.category || '').replace(/_/g, ' ');
+
+    patternCard = `
+      <div class="audit-pattern-card" onclick="jumpToPattern('${linked.pattern_id}')" style="cursor:pointer" title="Click to view details in library">
+        <div class="apc-label">Closest matching failure pattern ↗</div>
+        <div class="apc-name">${linked.name}</div>
+        <div class="apc-meta">
+          <span class="apc-id">${linked.pattern_id}</span>
+          <span class="apc-cat">${catLabel}</span>
+          <span class="apc-surv ${survClass}">
+            ${survRatePct}% survival rate
+          </span>
+        </div>
+        ${linked.famous_failures && linked.famous_failures.length > 0
+          ? `<div class="apc-example">"${linked.famous_failures[0].company} — ${linked.famous_failures[0].detail}"</div>`
+          : ''}
       </div>
-      ${linked.famous_failures && linked.famous_failures.length > 0
-        ? `<div class="apc-example">"${linked.famous_failures[0].company} — ${linked.famous_failures[0].detail}"</div>`
-        : ''}
-    </div>
-  ` : '';
+    `;
+  }
 
   el.innerHTML = `
     <div class="audit-risk ${cls}">
@@ -1027,7 +1129,21 @@ async function loadPatternLibrary() {
 
 function filterPatterns(category) {
   document.querySelectorAll('.pf-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  
+  if (typeof event !== 'undefined' && event && event.target && event.target.classList.contains('pf-btn')) {
+    event.target.classList.add('active');
+  } else {
+    // Select the category button programmatically
+    const buttons = document.querySelectorAll('.pf-btn');
+    buttons.forEach(btn => {
+      const onclickAttr = btn.getAttribute('onclick') || '';
+      if ((!category && onclickAttr.includes("filterPatterns('')")) || 
+          (category && onclickAttr.includes(`filterPatterns('${category}')`))) {
+        btn.classList.add('active');
+      }
+    });
+  }
+  
   const filtered = category ? _allPatterns.filter(p => p.category === category) : _allPatterns;
   renderPatternGrid(filtered);
 }
@@ -1095,7 +1211,10 @@ function renderPatternGrid(patterns) {
 }
 
 function jumpToPattern(patternId) {
-  // 1. Make sure the Pattern Library section is open
+  // 1. Switch to Pattern Library tab
+  if (typeof switchTab === 'function') switchTab('tab-library');
+
+  // 2. Make sure the Pattern Library section is open
   const container = document.getElementById('patterns-container');
   const btn = document.getElementById('toggle-patterns-btn');
   if (container && container.classList.contains('hidden')) {
@@ -1180,6 +1299,7 @@ function renderCatChart() {
 function openHowItWorks() {
   document.getElementById('hiw-overlay').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  switchHiwTab('hiw-panel-process'); // Always reset to first panel on click
   setTimeout(renderCatChart, 100);
 }
 function closeHowItWorks() {
@@ -1189,6 +1309,23 @@ function closeHowItWorks() {
 function closeIfBackdrop(e) {
   if (e.target === document.getElementById('hiw-overlay')) closeHowItWorks();
 }
+function switchHiwTab(panelId) {
+  // Hide all tab panels inside the modal
+  document.querySelectorAll('.hiw-tab-panel').forEach(p => p.classList.add('hidden'));
+  // Show the selected panel
+  const target = document.getElementById(panelId);
+  if (target) target.classList.remove('hidden');
+  
+  // Toggle the active class on corresponding navigation buttons
+  document.querySelectorAll('.hiw-tab-btn').forEach(btn => btn.classList.remove('active'));
+  const activeBtn = document.querySelector(`.hiw-tab-btn[data-panel="${panelId}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
+  
+  // Re-render chart if switching to database panel to guarantee proper SVG sizes
+  if (panelId === 'hiw-panel-database') {
+    setTimeout(renderCatChart, 50);
+  }
+}
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeHowItWorks(); });
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -1197,6 +1334,34 @@ function num(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
 function setText(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
 function show(id) { document.getElementById(id)?.classList.remove('hidden'); }
 function hide(id) { document.getElementById(id)?.classList.add('hidden'); }
+
+// Main Tab Switcher
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  const targetTab = document.getElementById(tabId);
+  if (targetTab) targetTab.classList.remove('hidden');
+
+  document.querySelectorAll('.nav-item, .mobile-nav-item').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll(`.nav-item[data-tab="${tabId}"], .mobile-nav-item[data-tab="${tabId}"]`).forEach(btn => btn.classList.add('active'));
+
+  const contentArea = document.querySelector('.content-area');
+  if (contentArea) contentArea.scrollTop = 0;
+}
+
+// Result Sub-tab Switcher
+function switchResultTab(tabId) {
+  document.querySelectorAll('.result-tab-content').forEach(el => el.classList.add('hidden'));
+  const targetTab = document.getElementById(tabId);
+  if (targetTab) targetTab.classList.remove('hidden');
+
+  document.querySelectorAll('.result-tab-btn').forEach(btn => {
+    if (btn.getAttribute('onclick')?.includes(tabId)) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
 
 // ── Monthly Tracking (localStorage) ─────────────────────────────
 const STORAGE_KEY = 'oracle_snapshots';
@@ -1382,6 +1547,7 @@ function renderTrendChart() {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: {
@@ -1730,31 +1896,52 @@ function updateLiveMetrics() {
   const burnMultiple = netNewMrr > 0 ? (burn / netNewMrr) : 99;
   
   const burnEl = document.getElementById('live-burn');
+  const burnBar = document.getElementById('live-burn-bar');
   if (burn > 0 && netNewMrr > 0) {
     burnEl.textContent = burnMultiple.toFixed(1) + 'x';
     burnEl.className = 'lm-value ' + (burnMultiple <= 1.5 ? 'healthy' : (burnMultiple <= 3 ? 'warning' : 'danger'));
+    if (burnBar) {
+      const pct = Math.max(0, Math.min(100, (1 - (burnMultiple / 4.0)) * 100)); // lower burn multiple is better
+      burnBar.style.width = `${pct}%`;
+      burnBar.className = 'lm-bar-fill ' + (burnMultiple <= 1.5 ? 'healthy' : (burnMultiple <= 3 ? 'warning' : 'danger'));
+    }
   } else {
     burnEl.textContent = '--';
     burnEl.className = 'lm-value';
+    if (burnBar) burnBar.style.width = '0%';
   }
 
   const ltvcac = cac > 0 ? (ltv / cac) : 0;
   const ltvEl = document.getElementById('live-ltvcac');
+  const ltvBar = document.getElementById('live-ltvcac-bar');
   if (ltv > 0 && cac > 0) {
     ltvEl.textContent = ltvcac.toFixed(1) + 'x';
     ltvEl.className = 'lm-value ' + (ltvcac >= 3 ? 'healthy' : (ltvcac >= 1.5 ? 'warning' : 'danger'));
+    if (ltvBar) {
+      const pct = Math.max(0, Math.min(100, (ltvcac / 5.0) * 100)); // higher is better
+      ltvBar.style.width = `${pct}%`;
+      ltvBar.className = 'lm-bar-fill ' + (ltvcac >= 3 ? 'healthy' : (ltvcac >= 1.5 ? 'warning' : 'danger'));
+    }
   } else {
     ltvEl.textContent = '--';
     ltvEl.className = 'lm-value';
+    if (ltvBar) ltvBar.style.width = '0%';
   }
 
   const runwayEl = document.getElementById('live-runway');
+  const runwayBar = document.getElementById('live-runway-bar');
   if (runway > 0) {
     runwayEl.textContent = runway + ' mo';
     runwayEl.className = 'lm-value ' + (runway >= 18 ? 'healthy' : (runway >= 9 ? 'warning' : 'danger'));
+    if (runwayBar) {
+      const pct = Math.max(0, Math.min(100, (runway / 24.0) * 100)); // higher is better
+      runwayBar.style.width = `${pct}%`;
+      runwayBar.className = 'lm-bar-fill ' + (runway >= 18 ? 'healthy' : (runway >= 9 ? 'warning' : 'danger'));
+    }
   } else {
     runwayEl.textContent = '--';
     runwayEl.className = 'lm-value';
+    if (runwayBar) runwayBar.style.width = '0%';
   }
 }
 
