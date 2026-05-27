@@ -74,17 +74,56 @@ class RecoveryScenario(BaseModel):
     pattern_name: Optional[str] = None
     confidence: float = 0.0
     survival_rate: float = 0.0
-    improvements: list[str] = []   # e.g. ["Cut churn from 22% to 5%", "Improve LTV:CAC to 3x"]
-    score_delta: int = 0           # how many points the Oracle Score would gain
+    improvements: list[str] = []
+    score_delta: int = 0
+
+
+class EscapeIntervention(BaseModel):
+    metric: str
+    current_value: str
+    target_value: str
+    change_needed: str
+    difficulty: str                 # "easy" | "medium" | "hard"
+    estimated_confidence_drop: int  # pp knocked off the match confidence
+    action: str                     # concrete one-liner for the founder
+    impact_tier: str = "medium"     # "high" | "medium" | "low"
+
+
+class EscapePlan(BaseModel):
+    current_confidence: int
+    escape_threshold: int = 60
+    interventions: list[EscapeIntervention] = []
+    combined_drop: int = 0          # pp drop if top-3 interventions executed
+    escape_possible: bool = False
+
+
+class CocktailPattern(BaseModel):
+    pattern_id: str
+    pattern_name: str
+    confidence: float
+    survival_rate: float
+    days_to_crisis: int
+    category: str
+
+
+class CocktailMatch(BaseModel):
+    patterns: list[CocktailPattern]
+    compound_survival_rate: float
+    dominant_pattern: str
+    combined_days_to_crisis: int
+    risk_summary: str
 
 
 class AlertResponse(BaseModel):
     alert: bool
     startup_name: str
     pattern: Optional[PatternMatch] = None
+    cocktail: Optional[CocktailMatch] = None
     oracle_score: Optional[int] = None
     score_band: Optional[str] = None
     recovery_scenario: Optional[RecoveryScenario] = None
+    escape_plan: Optional[EscapePlan] = None
+    cascade: Optional[dict] = None  # Failure cascade graph ($graphLookup result)
     message: str = ""
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 

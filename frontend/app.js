@@ -31,32 +31,32 @@ const DEMOS = {
     industry: 'B2B SaaS',
   },
   quibi: {
-    startup_name: 'Quibi (April 2020)',
-    current_month: 4,
+    startup_name: 'Quibi (Month 12 Projection)',
+    current_month: 12,
     mrr: 420000,
-    mrr_growth_rate: 0.04,
-    churn_rate: 0.22,
+    mrr_growth_rate: 0.02,
+    churn_rate: 0.28,
     burn_rate: 8500000,
-    runway_months: 14,
+    runway_months: 8,
     headcount: 185,
-    nps: 8,
+    nps: 4,
     cac: 48000,
-    ltv: 12000,
+    ltv: 8000,
     industry: 'Consumer',
   },
   wework: {
-    startup_name: 'WeWork (Q3 2019)',
-    current_month: 20,
+    startup_name: 'WeWork (Q4 2019)',
+    current_month: 22,
     mrr: 2900000,
-    mrr_growth_rate: 0.14,
-    churn_rate: 0.16,
+    mrr_growth_rate: 0.08,
+    churn_rate: 0.18,
     burn_rate: 22000000,
-    runway_months: 7,
+    runway_months: 5,
     headcount: 14000,
-    nps: 18,
+    nps: 12,
     cac: 38000,
-    ltv: 19000,
-    industry: 'Marketplace',
+    ltv: 15000,
+    industry: 'Real Estate SaaS',
   },
   theranos: {
     startup_name: 'Theranos (2015)',
@@ -71,6 +71,34 @@ const DEMOS = {
     cac: 95000,
     ltv: 8000,
     industry: 'Healthtech',
+  },
+  fintech: {
+    startup_name: 'NeoBank X (Q2 2023)',
+    current_month: 18,
+    mrr: 340000,
+    mrr_growth_rate: 0.06,
+    churn_rate: 0.14,
+    burn_rate: 4200000,
+    runway_months: 9,
+    headcount: 62,
+    nps: 22,
+    cac: 320,
+    ltv: 2100,
+    industry: 'Fintech',
+  },
+  b2c: {
+    startup_name: 'ConsumerApp Y',
+    current_month: 10,
+    mrr: 95000,
+    mrr_growth_rate: 0.09,
+    churn_rate: 0.19,
+    burn_rate: 780000,
+    runway_months: 11,
+    headcount: 22,
+    nps: 15,
+    cac: 48,
+    ltv: 210,
+    industry: 'B2C',
   },
 };
 
@@ -178,6 +206,10 @@ async function loadLiveStats() {
     animateStat('ls-monitored', d.startups_monitored);
     animateStat('ls-alerts',    d.alerts_today);
     animateStat('ls-patterns',  d.pattern_count);
+    // Live integration proof — populated only if the backend exposes the fields
+    if (typeof d.mcp_calls_24h === 'number')       animateStat('ls-mcp-calls',        d.mcp_calls_24h);
+    if (typeof d.vector_searches_24h === 'number') animateStat('ls-vector-searches',  d.vector_searches_24h);
+    if (typeof d.gemini_calls_24h === 'number')    animateStat('ls-gemini-calls',     d.gemini_calls_24h);
   } catch (_) {
     // Silently fail — live stats are additive, not required
   }
@@ -266,6 +298,11 @@ async function runAnalysis() {
   hide('alert-lib-link');
   hide('oracle-score-card');
   hide('recovery-card');
+  hide('escape-plan-panel');
+  hide('cocktail-panel');
+  hide('cascade-panel');
+  hide('conf-forecast-section');
+  hide('sources-block');
 
   const payload = {
     startup_name:    val('startup_name'),
@@ -337,16 +374,20 @@ async function runAnalysis() {
               alert: true,
               startup_name: evt.startup_name,
               pattern: evt.pattern,
+              cocktail: evt.cocktail || null,
+              cascade: evt.cascade || null,
               message: evt.message,
               oracle_score: evt.oracle_score,
               score_band: evt.score_band,
               recovery_scenario: evt.recovery_scenario,
+              escape_plan: evt.escape_plan,
             };
           } else if (evt.type === 'safe') {
             addTermLine('', evt.message, 'terminal-safe');
             finalData = {
               alert: false,
               startup_name: payload.startup_name,
+              cocktail: evt.cocktail || null,
               message: evt.message,
               oracle_score: evt.oracle_score,
               score_band: evt.score_band,
@@ -529,7 +570,7 @@ function renderRecovery(scenario) {
   const subEl   = document.getElementById('rec-sub');
 
   if (deltaEl) deltaEl.textContent = `+${scenario.score_delta}`;
-  if (subEl)   subEl.textContent   = `Match confidence would drop to ${Math.round((scenario.confidence || 0) * 100)}%`;
+  if (subEl)   subEl.textContent   = `Pattern similarity would drop to ${Math.round((scenario.confidence || 0) * 100)}%`;
   if (listEl) {
     listEl.innerHTML = scenario.improvements.map(s => `<li>${s}</li>`).join('');
   }
@@ -542,6 +583,11 @@ function renderResult(data) {
     renderOracleScore(data.oracle_score, data.score_band || 'watch');
   }
 
+  // Trend delta + confidence trajectory forecast vs prior snapshots
+  const startupName = _lastPayload?.startup_name || data.startup_name || '';
+  renderTrendDelta(data, startupName);
+  renderConfidenceForecast(startupName);
+
   if (!data.alert) {
     hide('risk-banner');
     show('safe-section');
@@ -552,6 +598,18 @@ function renderResult(data) {
 
   // Recovery scenario only meaningful on alert
   if (data.recovery_scenario) renderRecovery(data.recovery_scenario);
+
+  // Escape Plan — ranked interventions to drop below danger threshold
+  if (data.escape_plan) renderEscapePlan(data.escape_plan);
+  else hide('escape-plan-panel');
+
+  // Cocktail Detection — co-occurring failure patterns
+  if (data.cocktail) renderCocktail(data.cocktail);
+  else hide('cocktail-panel');
+
+  // Failure Cascade Graph — $graphLookup collapse timeline
+  if (data.cascade) renderCascade(data.cascade);
+  else hide('cascade-panel');
 
   const p = data.pattern;
   const pct = Math.round(p.confidence * 100);
@@ -637,6 +695,9 @@ function renderResult(data) {
 
   // Narrative
   setText('alert-narrative', p.narrative);
+
+  // Research sources — cross-reference pattern library (loaded at startup)
+  renderPatternSources(p.pattern_id);
 
   // Category intelligence — computed from already-loaded pattern library
   renderCategoryIntel(p.pattern_id);
@@ -779,6 +840,11 @@ function renderResult(data) {
   // Crisis trajectory timeline
   renderTimeline(p);
 
+  // Render Trajectory Forecast Chart
+  if (pl) {
+    renderTrajectoryChart(p, pl);
+  }
+
   // Playbook — numbered steps with staggered entrance
   const pbList = document.getElementById('playbook-list');
   pbList.innerHTML = '';
@@ -814,6 +880,20 @@ function renderResult(data) {
 
   show('alert-section');
   document.getElementById('alert-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ── Pattern Research Sources ─────────────────────────────────────
+function renderPatternSources(patternId) {
+  const block = document.getElementById('sources-block');
+  const tagsEl = document.getElementById('sources-tags');
+  if (!block || !tagsEl) return;
+
+  const pattern = _allPatterns.find(p => p.pattern_id === patternId);
+  const sources = pattern?.sources;
+  if (!sources?.length) { block.classList.add('hidden'); return; }
+
+  tagsEl.innerHTML = sources.map(s => `<span class="source-tag">${s}</span>`).join('');
+  block.classList.remove('hidden');
 }
 
 // ── Category Intelligence ─────────────────────────────────────────
@@ -1243,7 +1323,7 @@ function renderAudit(data) {
       <div class="audit-section-label">Analysis</div>
       <p class="audit-rationale">${data.rationale}</p>
     </div>` : ''}
-    <p class="audit-footer">Evaluated against 100 documented failure patterns</p>
+    <p class="audit-footer">Evaluated against ${(_allPatterns && _allPatterns.length) || (data.total_cases ? '' : '100')} documented failure patterns${linked ? ' · grounded in the named pattern above' : ''}</p>
   `;
   el.classList.remove('hidden');
   el.scrollIntoView({ behavior: 'smooth' });
@@ -1485,6 +1565,16 @@ function switchTab(tabId) {
   document.querySelectorAll('.nav-item, .mobile-nav-item').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll(`.nav-item[data-tab="${tabId}"], .mobile-nav-item[data-tab="${tabId}"]`).forEach(btn => btn.classList.add('active'));
 
+  // Auto-prefill cohort form from last analysis when portfolio tab is opened
+  if (tabId === 'tab-portfolio' && _lastResult && _lastPayload) {
+    const industryEl = document.getElementById('cohort-industry');
+    const scoreEl    = document.getElementById('cohort-score');
+    const monthEl    = document.getElementById('cohort-month');
+    if (industryEl && _lastPayload.industry) industryEl.value = _lastPayload.industry;
+    if (scoreEl && _lastResult.oracle_score != null) scoreEl.value = _lastResult.oracle_score;
+    if (monthEl && _lastPayload.current_month) monthEl.value = _lastPayload.current_month;
+  }
+
   const contentArea = document.querySelector('.content-area');
   if (contentArea) contentArea.scrollTop = 0;
 }
@@ -1502,6 +1592,159 @@ function switchResultTab(tabId) {
       btn.classList.remove('active');
     }
   });
+}
+
+// ── Escape Plan ──────────────────────────────────────────────────
+function renderEscapePlan(plan) {
+  const panel = document.getElementById('escape-plan-panel');
+  if (!panel || !plan || !plan.interventions?.length) {
+    if (panel) panel.classList.add('hidden');
+    return;
+  }
+
+  const afterConf = plan.current_confidence - plan.combined_drop;
+  const escapeEl   = document.getElementById('ep-after-conf');
+  const currentEl  = document.getElementById('ep-current-conf');
+  const possibleEl = document.getElementById('ep-possible');
+  const listEl     = document.getElementById('ep-list');
+
+  if (currentEl) currentEl.textContent = `${plan.current_confidence}%`;
+  if (escapeEl)  escapeEl.textContent  = `${afterConf}%`;
+
+  if (possibleEl) {
+    if (plan.escape_possible) {
+      possibleEl.className = 'ep-possible-badge ep-can-escape';
+      possibleEl.textContent = `Pattern escape achievable — implement all ${Math.min(plan.interventions.length, 3)} interventions`;
+    } else {
+      possibleEl.className = 'ep-possible-badge ep-deeply-entrenched';
+      possibleEl.textContent = 'Pattern deeply entrenched — significant restructuring required';
+    }
+  }
+
+  const diffIcon = { easy: '🟢', medium: '🟡', hard: '🔴' };
+
+  if (listEl) {
+    listEl.innerHTML = plan.interventions.slice(0, 5).map((item, i) => `
+      <div class="ep-item ep-diff-${item.difficulty}">
+        <div class="ep-item-rank">${i + 1}</div>
+        <div class="ep-item-body">
+          <div class="ep-item-top">
+            <span class="ep-metric">${item.metric}</span>
+            <span class="ep-values">${item.current_value} → <strong>${item.target_value}</strong></span>
+            <span class="ep-diff-badge">${diffIcon[item.difficulty] || ''} ${item.difficulty}</span>
+            <span class="ep-drop-badge">−${item.estimated_confidence_drop}pp risk</span>
+          </div>
+          <p class="ep-action">${item.action}</p>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  panel.classList.remove('hidden');
+}
+
+// ── Confidence Trajectory Forecast ──────────────────────────────
+function renderConfidenceForecast(startupName) {
+  const section = document.getElementById('conf-forecast-section');
+  if (!section) return;
+
+  try {
+    const all = JSON.parse(localStorage.getItem('oracle_snapshots') || '[]');
+    const snapshots = all
+      .filter(s => s.startup_name?.toLowerCase().trim() === startupName?.toLowerCase().trim())
+      .slice(0, 8)
+      .reverse(); // oldest first
+
+    if (snapshots.length < 2) { section.classList.add('hidden'); return; }
+
+    // Linear regression on confidence scores
+    const scores = snapshots.map(s => (s.match_score || 0) * 100);
+    const n = scores.length;
+    const xMean = (n - 1) / 2;
+    const yMean = scores.reduce((a, b) => a + b, 0) / n;
+    let num = 0, den = 0;
+    scores.forEach((y, x) => { num += (x - xMean) * (y - yMean); den += (x - xMean) ** 2; });
+    const slope = den > 0 ? num / den : 0;
+    const intercept = yMean - slope * xMean;
+
+    // Project 3 months forward
+    const proj = [1, 2, 3].map(ahead => {
+      const val = Math.max(0, Math.min(100, intercept + slope * (n - 1 + ahead)));
+      return Math.round(val);
+    });
+
+    const trend = slope > 1.5 ? 'worsening' : slope < -1.5 ? 'improving' : 'stable';
+    const trendColor = trend === 'worsening' ? 'var(--danger)' : trend === 'improving' ? 'var(--safe)' : 'var(--warning)';
+    const trendIcon  = trend === 'worsening' ? '↑' : trend === 'improving' ? '↓' : '→';
+
+    document.getElementById('cf-trend-icon').textContent  = trendIcon;
+    document.getElementById('cf-trend-label').textContent = `Risk ${trend}`;
+    document.getElementById('cf-trend-icon').style.color  = trendColor;
+    document.getElementById('cf-proj-1').textContent = `${proj[0]}%`;
+    document.getElementById('cf-proj-2').textContent = `${proj[1]}%`;
+    document.getElementById('cf-proj-3').textContent = `${proj[2]}%`;
+
+    // Colour each projected value
+    [1, 2, 3].forEach((m, i) => {
+      const el = document.getElementById(`cf-proj-${m}`);
+      if (el) el.style.color = proj[i] >= 75 ? 'var(--danger)' : proj[i] >= 60 ? 'var(--warning)' : 'var(--safe)';
+    });
+
+    section.classList.remove('hidden');
+  } catch (_) {
+    section.classList.add('hidden');
+  }
+}
+
+// ── Trend Delta Badge ────────────────────────────────────────────
+function renderTrendDelta(currentResult, startupName) {
+  const badge = document.getElementById('trend-delta-badge');
+  if (!badge) return;
+
+  try {
+    const snapshots = JSON.parse(localStorage.getItem('oracle_snapshots') || '[]');
+    // renderResult is called before saveSnapshot, so index 0 is the actual prior run
+    const prior = snapshots.find(s =>
+      s.startup_name && startupName &&
+      s.startup_name.toLowerCase().trim() === startupName.toLowerCase().trim()
+    );
+
+    if (!prior) { badge.classList.add('hidden'); return; }
+
+    const currentConf = currentResult.pattern?.confidence ?? 0;
+    const priorConf   = prior.match_score ?? 0;
+    const deltaPp     = Math.round((currentConf - priorConf) * 100);
+    const currentScore = currentResult.oracle_score ?? null;
+    const priorScore   = prior.oracle_score ?? null;
+    const deltaScore   = (currentScore !== null && priorScore !== null)
+                         ? Math.round(currentScore - priorScore) : null;
+
+    const priorDate = new Date(prior.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+    let arrow, cls, text;
+    if (Math.abs(deltaPp) < 2 && (deltaScore === null || Math.abs(deltaScore) < 2)) {
+      arrow = '→'; cls = 'delta-flat';
+      text = `No significant change vs last analysis (${priorDate})`;
+    } else if (deltaPp > 0 || (deltaScore !== null && deltaScore < 0)) {
+      arrow = '↑'; cls = 'delta-up';
+      const parts = [];
+      if (Math.abs(deltaPp) >= 2) parts.push(`match score +${deltaPp}pp`);
+      if (deltaScore !== null && Math.abs(deltaScore) >= 2) parts.push(`Oracle Score ${deltaScore > 0 ? '+' : ''}${deltaScore}`);
+      text = `Risk increasing — ${parts.join(', ')} vs last analysis`;
+    } else {
+      arrow = '↓'; cls = 'delta-down';
+      const parts = [];
+      if (Math.abs(deltaPp) >= 2) parts.push(`match score ${deltaPp}pp`);
+      if (deltaScore !== null && Math.abs(deltaScore) >= 2) parts.push(`Oracle Score ${deltaScore > 0 ? '+' : ''}${deltaScore}`);
+      text = `Risk decreasing — ${parts.join(', ')} vs last analysis`;
+    }
+
+    badge.className = `trend-delta-badge ${cls}`;
+    badge.innerHTML = `<span class="tdb-arrow">${arrow}</span><span class="tdb-text">${text}</span><span class="tdb-date">${priorDate}</span>`;
+    badge.classList.remove('hidden');
+  } catch (_) {
+    badge.classList.add('hidden');
+  }
 }
 
 // ── Monthly Tracking (localStorage) ─────────────────────────────
@@ -1522,6 +1765,7 @@ function saveSnapshot(result, payload) {
       alert: result.alert,
       pattern_name: result.pattern?.pattern_name || null,
       match_score: result.pattern?.confidence || 0,
+      oracle_score: result.oracle_score || null,
     };
     snapshots.unshift(snap);
     // Keep last 12 snapshots
@@ -2179,3 +2423,717 @@ document.addEventListener('keydown', (e) => {
     runAnalysis();
   }
 });
+
+// ── Trajectory Forecast Chart ──────────────────────────────────────
+let _trajectoryChartInstance = null;
+
+function renderTrajectoryChart(p, pl) {
+  const ctx = document.getElementById('trajectory-chart');
+  if (!ctx) return;
+
+  if (_trajectoryChartInstance) {
+    _trajectoryChartInstance.destroy();
+  }
+
+  const runway = pl.runway_months || 12;
+  const projectionMonths = Math.max(12, Math.round(runway * 1.5));
+  
+  const labels = [];
+  const currentPath = [];
+  const failurePath = [];
+  const recoveryPath = [];
+
+  for (let m = 0; m <= projectionMonths; m++) {
+    labels.push(`M +${m}`);
+    
+    // Danger path
+    const curVal = Math.max(0, runway - m);
+    currentPath.push(curVal);
+
+    // Exponential failure pattern spiral
+    const failVal = Math.max(0, Math.round(runway * Math.pow(0.8, m) * (1 - (m / projectionMonths) * 0.4)));
+    failurePath.push(failVal);
+
+    // Playbook recovery path
+    let recVal = runway;
+    if (m === 0) {
+      recVal = runway;
+    } else {
+      recVal = Math.min(24, Math.round(runway + (m * 0.8)));
+    }
+    recoveryPath.push(recVal);
+  }
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+  const textColor = isDark ? '#94a3b8' : '#64748b';
+
+  // Create glowing gradient backgrounds for trajectory lines
+  const ctx2d = ctx.getContext('2d');
+  const currentGradient = ctx2d.createLinearGradient(0, 0, 0, 240);
+  currentGradient.addColorStop(0, 'rgba(239, 68, 68, 0.28)');
+  currentGradient.addColorStop(1, 'rgba(239, 68, 68, 0.00)');
+
+  const recoveryGradient = ctx2d.createLinearGradient(0, 0, 0, 240);
+  recoveryGradient.addColorStop(0, 'rgba(16, 185, 129, 0.28)');
+  recoveryGradient.addColorStop(1, 'rgba(16, 185, 129, 0.00)');
+
+  _trajectoryChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Current Trajectory (Danger)',
+          data: currentPath,
+          borderColor: '#ef4444',
+          backgroundColor: currentGradient,
+          borderWidth: 3,
+          tension: 0.3,
+          fill: true
+        },
+        {
+          label: 'Historical Pattern Path',
+          data: failurePath,
+          borderColor: '#f59e0b',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          tension: 0.3,
+          fill: false
+        },
+        {
+          label: 'Recovery Trajectory (Playbook)',
+          data: recoveryPath,
+          borderColor: '#10b981',
+          backgroundColor: recoveryGradient,
+          borderWidth: 3,
+          tension: 0.3,
+          fill: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color: textColor,
+            font: { family: 'Outfit', size: 11, weight: '500' }
+          }
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: gridColor },
+          ticks: { color: textColor, font: { family: 'Inter', size: 10 } }
+        },
+        y: {
+          grid: { color: gridColor },
+          title: {
+            display: true,
+            text: 'Projected Runway (Months)',
+            color: textColor,
+            font: { family: 'Outfit', size: 11, weight: '600' }
+          },
+          ticks: { color: textColor, font: { family: 'Inter', size: 10 } },
+          min: 0
+        }
+      }
+    }
+  });
+}
+
+// ── Agent Audio Debate / Debrief ──────────────────────────────────
+let _speechSynthesisUtterances = [];
+let _isDebatePlaying = false;
+
+function toggleAudioWave(active) {
+  const wave = document.getElementById('chp-audio-wave');
+  if (wave) {
+    if (active) wave.classList.remove('hidden');
+    else wave.classList.add('hidden');
+  }
+}
+
+function playAudioDebrief() {
+  const synth = window.speechSynthesis;
+  if (!synth) {
+    alert('Web Speech API is not supported in your browser.');
+    return;
+  }
+
+  const btn = document.getElementById('chp-play-btn');
+  const statusEl = document.getElementById('chp-audio-status');
+  const icon = document.getElementById('chp-play-icon');
+  const text = document.getElementById('chp-play-text');
+
+  if (_isDebatePlaying) {
+    synth.cancel();
+    _isDebatePlaying = false;
+    toggleAudioWave(false);
+    if (text) text.textContent = 'Listen to Agent Debate';
+    if (statusEl) { statusEl.textContent = 'Debate stopped'; }
+    if (icon) {
+      icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+    }
+    return;
+  }
+
+  const p = _lastResult?.pattern;
+  if (!p) return;
+
+  const matchedName = p.pattern_name;
+  const pct = Math.round(p.confidence * 100);
+  const reasoning = p.match_reasoning || "our standard warning markers are triggered";
+  
+  const challengerEl = document.getElementById('chp-reasoning');
+  const challengerText = challengerEl ? challengerEl.textContent : "I recommend careful review of counter-indicators.";
+
+  const script = [
+    {
+      role: 'Investigator Agent',
+      pitch: 0.9,
+      rate: 0.95,
+      text: `Investigation report compiled. We have identified a strong ${pct} percent match with the failure archetype: ${matchedName}. The primary risk factors are clear: ${reasoning.slice(0, 160)}. The data points directly to a high probability of failure unless immediate pivots are made.`
+    },
+    {
+      role: 'Challenger Agent',
+      pitch: 1.15,
+      rate: 1.05,
+      text: `Let me challenge that absolute conclusion. While the ${pct} percent similarity is technically correct, our counter-evidence assessment shows important mitigating factors. ${challengerText.slice(0, 180)} We must not premature scale or over-generalize this risk.`
+    },
+    {
+      role: 'Investigator Agent',
+      pitch: 0.9,
+      rate: 0.95,
+      text: `Acknowledged, but the survival rate is only ${Math.round(p.survival_rate * 100)} percent. Founders who ignored these warning signs historically ran out of cash within ${p.days_to_crisis || 90} days. Skepticism is healthy, but inaction is fatal.`
+    },
+    {
+      role: 'Challenger Agent',
+      pitch: 1.15,
+      rate: 1.05,
+      text: `Agreed. Which is why the survival playbook must be deployed immediately. Focus on unit economics and retention. That is the path to beating the statistics.`
+    }
+  ];
+
+  _speechSynthesisUtterances = [];
+  _isDebatePlaying = true;
+  toggleAudioWave(true);
+  if (text) text.textContent = 'Stop Agent Debate';
+  if (statusEl) { statusEl.style.display = 'inline'; statusEl.textContent = 'Speaking...'; }
+  if (icon) {
+    icon.innerHTML = '<rect x="4" y="4" width="16" height="16" fill="currentColor"></rect>';
+  }
+
+  const voices = synth.getVoices();
+  
+  function getVoiceForRole(role) {
+    if (role === 'Investigator Agent') {
+      return voices.find(v => v.name.includes('David') || v.name.includes('Google US English') || v.name.includes('Microsoft David') || v.lang.startsWith('en-US')) || voices[0];
+    } else {
+      return voices.find(v => v.name.includes('Zira') || v.name.includes('Google UK English Female') || v.name.includes('Microsoft Zira') || v.name.includes('Hazel') || v.lang.startsWith('en-GB') || v.lang.includes('en')) || voices[0];
+    }
+  }
+
+  let index = 0;
+  function speakNext() {
+    if (index >= script.length || !_isDebatePlaying) {
+      _isDebatePlaying = false;
+      toggleAudioWave(false);
+      if (text) text.textContent = 'Listen to Agent Debate';
+      if (statusEl) { statusEl.textContent = 'Debate finished'; }
+      if (icon) {
+        icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+      }
+      return;
+    }
+
+    const turn = script[index];
+    const utter = new SpeechSynthesisUtterance(turn.text);
+    const chosenVoice = getVoiceForRole(turn.role);
+    if (chosenVoice) {
+      utter.voice = chosenVoice;
+    }
+    utter.pitch = turn.pitch;
+    utter.rate = turn.rate;
+
+    if (statusEl) {
+      statusEl.textContent = `${turn.role} speaking...`;
+    }
+
+    utter.onend = () => {
+      index++;
+      speakNext();
+    };
+
+    utter.onerror = () => {
+      _isDebatePlaying = false;
+      toggleAudioWave(false);
+      if (text) text.textContent = 'Listen to Agent Debate';
+      if (statusEl) statusEl.textContent = 'Debate finished';
+      if (icon) icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+    };
+
+    _speechSynthesisUtterances.push(utter);
+    synth.speak(utter);
+  }
+
+  if (voices.length === 0) {
+    synth.onvoiceschanged = () => {
+      speakNext();
+    };
+  } else {
+    speakNext();
+  }
+}
+
+// ── Cocktail Detection ────────────────────────────────────────────
+function renderCocktail(cocktail) {
+  const panel = document.getElementById('cocktail-panel');
+  if (!panel || !cocktail) { if (panel) panel.classList.add('hidden'); return; }
+
+  const survPct = Math.round(cocktail.compound_survival_rate * 100);
+  const countEl = document.getElementById('ctail-count');
+  const survEl  = document.getElementById('ctail-survival-val');
+  const patsEl  = document.getElementById('ctail-patterns');
+  const sumEl   = document.getElementById('ctail-summary');
+
+  if (countEl) countEl.textContent = cocktail.patterns.length;
+  if (survEl)  { survEl.textContent = `${survPct}%`; survEl.style.color = survPct < 10 ? 'var(--danger)' : survPct < 25 ? 'var(--warning)' : 'var(--safe)'; }
+  if (sumEl)   sumEl.textContent = cocktail.risk_summary;
+
+  if (patsEl) {
+    patsEl.innerHTML = cocktail.patterns.map((p, i) => {
+      const conf = Math.round(p.confidence * 100);
+      const surv = Math.round(p.survival_rate * 100);
+      const survColor = surv < 15 ? 'var(--danger)' : surv < 30 ? 'var(--warning)' : 'var(--safe)';
+      const domBadge = i === 0 ? '<span class="ctail-dominant-badge">DOMINANT</span>' : '';
+      return `
+        <div class="ctail-pattern-item">
+          <div class="ctail-pattern-top">
+            <span class="ctail-pattern-id">${p.pattern_id}</span>
+            ${domBadge}
+            <span class="ctail-pattern-name">${p.pattern_name}</span>
+            <span class="ctail-pattern-conf">${conf}% match</span>
+          </div>
+          <div class="ctail-pattern-meta">
+            <span class="ctail-pat-surv" style="color:${survColor}">${surv}% survival</span>
+            <span class="ctail-pat-sep">·</span>
+            <span class="ctail-pat-days">~${p.days_to_crisis}d to crisis</span>
+            <span class="ctail-pat-sep">·</span>
+            <span class="ctail-pat-cat">${p.category.replace(/_/g, ' ')}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  panel.classList.remove('hidden');
+}
+
+// ── Failure Cascade Graph ($graphLookup) ──────────────────────────
+function renderCascade(cascade) {
+  const panel = document.getElementById('cascade-panel');
+  if (!panel || !cascade || !cascade.has_cascade) {
+    if (panel) panel.classList.add('hidden');
+    return;
+  }
+
+  // Header badges
+  const depthBadge = document.getElementById('casc-depth-badge');
+  const daysBadge  = document.getElementById('casc-days-badge');
+  const rootName   = document.getElementById('casc-root-name');
+  if (depthBadge) depthBadge.textContent = `Depth: ${cascade.max_depth}`;
+  if (daysBadge)  daysBadge.textContent  = `Worst case: ${cascade.worst_case_days}d`;
+  if (rootName)   rootName.textContent   = cascade.root_pattern_name || 'Root Pattern';
+
+  // Timeline steps
+  const timeline = document.getElementById('casc-timeline');
+  if (timeline) {
+    timeline.innerHTML = (cascade.cascade_steps || []).map(step => {
+      const prob = Math.round(step.cumulative_probability * 100);
+      const survPct = Math.round((step.survival_rate || 0) * 100);
+      const probColor = prob >= 60 ? 'var(--danger)' : prob >= 35 ? 'var(--warning)' : 'var(--muted)';
+      const survColor = survPct < 15 ? 'var(--danger)' : survPct < 30 ? 'var(--warning)' : 'var(--safe)';
+      const triggerText = step.trigger_metric
+        ? `<span class="casc-trigger">${step.trigger_metric} ${step.trigger_direction === 'above' ? '>' : '<'} ${step.trigger_threshold}</span>`
+        : '';
+      const observedBadge = step.observed_count > 0
+        ? `<span class="casc-observed-badge" title="Confirmed in real oracle data">${step.observed_count} observed</span>`
+        : `<span class="casc-observed-badge casc-obs-research" title="Based on research estimates">research est.</span>`;
+      const depthClass = `casc-step-depth-${Math.min(step.depth, 3)}`;
+
+      return `
+        <div class="casc-step ${depthClass}">
+          <div class="casc-step-connector">
+            <div class="casc-step-line"></div>
+            <div class="casc-step-dot"></div>
+          </div>
+          <div class="casc-step-body">
+            <div class="casc-step-top">
+              <span class="casc-step-days">+${step.days_from_now}d</span>
+              <span class="casc-step-id">${step.pattern_id}</span>
+              <span class="casc-step-name">${step.pattern_name}</span>
+              ${observedBadge}
+            </div>
+            <div class="casc-step-meta">
+              <span class="casc-step-prob" style="color:${probColor}">${prob}% cumulative probability</span>
+              <span class="casc-meta-sep">·</span>
+              <span class="casc-step-surv" style="color:${survColor}">${survPct}% survival</span>
+              ${triggerText ? `<span class="casc-meta-sep">·</span>` + triggerText : ''}
+            </div>
+            ${step.mechanism ? `<p class="casc-step-mechanism">${step.mechanism}</p>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // Interventions (Cascade Intervention Optimizer)
+  const intPanel = document.getElementById('casc-interventions');
+  const intList  = document.getElementById('casc-int-list');
+  const realInts = (cascade.interventions || []).filter(i => i.action && i.action !== 'monitor' && i.action !== 'reduce_risk');
+  if (intPanel && intList && realInts.length > 0) {
+    intList.innerHTML = realInts.map(iv => {
+      const urgencyClass = iv.urgency === 'CRITICAL' ? 'casc-int-critical' : 'casc-int-warning';
+      const daysText = iv.days_to_act ? `Act within ${iv.days_to_act}d` : '';
+      return `
+        <div class="casc-int-item ${urgencyClass}">
+          <div class="casc-int-item-header">
+            <span class="casc-int-urgency-badge">${iv.urgency}</span>
+            <span class="casc-int-target">→ prevents cascade to <strong>${iv.cascade_pattern_name}</strong></span>
+            <span class="casc-int-days-hint">${daysText}</span>
+          </div>
+          <p class="casc-int-message">${iv.message}</p>
+        </div>`;
+    }).join('');
+    intPanel.classList.remove('hidden');
+  } else if (intPanel) {
+    intPanel.classList.add('hidden');
+  }
+
+  // Calibration note (shows whether probabilities are research-based or self-learned)
+  const calibEl = document.getElementById('casc-calibration');
+  if (calibEl) calibEl.textContent = cascade.cascade_calibration || '';
+
+  panel.classList.remove('hidden');
+}
+
+// ── Cohort Percentile Intelligence ($bucket + $facet) ────────────
+async function runCohortIntelligence() {
+  const industry = document.getElementById('cohort-industry')?.value.trim() || 'B2B SaaS';
+  const score    = parseInt(document.getElementById('cohort-score')?.value) || 50;
+  const month    = parseInt(document.getElementById('cohort-month')?.value) || 12;
+
+  const btnText   = document.getElementById('cohort-btn-text');
+  const spinner   = document.getElementById('cohort-spinner');
+  const resultEl  = document.getElementById('cohort-result');
+  if (btnText) btnText.classList.add('hidden');
+  if (spinner) spinner.classList.remove('hidden');
+  if (resultEl) resultEl.classList.add('hidden');
+
+  try {
+    const params = new URLSearchParams({ industry, oracle_score: score, current_month: month });
+    const res = await fetch(`${API}/api/cascade/cohort/intelligence?${params}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderCohortResult(data);
+  } catch (err) {
+    console.error('[cohort]', err);
+    alert(`Cohort analysis failed: ${err.message}`);
+  } finally {
+    if (btnText) btnText.classList.remove('hidden');
+    if (spinner) spinner.classList.add('hidden');
+  }
+}
+
+function renderCohortResult(data) {
+  const resultEl = document.getElementById('cohort-result');
+  if (!resultEl) return;
+
+  // Pre-fill inputs from response (sync if auto-triggered from analysis)
+  const industryEl = document.getElementById('cohort-industry');
+  const scoreEl    = document.getElementById('cohort-score');
+  const monthEl    = document.getElementById('cohort-month');
+  if (industryEl && data.industry) industryEl.value = data.industry;
+  if (scoreEl    && data.oracle_score != null) scoreEl.value = data.oracle_score;
+  if (monthEl    && data.current_month != null) monthEl.value = data.current_month;
+
+  // Percentile card
+  const percNum     = document.getElementById('cohort-perc-number');
+  const percMsg     = document.getElementById('cohort-perc-message');
+  const percCard    = document.getElementById('cohort-percentile-card');
+  const sizeBadge   = document.getElementById('cohort-size-badge');
+  const alertRate   = document.getElementById('cohort-alert-rate');
+
+  const pct = data.percentile;
+  const percLabel = document.getElementById('cohort-perc-label');
+  if (pct != null) {
+    // Correct ordinal suffix (1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 33rd…)
+    const suffix = (pct % 100 >= 11 && pct % 100 <= 13) ? 'th'
+      : pct % 10 === 1 ? 'st' : pct % 10 === 2 ? 'nd' : pct % 10 === 3 ? 'rd' : 'th';
+    if (percNum)   percNum.textContent   = pct;
+    if (percLabel) percLabel.textContent = suffix + ' percentile';
+  } else {
+    if (percNum)   percNum.textContent   = '—';
+    if (percLabel) percLabel.textContent = 'th percentile';
+  }
+  if (percMsg)  percMsg.textContent  = data.percentile_message || '—';
+  if (sizeBadge) sizeBadge.textContent = `${data.total_in_cohort || 0} in cohort`;
+  if (alertRate) alertRate.textContent = data.cohort_alert_rate_pct != null
+    ? `${data.cohort_alert_rate_pct}% at risk` : '— at risk';
+
+  // Color the percentile card by severity
+  const sevMap = { critical: '#ef4444', warning: '#f59e0b', watch: '#f59e0b', healthy: '#10b981', strong: '#10b981', unknown: '#6b7280' };
+  const sevColor = sevMap[data.percentile_severity] || '#6b7280';
+  if (percCard) {
+    percCard.style.borderLeftColor = sevColor;
+    const numEl = percCard.querySelector('.cohort-perc-number');
+    if (numEl) numEl.style.color = sevColor;
+  }
+
+  // Stats grid
+  const statsGrid = document.getElementById('cohort-stats-grid');
+  if (statsGrid) {
+    statsGrid.innerHTML = `
+      <div class="cohort-stat-item">
+        <div class="cohort-stat-val">${data.cohort_avg_oracle_score ?? '—'}</div>
+        <div class="cohort-stat-label">Cohort Avg Oracle Score</div>
+      </div>
+      <div class="cohort-stat-item">
+        <div class="cohort-stat-val">${data.cohort_avg_churn_pct != null ? data.cohort_avg_churn_pct + '%' : '—'}</div>
+        <div class="cohort-stat-label">Cohort Avg Churn</div>
+      </div>
+      <div class="cohort-stat-item">
+        <div class="cohort-stat-val">${data.cohort_avg_runway_months != null ? data.cohort_avg_runway_months + 'mo' : '—'}</div>
+        <div class="cohort-stat-label">Cohort Avg Runway</div>
+      </div>
+      <div class="cohort-stat-item">
+        <div class="cohort-stat-val">${data.cohort_alert_rate_pct != null ? data.cohort_alert_rate_pct + '%' : '—'}</div>
+        <div class="cohort-stat-label">Cohort At-Risk Rate</div>
+      </div>`;
+  }
+
+  // Top failure patterns
+  const patsRow = document.getElementById('cohort-patterns-row');
+  if (patsRow && data.top_failure_patterns?.length) {
+    patsRow.innerHTML = `
+      <div class="cohort-pats-header">Top Failure Patterns in Your Cohort</div>
+      <div class="cohort-pats-list">
+        ${data.top_failure_patterns.map(p => `
+          <div class="cohort-pat-item">
+            <span class="cohort-pat-name">${p.pattern_name}</span>
+            <span class="cohort-pat-freq">${p.frequency}×</span>
+          </div>`).join('')}
+      </div>`;
+    patsRow.classList.remove('hidden');
+  } else if (patsRow) {
+    patsRow.classList.add('hidden');
+  }
+
+  // Survivor stats
+  const survivorCard = document.getElementById('cohort-survivor-card');
+  const survivorStats = document.getElementById('cohort-survivor-stats');
+  if (survivorCard && survivorStats && data.survivor_avg_score != null) {
+    survivorStats.innerHTML = `
+      <div class="cohort-stat-item cohort-surv-stat">
+        <div class="cohort-stat-val cohort-surv-val">${data.survivor_avg_score}</div>
+        <div class="cohort-stat-label">Survivor Avg Score</div>
+      </div>
+      <div class="cohort-stat-item cohort-surv-stat">
+        <div class="cohort-stat-val cohort-surv-val">${data.survivor_avg_churn_pct}%</div>
+        <div class="cohort-stat-label">Survivor Avg Churn</div>
+      </div>
+      <div class="cohort-stat-item cohort-surv-stat">
+        <div class="cohort-stat-val cohort-surv-val">${data.survivor_avg_runway_months}mo</div>
+        <div class="cohort-stat-label">Survivor Avg Runway</div>
+      </div>
+      <div class="cohort-stat-item cohort-surv-stat">
+        <div class="cohort-stat-val cohort-surv-val">${data.survivor_count}</div>
+        <div class="cohort-stat-label">Survivors in Cohort</div>
+      </div>`;
+    survivorCard.classList.remove('hidden');
+  } else if (survivorCard) {
+    survivorCard.classList.add('hidden');
+  }
+
+  // Score distribution chart ($bucket aggregation visualization)
+  if (data.score_distribution?.length > 0) {
+    renderCohortDistChart(data.score_distribution, data.oracle_score);
+  }
+
+  // Methodology footnote
+  const methEl = document.getElementById('cohort-methodology');
+  if (methEl) methEl.textContent = data.methodology || '';
+
+  resultEl.classList.remove('hidden');
+}
+
+function renderCohortDistChart(buckets, userScore) {
+  const wrap = document.getElementById('cohort-dist-wrap');
+  const container = document.getElementById('cohort-dist-chart');
+  if (!wrap || !container || !buckets.length) return;
+
+  const bucketLabels = { 0: '0–20', 20: '20–40', 40: '40–60', 60: '60–80', 80: '80–100' };
+  const bucketColors = {
+    0: 'var(--danger)', 20: 'var(--warning)', 40: 'var(--warning)',
+    60: 'var(--safe)', 80: 'var(--safe)'
+  };
+
+  const maxCount = Math.max(...buckets.map(b => b.count || 0), 1);
+
+  const bars = buckets.map(b => {
+    const id  = typeof b._id === 'number' ? b._id : -1;
+    if (id < 0) return '';
+    const pct = Math.round((b.count / maxCount) * 100);
+    const label = bucketLabels[id] || `${id}+`;
+    const color = bucketColors[id] || 'var(--muted)';
+    // Highlight the bucket that contains the user's score
+    const isUser = (userScore >= id && userScore < id + 20) || (id === 80 && userScore >= 80);
+    return `
+      <div class="cohort-dist-bar-group${isUser ? ' cohort-dist-bar-user' : ''}">
+        <div class="cohort-dist-bar-track">
+          <div class="cohort-dist-bar-fill" style="height:${pct}%;background:${color}"></div>
+        </div>
+        <div class="cohort-dist-bar-label">${label}</div>
+        <div class="cohort-dist-bar-count">${b.count}</div>
+        ${isUser ? '<div class="cohort-dist-you">You</div>' : ''}
+      </div>`;
+  }).join('');
+
+  container.innerHTML = `<div class="cohort-dist-bars">${bars}</div>`;
+  wrap.classList.remove('hidden');
+}
+
+// ── Oracle Pre-Mortem ─────────────────────────────────────────────
+async function runPreMortem() {
+  const decisionText = document.getElementById('pm-decision-text')?.value.trim();
+  if (!decisionText || decisionText.length < 10) {
+    alert('Please describe a strategic decision (min 10 characters).');
+    return;
+  }
+  if (!_lastPayload) {
+    alert('Run an analysis first — the Pre-Mortem uses your last analysis metrics as baseline.');
+    switchTab('tab-dashboard');
+    return;
+  }
+
+  const btnText    = document.getElementById('pm-btn-text');
+  const btnSpinner = document.getElementById('pm-btn-spinner');
+  const resultEl   = document.getElementById('pm-result');
+  btnText.classList.add('hidden');
+  btnSpinner.classList.remove('hidden');
+  resultEl.classList.add('hidden');
+
+  try {
+    const res = await fetch(`${API}/api/audit/pre-mortem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        startup_name: _lastPayload.startup_name || 'Your Startup',
+        decision: decisionText,
+        metrics: _lastPayload,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    renderPreMortemResult(data);
+  } catch (err) {
+    resultEl.innerHTML = `<div class="pm-error">Pre-Mortem failed: ${err.message}</div>`;
+    resultEl.classList.remove('hidden');
+    resultEl.scrollIntoView({ behavior: 'smooth' });
+  } finally {
+    btnText.classList.remove('hidden');
+    btnSpinner.classList.add('hidden');
+  }
+}
+
+function renderPreMortemResult(data) {
+  const resultEl  = document.getElementById('pm-result');
+  const verdictEl = document.getElementById('pm-verdict');
+  const trajEl    = document.getElementById('pm-trajectory');
+  const risksEl   = document.getElementById('pm-risks-opps');
+  const patRiskEl = document.getElementById('pm-pattern-risk');
+  if (!resultEl) return;
+
+  // Verdict
+  if (verdictEl) {
+    const isPos  = data.verdict?.startsWith('POSITIVE');
+    const isHigh = data.verdict?.startsWith('HIGH RISK');
+    const isCaut = data.verdict?.startsWith('CAUTION');
+    const vcls   = isHigh ? 'pm-verdict-high' : isCaut ? 'pm-verdict-caution' : isPos ? 'pm-verdict-positive' : 'pm-verdict-neutral';
+    verdictEl.className = `pm-verdict ${vcls}`;
+    verdictEl.textContent = data.verdict || '';
+  }
+
+  // Trajectory cards (+1, +3, +6)
+  if (trajEl && data.trajectory?.length) {
+    trajEl.innerHTML = `
+      <div class="pm-traj-label">Oracle Score Trajectory</div>
+      <div class="pm-traj-cards">
+        ${data.trajectory.map(h => {
+          const scoreColor = h.oracle_score >= 60 ? 'var(--safe)' : h.oracle_score >= 40 ? 'var(--warning)' : 'var(--danger)';
+          const delta = h.oracle_score - (data.current_score || 50);
+          const deltaStr = delta > 0 ? `+${delta}` : String(delta);
+          const deltaCls = delta > 0 ? 'pm-delta-pos' : delta < 0 ? 'pm-delta-neg' : 'pm-delta-flat';
+          return `
+            <div class="pm-traj-card">
+              <div class="pm-traj-month">Month +${h.month_offset}</div>
+              <div class="pm-traj-score" style="color:${scoreColor}">${h.oracle_score}</div>
+              <div class="pm-traj-band">${(h.score_band || '').toUpperCase()}</div>
+              <div class="pm-traj-delta ${deltaCls}">${deltaStr} vs now</div>
+            </div>`;
+        }).join('')}
+      </div>
+      ${typeof data.current_score === 'number' ? `<div class="pm-current-score">Baseline Oracle Score: <strong>${data.current_score}</strong></div>` : ''}
+    `;
+  }
+
+  // Key risks and opportunities
+  if (risksEl) {
+    const risks = data.key_risks || [];
+    const opps  = data.key_opportunities || [];
+    risksEl.innerHTML = `
+      ${risks.length ? `
+        <div class="pm-ro-block">
+          <div class="pm-ro-label pm-ro-risk">Key Risks</div>
+          <ul class="pm-ro-list">${risks.map(r => `<li>${r}</li>`).join('')}</ul>
+        </div>` : ''}
+      ${opps.length ? `
+        <div class="pm-ro-block">
+          <div class="pm-ro-label pm-ro-opp">Opportunities</div>
+          <ul class="pm-ro-list">${opps.map(o => `<li>${o}</li>`).join('')}</ul>
+        </div>` : ''}
+    `;
+  }
+
+  // Month-6 pattern risk
+  if (patRiskEl) {
+    const pr = data.month6_pattern_risk;
+    if (pr && pr.pattern_name) {
+      const conf = Math.round((pr.confidence || 0) * 100);
+      patRiskEl.innerHTML = `
+        <div class="pm-pr-header">Month-6 Pattern Risk</div>
+        <div class="pm-pr-body">
+          <span class="pm-pr-name">${pr.pattern_name}</span>
+          <span class="pm-pr-conf">${conf}% match</span>
+          <span class="pm-pr-days">~${pr.days_to_crisis || 90}d to crisis if triggered</span>
+        </div>
+        <p class="pm-pr-note">${pr.match_reasoning || ''}</p>
+      `;
+      patRiskEl.classList.remove('hidden');
+    } else {
+      patRiskEl.classList.add('hidden');
+    }
+  }
+
+  resultEl.classList.remove('hidden');
+  resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}

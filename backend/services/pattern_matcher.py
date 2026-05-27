@@ -5,7 +5,7 @@ Finds failure patterns that match the startup's current metrics.
 import asyncio
 import json
 from backend.db.connection import get_db
-from backend.db.schemas import MetricsInput, PatternMatch, WarningSig
+from backend.db.schemas import MetricsInput, PatternMatch, WarningSig, CocktailPattern, CocktailMatch
 from backend.services import gemini
 
 
@@ -147,14 +147,31 @@ async def _atlas_search_candidates(metrics: MetricsInput, query_text: str) -> li
     if _ltv_cac_ratio(metrics) < 1: category_hints.append("unit economics acquisition")
     search_phrase = " ".join(category_hints) if category_hints else query_text[:100]
     try:
+        # $compound query: narrative/name path boosted by weight, category path boosted higher
+        should_clauses: list[dict] = [
+            {
+                "text": {
+                    "query": search_phrase,
+                    "path": ["narrative", "name"],
+                    "fuzzy": {"maxEdits": 1},
+                    "score": {"boost": {"value": 1.5}},
+                }
+            },
+            {
+                "text": {
+                    "query": search_phrase,
+                    "path": "category",
+                    "score": {"boost": {"value": 3.0}},
+                }
+            },
+        ]
         pipeline = [
             {
                 "$search": {
                     "index": "default",
-                    "text": {
-                        "query": search_phrase,
-                        "path": ["name", "narrative", "category"],
-                        "fuzzy": {"maxEdits": 1},
+                    "compound": {
+                        "should": should_clauses,
+                        "minimumShouldMatch": 1,
                     },
                 }
             },
@@ -210,6 +227,12 @@ async def _candidate_patterns(metrics: MetricsInput) -> list[dict]:
             },
             {"$project": {"narrative_embedding": 0}},
         ]
+        # Telemetry: count one vector search per query (fire-and-forget)
+        try:
+            from backend.services import telemetry
+            telemetry.inc("vector_search")
+        except Exception:
+            pass
         vector_results, bm25_results = await asyncio.gather(
             db["failure_patterns"].aggregate(vector_pipeline).to_list(length=10),
             _atlas_search_candidates(metrics, query_text),
@@ -305,6 +328,9 @@ async def _score_with_gemini(metrics: MetricsInput, pattern: dict) -> dict:
         if checked:
             if isinstance(checked, str):
                 checked = datetime.fromisoformat(checked.replace("Z", "+00:00"))
+            # Motor returns timezone-naive datetimes from MongoDB; make UTC-aware before subtracting
+            if checked.tzinfo is None:
+                checked = checked.replace(tzinfo=timezone.utc)
             delta = (datetime.now(timezone.utc) - checked).days
             days_ago = f" ({delta} days ago)"
         prev_context = (
@@ -355,6 +381,223 @@ IMPORTANT RULES:
 """
     raw = await gemini.generate_json_fast(prompt)
     return json.loads(raw)
+
+
+def compute_escape_plan(metrics: MetricsInput, pattern: dict, confidence: float) -> dict | None:
+    """
+    Compute the minimum metric changes to drop match confidence below 60% (the alert threshold).
+    Returns ranked interventions ordered by impact (largest confidence-point drop first).
+    Pure math — no Gemini call, runs instantly.
+    """
+    tc = pattern.get("trigger_conditions") or {}
+    if not tc:
+        return None
+
+    ltv_cac = _ltv_cac_ratio(metrics)
+    burn_mult = _burn_multiple(metrics)
+    conf_pct = round(confidence * 100)
+    interventions: list[dict] = []
+
+    def _diff(pct_change: float) -> str:
+        return "easy" if pct_change < 20 else ("medium" if pct_change < 45 else "hard")
+
+    def _drop(weight: float = 1.0) -> int:
+        return min(max(round(conf_pct * 0.18 * weight), 5), 30)
+
+    # ── Churn ──────────────────────────────────────────────────────
+    if tc.get("churn_rate_min") is not None and metrics.churn_rate >= tc["churn_rate_min"]:
+        target = min(tc["churn_rate_min"] * 0.78, 0.05)
+        pct_chg = (metrics.churn_rate - target) / metrics.churn_rate * 100
+        interventions.append({
+            "metric": "Monthly Churn",
+            "current_value": f"{metrics.churn_rate*100:.1f}%",
+            "target_value": f"{target*100:.1f}%",
+            "change_needed": f"−{pct_chg:.0f}% reduction",
+            "difficulty": _diff(pct_chg),
+            "estimated_confidence_drop": _drop(1.2 if pct_chg < 30 else 0.9),
+            "action": (
+                f"Deploy customer-success health scoring: flag accounts with >20% week-over-week"
+                f" usage drop, trigger proactive outreach within 24 h. Target: {target*100:.1f}% churn."
+            ),
+            "impact_tier": "high" if pct_chg < 30 else "medium",
+        })
+
+    # ── LTV:CAC ────────────────────────────────────────────────────
+    if tc.get("ltv_cac_ratio_max") is not None and ltv_cac <= tc["ltv_cac_ratio_max"]:
+        target_ratio = max(tc["ltv_cac_ratio_max"] * 1.35, 3.0)
+        pct_chg = (target_ratio - ltv_cac) / max(ltv_cac, 0.1) * 100
+        interventions.append({
+            "metric": "LTV:CAC Ratio",
+            "current_value": f"{ltv_cac:.1f}x",
+            "target_value": f"{target_ratio:.1f}x",
+            "change_needed": f"Improve by {target_ratio - ltv_cac:.1f}x",
+            "difficulty": _diff(min(pct_chg, 80)),
+            "estimated_confidence_drop": _drop(1.1),
+            "action": (
+                f"Shift acquisition budget to highest-LTV segments (referral / inbound). "
+                f"Launch expansion revenue: identify top 20% accounts by usage for upsell. Target LTV:CAC {target_ratio:.1f}x."
+            ),
+            "impact_tier": "high" if ltv_cac < 1 else "medium",
+        })
+
+    # ── Burn Multiple ──────────────────────────────────────────────
+    if tc.get("burn_multiple_min") is not None and burn_mult >= tc["burn_multiple_min"]:
+        target_bm = tc["burn_multiple_min"] * 0.75
+        net_new = metrics.mrr * metrics.mrr_growth_rate
+        target_burn = target_bm * net_new if net_new > 0 else metrics.burn_rate * 0.6
+        pct_chg = max((metrics.burn_rate - target_burn) / metrics.burn_rate * 100, 0)
+        interventions.append({
+            "metric": "Burn Multiple",
+            "current_value": f"{burn_mult:.1f}x",
+            "target_value": f"{target_bm:.1f}x",
+            "change_needed": f"Cut burn ~{pct_chg:.0f}%",
+            "difficulty": _diff(pct_chg),
+            "estimated_confidence_drop": _drop(1.0),
+            "action": (
+                f"90-day burn reduction sprint: freeze non-essential hires, audit SaaS stack,"
+                f" negotiate vendor terms. Target: ${target_burn:,.0f}/mo burn rate."
+            ),
+            "impact_tier": "medium",
+        })
+
+    # ── Runway ─────────────────────────────────────────────────────
+    if tc.get("runway_months_max") is not None and metrics.runway_months <= tc["runway_months_max"]:
+        target_runway = tc["runway_months_max"] + 8
+        pct_chg = (target_runway - metrics.runway_months) / max(metrics.runway_months, 1) * 100
+        interventions.append({
+            "metric": "Cash Runway",
+            "current_value": f"{metrics.runway_months} months",
+            "target_value": f"{target_runway} months",
+            "change_needed": f"+{target_runway - metrics.runway_months} months",
+            "difficulty": _diff(min(pct_chg, 90)),
+            "estimated_confidence_drop": _drop(0.8),
+            "action": (
+                f"Bridge now: open SAFE with existing investors, negotiate 90-day payment deferrals"
+                f" with vendors, accelerate AR collection. Target: {target_runway}-month runway."
+            ),
+            "impact_tier": "high" if metrics.runway_months < 6 else "medium",
+        })
+
+    # ── NPS ────────────────────────────────────────────────────────
+    if tc.get("nps_max") is not None and metrics.nps <= tc["nps_max"]:
+        target_nps = min(tc["nps_max"] + 22, 50)
+        interventions.append({
+            "metric": "Net Promoter Score",
+            "current_value": str(metrics.nps),
+            "target_value": str(target_nps),
+            "change_needed": f"+{target_nps - metrics.nps} NPS points",
+            "difficulty": "hard" if target_nps - metrics.nps > 40 else "medium",
+            "estimated_confidence_drop": _drop(0.85),
+            "action": (
+                f"Run 10 customer interviews this week. Ship the top-3 detractor pain points"
+                f" in 30-day sprints. Target NPS: {target_nps}."
+            ),
+            "impact_tier": "medium",
+        })
+
+    # ── MRR Growth ─────────────────────────────────────────────────
+    if tc.get("mrr_growth_rate_max") is not None and metrics.mrr_growth_rate <= tc["mrr_growth_rate_max"]:
+        target_g = tc["mrr_growth_rate_max"] * 1.55
+        pct_chg = (target_g - metrics.mrr_growth_rate) / max(metrics.mrr_growth_rate, 0.01) * 100
+        interventions.append({
+            "metric": "MRR Growth Rate",
+            "current_value": f"{metrics.mrr_growth_rate*100:.1f}%/mo",
+            "target_value": f"{target_g*100:.1f}%/mo",
+            "change_needed": f"+{(target_g - metrics.mrr_growth_rate)*100:.1f}pp",
+            "difficulty": _diff(min(pct_chg, 90)),
+            "estimated_confidence_drop": _drop(1.1),
+            "action": (
+                f"Launch a usage-based upsell tier targeting your top 20% power users."
+                f" Add a referral incentive. Target: {target_g*100:.1f}%/mo MRR growth."
+            ),
+            "impact_tier": "high" if metrics.mrr_growth_rate < 0.05 else "medium",
+        })
+
+    if not interventions:
+        return None
+
+    # Sort by impact descending, then difficulty ascending
+    interventions.sort(key=lambda x: (-x["estimated_confidence_drop"],
+                                      {"easy": 0, "medium": 1, "hard": 2}[x["difficulty"]]))
+
+    top3_sum = sum(i["estimated_confidence_drop"] for i in interventions[:3])
+    combined_drop = min(int(top3_sum * 0.82), int(conf_pct * 0.68))
+
+    return {
+        "current_confidence": conf_pct,
+        "escape_threshold": 60,
+        "interventions": interventions,
+        "combined_drop": combined_drop,
+        "escape_possible": conf_pct - combined_drop < 60,
+    }
+
+
+async def match_patterns_top3(metrics: MetricsInput) -> CocktailMatch | None:
+    """
+    Multi-pattern Cocktail matching: find up to the top 3 co-occurring failure patterns.
+
+    Returns a CocktailMatch only when 2+ patterns exceed the 0.60 confidence threshold.
+    Compound survival rate: max(0.02, min(individual_rates) * 0.5^(n-1))
+    This models how co-occurring failure modes multiply risk non-linearly.
+    """
+    candidates = await _candidate_patterns(metrics)
+    if not candidates:
+        return None
+
+    scorings = await asyncio.gather(
+        *[_score_with_gemini(metrics, p) for p in candidates],
+        return_exceptions=True,
+    )
+
+    # Collect every confident match (>= 0.60)
+    qualified: list[tuple[float, dict, dict, float]] = []
+    for pattern, scoring in zip(candidates, scorings):
+        if isinstance(scoring, Exception):
+            continue
+        confidence = float(scoring.get("confidence", 0.0))
+        if confidence >= 0.60:
+            total = pattern["failure_count"] + pattern["survival_count"]
+            survival_rate = pattern["survival_count"] / total if total > 0 else 0.0
+            qualified.append((confidence, scoring, pattern, survival_rate))
+
+    # A cocktail requires at least 2 overlapping patterns
+    if len(qualified) < 2:
+        return None
+
+    qualified.sort(key=lambda x: x[0], reverse=True)
+    top3 = qualified[:3]
+    n = len(top3)
+
+    survival_rates = [item[3] for item in top3]
+    compound_survival = max(0.02, min(survival_rates) * (0.5 ** (n - 1)))
+
+    cocktail_patterns = [
+        CocktailPattern(
+            pattern_id=pattern["pattern_id"],
+            pattern_name=pattern["name"],
+            confidence=round(confidence, 2),
+            survival_rate=round(survival_rate, 3),
+            days_to_crisis=int(scoring.get("days_to_crisis", 90)),
+            category=pattern.get("category", ""),
+        )
+        for confidence, scoring, pattern, survival_rate in top3
+    ]
+
+    dominant = top3[0][2]["name"]
+    min_days = min(int(scoring.get("days_to_crisis", 90)) for _, scoring, _, _ in top3)
+    risk_summary = (
+        f"COCKTAIL DETECTED: {n} co-occurring failure patterns. "
+        f"Compound survival rate: {compound_survival*100:.0f}%. "
+        f"Dominant: {dominant}. Crisis window: ~{min_days} days."
+    )
+
+    return CocktailMatch(
+        patterns=cocktail_patterns,
+        compound_survival_rate=round(compound_survival, 3),
+        dominant_pattern=dominant,
+        combined_days_to_crisis=min_days,
+        risk_summary=risk_summary,
+    )
 
 
 async def _challenger_evaluate(metrics: MetricsInput, pattern: dict, investigator_confidence: float) -> dict:
@@ -465,12 +708,12 @@ async def match_patterns(metrics: MetricsInput) -> PatternMatch | None:
     total = best_match["failure_count"] + best_match["survival_count"]
     survival_rate = best_match["survival_count"] / total if total > 0 else 0.0
 
-    # Persist to MongoDB for session memory
+    # Persist to MongoDB for session memory — MCP primary, Motor fallback
     try:
         from backend.db.connection import get_db
+        from backend.services.mcp_client import mcp
         from datetime import datetime, timezone
-        db = get_db()
-        await db["startup_analyses"].insert_one({
+        doc = {
             "startup_name": metrics.startup_name,
             "checked_at": datetime.now(timezone.utc),
             "alert": True,
@@ -478,7 +721,17 @@ async def match_patterns(metrics: MetricsInput) -> PatternMatch | None:
             "confidence": round(best_score, 2),
             "days_to_crisis": best_scoring.get("days_to_crisis", 90),
             "metrics_snapshot": metrics.model_dump(),
-        })
+        }
+        _saved = False
+        if mcp.available:
+            try:
+                _saved = await mcp.insert_one("startup_analyses", doc)
+            except Exception as _e:
+                import logging as _log
+                _log.getLogger(__name__).debug("MCP insert_one failed, using Motor: %s", _e)
+        if not _saved:
+            db = get_db()
+            await db["startup_analyses"].insert_one(doc)
     except Exception:
         pass
 

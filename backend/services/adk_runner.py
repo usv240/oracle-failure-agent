@@ -1,20 +1,27 @@
 """
-ADK (Agent Development Kit) runner for startup failure analysis.
+ADK (Agent Development Kit) runner — 3-agent SequentialAgent pipeline.
 
-The ADK agent orchestrates the analysis pipeline:
-  1. Calls analyze_startup_metrics tool → embed + vector search + Gemini scoring
-  2. Returns the highest-confidence failure pattern (or safe result)
+Architecture (google-adk v2.0 SequentialAgent):
+  Agent 1 — Investigator  : embeds metrics → MongoDB Atlas Vector Search + BM25 RRF → Gemini scoring
+  Agent 2 — Challenger    : adversarial verifier, second Gemini instance, stress-tests the match
+  Agent 3 — Reporter      : fetches MongoDB category benchmarks → saves structured Markdown report
 
-This makes Google ADK genuinely in the critical path for the /api/metrics/analyze
-endpoint. The SSE streaming endpoint uses the same underlying tools directly for
-real-time step-by-step visibility.
+Each sub-agent is a real LlmAgent (Agent) with its own Gemini 3 Flash call and dedicated tool set.
+ADK SequentialAgent orchestrates the three-agent handoff; output_key writes each agent's
+verdict into shared session state for downstream agents to read.
+
+SSE streaming: run_analysis_via_adk_stream() routes the SSE streaming endpoint through the same
+ADK pipeline. Each tool function emits progress events to a shared asyncio.Queue (via ContextVar),
+enabling real-time streaming while the ADK SequentialAgent orchestrates execution.
 """
 import json
 import uuid
+import asyncio as _asyncio
 import logging
+from contextvars import ContextVar
 from typing import Optional
 
-from google.adk.agents import Agent
+from google.adk.agents import Agent, SequentialAgent
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.adk.tools import FunctionTool
@@ -24,29 +31,42 @@ from backend.db.schemas import MetricsInput, PatternMatch, WarningSig
 
 logger = logging.getLogger(__name__)
 
-# Configure ADK to use the Gemini API key for Gemini 3 models.
-# Gemini 3 (gemini-3-flash-preview) is only available via the public Gemini API,
-# not yet on Vertex AI for this project.
-# Note: gemini.py uses explicit genai.Client(vertexai=True, ...) so it is
-# completely unaffected by these env vars — it always hits Vertex AI directly.
+_MODEL = "gemini-3-flash-preview"
+
+# ── SSE event queue for streaming ────────────────────────────────────────────
+# Set by run_analysis_via_adk_stream before starting the ADK pipeline.
+# Tool functions check this ContextVar and emit events when streaming is active.
+_stream_queue_var: ContextVar[Optional[_asyncio.Queue]] = ContextVar("_stream_queue", default=None)
+
+
+async def _emit(type_: str, **kwargs) -> None:
+    """Put an SSE event dict onto the stream queue if streaming is active."""
+    q = _stream_queue_var.get()
+    if q is not None:
+        await q.put({"type": type_, **kwargs})
+
+
 def _configure_adk_auth() -> None:
+    """Point ADK at the Gemini API key (Gemini 3 not yet available on Vertex AI)."""
     import os
     try:
         from backend.config import settings
         if settings.GEMINI_API_KEY:
             os.environ["GOOGLE_API_KEY"] = settings.GEMINI_API_KEY
-        # Do NOT set GOOGLE_GENAI_USE_VERTEXAI — Gemini 3 only available via API key
         os.environ.pop("GOOGLE_GENAI_USE_VERTEXAI", None)
     except Exception:
         pass
 
+
 _configure_adk_auth()
 
-# ── Tool result capture ──────────────────────────────────────────────────────
-# The ADK agent calls our tool and we capture the structured result here.
-# Each run uses a unique key to avoid cross-request contamination.
+# ── Shared result capture ────────────────────────────────────────────────────
+# _analyze_startup_metrics writes into this dict; run_analysis_via_adk reads it.
+# Keyed by per-request UUID so parallel requests never collide.
 _results: dict[str, dict] = {}
 
+
+# ── Tool 1 — Investigator ────────────────────────────────────────────────────
 
 async def _analyze_startup_metrics(
     startup_name: str,
@@ -64,12 +84,19 @@ async def _analyze_startup_metrics(
     _result_key: str = "",
 ) -> str:
     """
-    Analyze startup metrics against the failure pattern library.
-    Uses MongoDB Atlas Vector Search + Gemini 3 Flash scoring.
-    Orchestrated by Gemini 3 Flash (gemini-3-flash-preview) via Google ADK.
-    Returns the best-matching failure pattern with survival playbook, or safe result.
+    Investigator Agent tool. Embeds startup metrics → MongoDB Atlas Vector Search + BM25 RRF →
+    Gemini parallel scoring → re-evaluation loop if needed.
+    Emits real-time SSE events when run_analysis_via_adk_stream is active (via ContextVar queue).
+    Stores full result in _results[_result_key] for the outer runner.
     """
-    from backend.services.pattern_matcher import match_patterns
+    from backend.services.pattern_matcher import (
+        _atlas_search_candidates, _reciprocal_rank_fusion, _score_with_gemini,
+    )
+    from backend.services import gemini as _gemini
+    from backend.services.mcp_client import mcp
+    from backend.db.connection import get_db
+    from backend.services.output_writer import write_alert
+    from backend.config import settings
 
     metrics = MetricsInput(
         startup_name=startup_name, current_month=current_month,
@@ -77,128 +104,291 @@ async def _analyze_startup_metrics(
         burn_rate=burn_rate, runway_months=runway_months, headcount=headcount,
         nps=nps, cac=cac, ltv=ltv, industry=industry,
     )
-    match = await match_patterns(metrics)
+    db = get_db()
 
-    if match is None:
-        result = {"alert": False, "startup_name": startup_name,
-                  "message": "No dangerous failure patterns detected. Metrics look healthy."}
-    else:
+    embed_model = (
+        "MongoDB Voyage AI voyage-4-large (1024-dim)"
+        if settings.VOYAGE_API_KEY
+        else "Google text-embedding-004"
+    )
+    await _emit("step", icon="🤖", message=(
+        f"Investigator Agent initializing — {embed_model} → "
+        "Atlas Vector Search + BM25 RRF → MongoDB MCP → Gemini 3 Flash scoring"
+    ))
+    await _emit("step", icon="🔢", message=f"Generating 1024-dim embedding via {embed_model}...")
+
+    ltv_cac = ltv / cac if cac > 0 else 0.0
+    net_new = mrr * mrr_growth_rate
+    burn_mult = burn_rate / net_new if net_new > 0 else 99.0
+    query_text = (
+        f"startup failure: month {current_month}, "
+        f"churn {churn_rate*100:.0f}%, NPS {nps}, "
+        f"burn ${burn_rate:,.0f}/month, runway {runway_months} months, "
+        f"LTV:CAC {ltv_cac:.1f}x, burn multiple {burn_mult:.1f}x"
+    )
+
+    # ── Step 1: Embed ────────────────────────────────────────────────
+    query_vector = None
+    try:
+        query_vector = await _gemini.embed(query_text)
+        await _emit("step", icon="✅", message="1024-dimensional embedding ready — querying MongoDB Atlas Vector Search...")
+    except Exception as e:
+        await _emit("step", icon="⚠️", message=f"Embedding failed: {e}")
+
+    # ── Step 2: Hybrid retrieval ─────────────────────────────────────
+    await _emit("step", icon="🔍", message=(
+        "Hybrid retrieval: MongoDB Atlas Vector Search (cosine similarity) + "
+        "Atlas Search (BM25) → Reciprocal Rank Fusion..."
+    ))
+
+    candidates = []
+    vector_results: list = []
+    bm25_results: list = []
+
+    if query_vector:
+        try:
+            vector_pipeline = [
+                {
+                    "$vectorSearch": {
+                        "index": "vector_index",
+                        "path": "narrative_embedding",
+                        "queryVector": query_vector,
+                        "numCandidates": 20,
+                        "limit": 10,
+                        "filter": {
+                            "stage_month_min": {"$lte": current_month},
+                            "stage_month_max": {"$gte": current_month},
+                        },
+                    }
+                },
+                {"$project": {"narrative_embedding": 0}},
+            ]
+            v_res, b_res = await _asyncio.gather(
+                db["failure_patterns"].aggregate(vector_pipeline).to_list(length=10),
+                _atlas_search_candidates(metrics, query_text),
+                return_exceptions=True,
+            )
+            vector_results = v_res if not isinstance(v_res, Exception) else []
+            bm25_results = b_res if not isinstance(b_res, Exception) else []
+
+            if vector_results or bm25_results:
+                merged = (
+                    _reciprocal_rank_fusion([vector_results, bm25_results])
+                    if bm25_results
+                    else vector_results
+                )
+                candidates = merged[:5]
+                src = "Vector Search + BM25 RRF" if bm25_results else "Vector Search"
+                await _emit("step", icon="✅", message=(
+                    f"{src}: {len(vector_results)} vector + {len(bm25_results)} BM25 results "
+                    f"merged → top {len(candidates)} candidates"
+                ))
+        except Exception as e:
+            logger.warning("Hybrid search failed in Investigator tool: %s", e)
+
+    if not candidates:
+        await _emit("step", icon="⚠️", message="Hybrid search returned no results — running numeric filter fallback...")
+        from backend.services.pattern_matcher import _candidate_patterns
+        candidates = await _candidate_patterns(metrics)
+
+    if not candidates:
         result = {
-            "alert": True,
+            "alert": False,
             "startup_name": startup_name,
-            "pattern": match.model_dump(),
-            "message": f"Pattern detected: {match.pattern_name} at {int(match.confidence*100)}%",
+            "message": "No dangerous failure patterns detected. Metrics look healthy.",
         }
+        if _result_key:
+            _results[_result_key] = result
+        await _emit("step", icon="✅", message="No patterns matched your metrics — trajectory looks healthy.")
+        return json.dumps({
+            "status": "complete", "alert": False,
+            "pattern_name": "none", "pattern_id": "none", "category": "none", "confidence": 0,
+        })
 
+    await _emit("step", icon="✅", message=f"Candidates: {', '.join(p['name'] for p in candidates)}")
+
+    # ── Step 3: MongoDB MCP category context ─────────────────────────
+    if mcp.available:
+        top_cat = candidates[0].get("category", "")
+        await _emit("step", icon="🗄️", message=(
+            f"MongoDB MCP → find('failure_patterns', {{category: '{top_cat}'}}, limit=10)"
+        ))
+        try:
+            cat_patterns = await mcp.find(
+                "failure_patterns",
+                filter_={"category": top_cat},
+                projection={"_id": 0, "pattern_id": 1, "name": 1, "failure_count": 1, "survival_count": 1},
+                limit=10,
+            )
+            await _emit("step", icon="✅", message=(
+                f"MCP returned {len(cat_patterns)} '{top_cat}' patterns → "
+                f"survival rates: {', '.join(p['pattern_id'] for p in cat_patterns[:3])}..."
+            ))
+        except Exception as e:
+            await _emit("step", icon="⚠️", message=f"MCP fetch skipped: {e}")
+
+    # ── Step 4: Parallel Vertex AI scoring ───────────────────────────
+    _gemini.last_fallback_reason = None
+    await _emit("step", icon="🤖", message=f"Vertex AI Gemini 2.5 Flash scoring {len(candidates)} candidates in parallel (thinking_budget=0)...")
+    for i, p in enumerate(candidates):
+        await _emit("step", icon="⚡", message=f"Evaluating [{i+1}/{len(candidates)}] {p['name']}...")
+
+    scorings = await _asyncio.gather(
+        *[_score_with_gemini(metrics, p) for p in candidates],
+        return_exceptions=True,
+    )
+
+    if _gemini.last_fallback_reason:
+        await _emit("step", icon="🔄", message=f"Model fallback: {_gemini.last_fallback_reason}")
+        _gemini.last_fallback_reason = None
+
+    best_match = None
+    best_score = 0.0
+    best_scoring = None
+
+    for pattern, scoring in zip(candidates, scorings):
+        if isinstance(scoring, Exception):
+            continue
+        score = scoring.get("confidence", 0.0)
+        await _emit("step", icon="📊", message=f"  → {pattern['name']}: {int(score*100)}% match score")
+        if score > best_score:
+            best_score = score
+            best_match = pattern
+            best_scoring = scoring
+
+    # ── Step 5: Agent re-evaluation if low confidence ────────────────
+    if best_score < 0.70 and mcp.available:
+        await _emit("step", icon="🔄", message=(
+            f"Match score {int(best_score*100)}% — below threshold. "
+            "Agent re-querying MongoDB MCP for broader pattern set..."
+        ))
+        try:
+            await _emit("step", icon="🗄️", message=(
+                "MongoDB MCP → find('failure_patterns', {}, limit=10) [re-evaluation pass]"
+            ))
+            backup_patterns = await mcp.find(
+                "failure_patterns",
+                filter_={},
+                projection={"_id": 0, "narrative_embedding": 0},
+                limit=10,
+            )
+            seen_ids = {p["pattern_id"] for p in candidates}
+            backup_candidates = [
+                p for p in backup_patterns if p.get("pattern_id") not in seen_ids
+            ][:3]
+
+            if backup_candidates:
+                await _emit("step", icon="🤖", message=(
+                    f"Re-scoring {len(backup_candidates)} backup patterns via Vertex AI Gemini 2.5 Flash..."
+                ))
+                backup_scorings = await _asyncio.gather(
+                    *[_score_with_gemini(metrics, p) for p in backup_candidates],
+                    return_exceptions=True,
+                )
+                for pattern, scoring in zip(backup_candidates, backup_scorings):
+                    if isinstance(scoring, Exception):
+                        continue
+                    score = scoring.get("confidence", 0.0)
+                    await _emit("step", icon="📊", message=f"  → {pattern['name']}: {int(score*100)}% match score")
+                    if score > best_score:
+                        best_score = score
+                        best_match = pattern
+                        best_scoring = scoring
+        except Exception as e:
+            await _emit("step", icon="⚠️", message=f"Re-evaluation skipped: {e}")
+
+    # ── Step 6: Build result ──────────────────────────────────────────
+    if best_score < 0.60 or best_match is None:
+        result = {
+            "alert": False,
+            "startup_name": startup_name,
+            "message": "No dangerous failure patterns detected. Metrics look healthy.",
+        }
+        if _result_key:
+            _results[_result_key] = result
+        await _emit("step", icon="✅", message=(
+            f"Best match score {int(best_score*100)}% — below 60% threshold. No dangerous pattern confirmed."
+        ))
+        return json.dumps({
+            "status": "complete", "alert": False,
+            "pattern_name": "none", "pattern_id": "none", "category": "none", "confidence": 0,
+        })
+
+    await _emit("step", icon="⚠️", message=(
+        f"Pattern confirmed: {best_match['name']} at {int(best_score*100)}% match score. "
+        "Handing off to Challenger Agent for independent verification..."
+    ))
+
+    signals = [
+        WarningSig(
+            signal=s["signal"],
+            status=s.get("status", "DETECTED"),
+            days_detectable=s.get("days_detectable"),
+        )
+        for s in best_scoring.get("detected_signals", [])
+        if s.get("status") in ("DETECTED", "EMERGING")
+    ]
+    total = best_match["failure_count"] + best_match["survival_count"]
+    survival_rate = best_match["survival_count"] / total if total > 0 else 0.0
+
+    match = PatternMatch(
+        pattern_id=best_match["pattern_id"],
+        pattern_name=best_match["name"],
+        confidence=round(best_score, 2),
+        failure_count=best_match["failure_count"],
+        survival_count=best_match["survival_count"],
+        survival_rate=round(survival_rate, 3),
+        narrative=best_match["narrative"],
+        warning_signals_detected=signals,
+        survival_playbook=best_match["survival_playbook"],
+        famous_failures=best_match.get("famous_failures", []),
+        days_to_crisis=best_scoring.get("days_to_crisis", 90),
+        match_reasoning=best_scoring.get("match_reasoning"),
+        trigger_conditions=best_match.get("trigger_conditions"),
+    )
+
+    try:
+        output_file = write_alert(match, metrics)
+        match.output_file = output_file
+    except Exception:
+        pass
+
+    # Persist to MongoDB for session memory (previous analysis context in future queries)
+    try:
+        from datetime import datetime, timezone
+        await db["startup_analyses"].insert_one({
+            "startup_name": startup_name,
+            "checked_at": datetime.now(timezone.utc),
+            "alert": True,
+            "pattern_name": best_match["name"],
+            "confidence": round(best_score, 2),
+            "days_to_crisis": best_scoring.get("days_to_crisis", 90),
+            "metrics_snapshot": metrics.model_dump(),
+        })
+    except Exception:
+        pass
+
+    result = {
+        "alert": True,
+        "startup_name": startup_name,
+        "pattern": match.model_dump(),
+        "message": f"Pattern detected: {match.pattern_name} at {int(match.confidence * 100)}%",
+    }
     if _result_key:
         _results[_result_key] = result
 
-    return json.dumps({"status": "complete", "alert": result["alert"],
-                       "pattern_name": result.get("pattern", {}).get("pattern_name", "none"),
-                       "pattern_id": result.get("pattern", {}).get("pattern_id", "none"),
-                       "confidence": result.get("pattern", {}).get("confidence", 0)})
+    logger.info("[ADK:Investigator] Pattern: %s (%.0f%%)", match.pattern_name, match.confidence * 100)
+    return json.dumps({
+        "status": "complete",
+        "alert": True,
+        "pattern_name": best_match["name"],
+        "pattern_id": best_match["pattern_id"],
+        "category": best_match.get("category", "none"),
+        "confidence": best_score,
+    })
 
 
-async def _save_analysis_report(
-    startup_name: str,
-    alert: bool,
-    pattern_name: str = "",
-    confidence: float = 0.0,
-    recommendation: str = "",
-    category_insight: str = "",
-) -> str:
-    """
-    Save a structured analysis report to disk.
-    Called by the ADK agent after pattern analysis to persist findings.
-    Demonstrates action execution — the agent doesn't just answer, it writes artefacts.
-    """
-    from backend.config import OUTPUT_PATH
-    from datetime import datetime
-    import re
-
-    safe_name = re.sub(r'[^a-z0-9-]', '-', startup_name.lower())[:30]
-    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    fname = OUTPUT_PATH / f"report_{safe_name}_{ts}.md"
-    OUTPUT_PATH.mkdir(exist_ok=True)
-
-    status = "ALERT" if alert else "SAFE"
-    content = f"""# Oracle Analysis Report — {startup_name}
-Generated: {datetime.utcnow().isoformat()}Z
-Status: {status}
-"""
-    if alert and pattern_name:
-        content += f"""Pattern: {pattern_name}
-Confidence: {int(confidence*100)}%
-"""
-    if recommendation:
-        content += f"\n## Recommendation\n{recommendation}\n"
-    if category_insight:
-        content += f"\n## Category Intelligence\n{category_insight}\n"
-    content += "\n---\n*Generated by The Failure Oracle ADK Agent*\n"
-
-    fname.write_text(content, encoding="utf-8")
-    logger.info("[ADK] Report saved: %s", fname.name)
-    return json.dumps({"saved": True, "file": fname.name, "status": status})
-
-
-async def _fetch_category_benchmarks(category: str) -> str:
-    """
-    Fetch survival statistics for a failure pattern category from MongoDB.
-    Called by the ADK agent after analysis to enrich the report with category context.
-    Returns: total patterns in category, aggregate survival rate, most dangerous pattern.
-    """
-    from backend.db.connection import get_db
-    db = get_db()
-    try:
-        pipeline = [
-            {"$match": {"category": category}},
-            {"$group": {
-                "_id": "$category",
-                "pattern_count": {"$sum": 1},
-                "total_failures": {"$sum": "$failure_count"},
-                "total_survivals": {"$sum": "$survival_count"},
-                "avg_survival_rate": {"$avg": {
-                    "$cond": [
-                        {"$gt": [{"$add": ["$failure_count", "$survival_count"]}, 0]},
-                        {"$divide": ["$survival_count",
-                                     {"$add": ["$failure_count", "$survival_count"]}]},
-                        0
-                    ]
-                }},
-                "patterns": {"$push": {"name": "$name", "survival_count": "$survival_count",
-                                        "failure_count": "$failure_count"}},
-            }}
-        ]
-        results = await db["failure_patterns"].aggregate(pipeline).to_list(length=1)
-        if not results:
-            return json.dumps({"error": f"No patterns found for category: {category}"})
-
-        row = results[0]
-        total_cases = row["total_failures"] + row["total_survivals"]
-        survival_pct = round(row["avg_survival_rate"] * 100, 1)
-
-        # Find the most dangerous pattern (lowest survival rate)
-        worst = min(
-            row["patterns"],
-            key=lambda p: p["survival_count"] / max(p["failure_count"] + p["survival_count"], 1)
-        )
-
-        return json.dumps({
-            "category": category,
-            "pattern_count": row["pattern_count"],
-            "total_documented_cases": total_cases,
-            "category_survival_rate_pct": survival_pct,
-            "most_dangerous_pattern": worst["name"],
-            "summary": (
-                f"The '{category}' category has {row['pattern_count']} documented failure patterns "
-                f"across {total_cases} cases. Category survival rate: {survival_pct}%. "
-                f"Most dangerous pattern: '{worst['name']}'."
-            )
-        })
-    except Exception as e:
-        logger.warning("[ADK] fetch_category_benchmarks failed: %s", e)
-        return json.dumps({"error": str(e)})
-
+# ── Tool 2 — Challenger ──────────────────────────────────────────────────────
 
 async def _challenge_pattern_match(
     startup_name: str,
@@ -217,16 +407,12 @@ async def _challenge_pattern_match(
     industry: str = "B2B SaaS",
 ) -> str:
     """
-    Challenger Agent — a second Gemini 3 instance that independently stress-tests
-    the Investigator's pattern match with deliberate skepticism.
-
-    Call this when alert=True and 0.60 <= confidence <= 0.92.
-    Skip when confidence >= 0.93 (evidence is overwhelming) or alert=False.
-
-    Returns: verdict (CONFIRM|DISPUTE), challenger_confidence, reasoning, strongest_counter.
+    Adversarial verification tool for the Challenger Agent.
+    Independently re-evaluates the Investigator's pattern match with deliberate skepticism.
+    Always called when alert=True — high confidence makes adversarial verification MORE important.
+    Returns: verdict (CONFIRM|DISPUTE), challenger_confidence, delta_pp, reasoning.
     """
     from backend.services.pattern_matcher import _challenger_evaluate
-    from backend.db.schemas import MetricsInput
     from backend.db.connection import get_db
 
     metrics = MetricsInput(
@@ -235,76 +421,309 @@ async def _challenge_pattern_match(
         burn_rate=burn_rate, runway_months=runway_months, headcount=headcount,
         nps=nps, cac=cac, ltv=ltv, industry=industry,
     )
-
-    # Fetch the full pattern to give the Challenger real trigger conditions and signals
     db = get_db()
     full_pattern = await db["failure_patterns"].find_one(
         {"pattern_id": pattern_id},
         {"_id": 0, "narrative_embedding": 0},
     )
     if not full_pattern:
-        return json.dumps({"error": f"Pattern {pattern_id} not found — skipping Challenger"})
+        await _emit("step", icon="⚠️", message=f"Challenger Agent: Pattern {pattern_id} not found — skipped")
+        return json.dumps({"error": f"Pattern {pattern_id} not found", "verdict": "SKIPPED"})
+
+    await _emit("step", icon="⚖️", message=(
+        "Challenger Agent independently evaluating Investigator's finding — "
+        "stress-testing with deliberate skepticism..."
+    ))
 
     result = await _challenger_evaluate(metrics, full_pattern, investigator_confidence)
-    logger.info("[ADK] Challenger: %s (Δ%.0fpp) — %s",
-                result["verdict"], result["delta_pp"], result.get("reasoning", "")[:80])
+
+    verdict_icon = "✅" if result["verdict"] == "CONFIRM" else "⚡"
+    verdict_verb = f"{result['verdict']}S"
+    await _emit("step", icon=verdict_icon, message=(
+        f"Challenger Agent {verdict_verb} at {int(result['confidence']*100)}% "
+        f"(Δ{result['delta_pp']}pp) — {result['reasoning']}"
+    ))
+    await _emit("challenger",
+                verdict=result["verdict"],
+                confidence=result["confidence"],
+                reasoning=result["reasoning"],
+                strongest_counter=result["strongest_counter"],
+                delta_pp=result["delta_pp"],
+                investigator_confidence=investigator_confidence)
+
+    await _emit("step", icon="🔄", message=(
+        "Challenger verification complete — Reporter Agent synthesizing findings..."
+    ))
+
+    logger.info("[ADK:Challenger] %s (Δ%.0fpp) — %s",
+                result["verdict"], result.get("delta_pp", 0), result.get("reasoning", "")[:80])
     return json.dumps(result)
 
 
-# ── Agent singleton ──────────────────────────────────────────────────────────
+# ── Tool 3 & 4 — Reporter ────────────────────────────────────────────────────
 
-_agent: Optional[Agent] = None
+async def _fetch_category_benchmarks(category: str) -> str:
+    """
+    Query MongoDB for aggregate survival statistics across all patterns in a failure category.
+    Returns pattern count, total cases, survival rate, and the most dangerous pattern.
+    Uses MCP aggregate tool (primary); falls back to Motor if MCP unavailable.
+    """
+    from backend.services.mcp_client import mcp as _mcp
+
+    await _emit("step", icon="📊", message=(
+        f"Reporter Agent: MongoDB MCP → aggregate('failure_patterns', $match+$group, category='{category}')..."
+    ))
+
+    try:
+        pipeline = [
+            {"$match": {"category": category}},
+            {"$group": {
+                "_id": "$category",
+                "pattern_count": {"$sum": 1},
+                "total_failures": {"$sum": "$failure_count"},
+                "total_survivals": {"$sum": "$survival_count"},
+                "avg_survival_rate": {"$avg": {
+                    "$cond": [
+                        {"$gt": [{"$add": ["$failure_count", "$survival_count"]}, 0]},
+                        {"$divide": ["$survival_count",
+                                     {"$add": ["$failure_count", "$survival_count"]}]},
+                        0,
+                    ]
+                }},
+                "patterns": {"$push": {
+                    "name": "$name",
+                    "survival_count": "$survival_count",
+                    "failure_count": "$failure_count",
+                }},
+            }},
+        ]
+
+        if _mcp.available:
+            rows = await _mcp.aggregate("failure_patterns", pipeline)
+        else:
+            from backend.db.connection import get_db
+            db = get_db()
+            rows = await db["failure_patterns"].aggregate(pipeline).to_list(length=1)
+        if not rows:
+            await _emit("step", icon="⚠️", message=f"No benchmark data for category: {category}")
+            return json.dumps({"error": f"No patterns found for category: {category}"})
+
+        row = rows[0]
+        total = row["total_failures"] + row["total_survivals"]
+        survival_pct = round(row["avg_survival_rate"] * 100, 1)
+        worst = min(
+            row["patterns"],
+            key=lambda p: p["survival_count"] / max(p["failure_count"] + p["survival_count"], 1),
+        )
+
+        await _emit("step", icon="✅", message=(
+            f"Category insight: {survival_pct}% survival rate across "
+            f"{row['pattern_count']} documented '{category}' patterns — "
+            f"most dangerous: '{worst['name']}'"
+        ))
+
+        return json.dumps({
+            "category": category,
+            "pattern_count": row["pattern_count"],
+            "total_documented_cases": total,
+            "category_survival_rate_pct": survival_pct,
+            "most_dangerous_pattern": worst["name"],
+            "summary": (
+                f"The '{category}' category has {row['pattern_count']} documented failure patterns "
+                f"across {total:,} cases. Category survival rate: {survival_pct}%. "
+                f"Most dangerous pattern: '{worst['name']}'."
+            ),
+        })
+    except Exception as e:
+        logger.warning("[ADK:Reporter] fetch_category_benchmarks failed: %s", e)
+        await _emit("step", icon="⚠️", message=f"Category benchmarks skipped: {e}")
+        return json.dumps({"error": str(e)})
+
+
+async def _save_analysis_report(
+    startup_name: str,
+    alert: bool,
+    pattern_name: str = "",
+    confidence: float = 0.0,
+    recommendation: str = "",
+    category_insight: str = "",
+) -> str:
+    """
+    Persist a structured Markdown analysis report synthesising all three agent findings.
+    Demonstrates the ADK pipeline's action capability — agents don't just answer, they write artefacts.
+    """
+    from backend.config import OUTPUT_PATH
+    from datetime import datetime
+    import re
+
+    await _emit("step", icon="💾", message=f"Reporter Agent: Saving structured analysis report for '{startup_name}'...")
+
+    safe_name = re.sub(r"[^a-z0-9-]", "-", startup_name.lower())[:30]
+    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    fname = OUTPUT_PATH / f"report_{safe_name}_{ts}.md"
+    OUTPUT_PATH.mkdir(exist_ok=True)
+
+    status = "ALERT" if alert else "SAFE"
+    content = (
+        f"# Oracle Analysis Report — {startup_name}\n"
+        f"Generated: {datetime.utcnow().isoformat()}Z\n"
+        f"Status: {status}\n"
+    )
+    if alert and pattern_name:
+        content += f"Pattern: {pattern_name}\nConfidence: {int(confidence * 100)}%\n"
+    if recommendation:
+        content += f"\n## Recommendation\n{recommendation}\n"
+    if category_insight:
+        content += f"\n## Category Intelligence\n{category_insight}\n"
+    content += "\n---\n*Generated by The Failure Oracle — 3-Agent ADK SequentialAgent Pipeline*\n"
+
+    fname.write_text(content, encoding="utf-8")
+
+    await _emit("step", icon="✅", message=(
+        f"Report saved — Oracle pipeline complete: 3 agents executed, "
+        f"1 Markdown report generated ({fname.name})"
+    ))
+
+    logger.info("[ADK:Reporter] Report saved: %s", fname.name)
+    return json.dumps({"saved": True, "file": fname.name, "status": status})
+
+
+# ── Agent instructions ───────────────────────────────────────────────────────
+
+_INVESTIGATOR_INSTRUCTION = """\
+You are the Investigator — Agent 1 of Oracle's 3-agent failure detection pipeline.
+
+Your sole task: call analyze_startup_metrics with ALL metric values from the user message, passing
+_result_key exactly as given. Do not paraphrase or omit any field.
+
+After the tool returns, output ONLY the following JSON (no markdown fences, no prose):
+{"alert": <bool>, "pattern_id": "<id>", "category": "<category>", "confidence": <float>, "pattern_name": "<name>"}
+
+If alert is false, output:
+{"alert": false, "pattern_id": "none", "category": "none", "confidence": 0, "pattern_name": "none"}
+"""
+
+_CHALLENGER_INSTRUCTION = """\
+You are the Challenger — Agent 2 of Oracle's 3-agent pipeline. Your role: adversarial verification.
+
+Read the Investigator's JSON output in the conversation above. Then:
+
+If "alert" is true:
+   → ALWAYS call challenge_pattern_match using ALL startup metric values from the user message,
+     plus pattern_id and investigator_confidence from the Investigator's JSON.
+   → Output the tool result as JSON.
+   → The Challenger ALWAYS verifies alert matches — high confidence makes adversarial
+     verification MORE important, not less. Never skip based on confidence.
+
+If "alert" is false:
+   → Output: {"verdict": "SKIPPED", "reason": "no alert detected — nothing to challenge"}
+
+Output ONLY JSON. No prose.
+"""
+
+_REPORTER_INSTRUCTION = """\
+You are the Reporter — Agent 3 and final agent in Oracle's 3-agent pipeline.
+
+Review the full conversation above (Investigator JSON + Challenger JSON). Then:
+
+Step 1: If "alert" is true in the Investigator's output, call fetch_category_benchmarks
+        with the "category" value from the Investigator's JSON.
+
+Step 2: Call save_analysis_report with:
+  - startup_name: from the user message
+  - alert: from the Investigator's JSON
+  - pattern_name: from the Investigator's JSON (empty string if no alert)
+  - confidence: from the Investigator's JSON (0.0 if no alert)
+  - recommendation: a single sentence that synthesises both the Investigator's finding
+    AND the Challenger's verdict (or "Metrics within safe thresholds." if no alert)
+  - category_insight: the "summary" field from fetch_category_benchmarks (empty string if no alert)
+
+ALWAYS call save_analysis_report — mandatory for every analysis, alert or safe.
+"""
+
+
+# ── Agent + pipeline singletons ──────────────────────────────────────────────
+
+_oracle: Optional[SequentialAgent] = None
 _runner: Optional[Runner] = None
 _session_service: Optional[InMemorySessionService] = None
 
-_AGENT_INSTRUCTION = """You are the Failure Oracle — an AI agent that detects startup failure patterns
-before they become fatal. You have four tools:
-
-1. analyze_startup_metrics — analyzes metrics against the failure pattern library
-2. challenge_pattern_match — Challenger Agent: a second Gemini 3 instance that stress-tests the Investigator's finding
-3. fetch_category_benchmarks — fetches survival statistics for a failure category from MongoDB
-4. save_analysis_report — saves a structured report to disk
-
-When given startup metrics:
-1. Call analyze_startup_metrics with ALL metric values provided
-2. If alert=True and 0.60 <= confidence <= 0.92, call challenge_pattern_match with all the same metric values plus the pattern_id and investigator_confidence returned from step 1. Skip if confidence >= 0.93 or alert=False.
-3. If an alert was detected, call fetch_category_benchmarks with the matched pattern's category to get survival stats
-4. Call save_analysis_report with: startup_name, alert status, pattern_name, confidence, a 1-sentence recommendation, and the category_insight string from step 3
-
-Always call all relevant tools when an alert is detected. If no alert, skip steps 2-3 and call save_analysis_report with alert=False."""
-
 
 def _get_runner() -> tuple[Runner, InMemorySessionService]:
-    global _agent, _runner, _session_service
-    if _runner is None:
-        _agent = Agent(
-            name="failure_oracle",
-            model="gemini-3-flash-preview",
-            description="Detects startup failure patterns using MongoDB Atlas Vector Search and Gemini 3, stress-tests findings with a Challenger Agent, enriches with category benchmarks, then saves a report",
-            instruction=_AGENT_INSTRUCTION,
-            tools=[
-                FunctionTool(_analyze_startup_metrics),
-                FunctionTool(_challenge_pattern_match),
-                FunctionTool(_fetch_category_benchmarks),
-                FunctionTool(_save_analysis_report),
-            ],
-        )
-        _session_service = InMemorySessionService()
-        _runner = Runner(
-            agent=_agent,
-            app_name="oracle",
-            session_service=_session_service,
-        )
-        logger.info("[ADK] Failure Oracle agent initialized (model: gemini-3-flash-preview)")
+    global _oracle, _runner, _session_service
+    if _runner is not None:
+        return _runner, _session_service
+
+    investigator = Agent(
+        name="investigator",
+        model=_MODEL,
+        description=(
+            "Embeds startup metrics with Voyage AI voyage-4-large (1024-dim), "
+            "runs MongoDB Atlas Vector Search + BM25 Reciprocal Rank Fusion, "
+            "scores top candidates with Gemini 3 Flash."
+        ),
+        instruction=_INVESTIGATOR_INSTRUCTION,
+        tools=[FunctionTool(_analyze_startup_metrics)],
+        output_key="investigator_result",
+    )
+
+    challenger = Agent(
+        name="challenger",
+        model=_MODEL,
+        description=(
+            "Adversarial verifier — a second independent Gemini 3 Flash instance that "
+            "stress-tests the Investigator's pattern match with deliberate skepticism. "
+            "Returns CONFIRM or DISPUTE with confidence delta."
+        ),
+        instruction=_CHALLENGER_INSTRUCTION,
+        tools=[FunctionTool(_challenge_pattern_match)],
+        output_key="challenger_result",
+    )
+
+    reporter = Agent(
+        name="reporter",
+        model=_MODEL,
+        description=(
+            "Synthesises Investigator + Challenger findings, enriches with MongoDB "
+            "category benchmarks, and saves a structured Markdown report to disk."
+        ),
+        instruction=_REPORTER_INSTRUCTION,
+        tools=[
+            FunctionTool(_fetch_category_benchmarks),
+            FunctionTool(_save_analysis_report),
+        ],
+    )
+
+    _oracle = SequentialAgent(
+        name="failure_oracle",
+        description="3-agent SequentialAgent: Investigator → Challenger → Reporter",
+        sub_agents=[investigator, challenger, reporter],
+    )
+
+    _session_service = InMemorySessionService()
+    _runner = Runner(
+        agent=_oracle,
+        app_name="oracle",
+        session_service=_session_service,
+    )
+    logger.info(
+        "[ADK] Failure Oracle initialized: SequentialAgent "
+        "[Investigator → Challenger → Reporter] | model: %s", _MODEL
+    )
     return _runner, _session_service
 
 
-# ── Public entry point ───────────────────────────────────────────────────────
+# ── Public entry points ──────────────────────────────────────────────────────
 
 async def run_analysis_via_adk(metrics: MetricsInput) -> dict:
     """
-    Run the failure pattern analysis through the ADK agent.
-    The agent calls analyze_startup_metrics tool, which uses MCP + Gemini internally.
+    Run startup failure analysis through the 3-agent ADK SequentialAgent pipeline.
+
+    Flow:
+      1. Investigator calls analyze_startup_metrics (Vector Search + BM25 + Gemini scoring)
+      2. Challenger always stress-tests alert matches (adversarial verification)
+      3. Reporter fetches MongoDB category benchmarks + saves Markdown report
+
     Returns an AlertResponse-compatible dict.
     """
     runner, session_service = _get_runner()
@@ -319,7 +738,6 @@ async def run_analysis_via_adk(metrics: MetricsInput) -> dict:
         session_id=session_id,
     )
 
-    # Pass raw decimal values to avoid the agent misinterpreting percentages
     msg = (
         f"Analyze startup '{metrics.startup_name}' for failure patterns. "
         f"Call analyze_startup_metrics with exactly these values:\n"
@@ -332,7 +750,6 @@ async def run_analysis_via_adk(metrics: MetricsInput) -> dict:
     )
 
     try:
-        # Drain the generator fully — breaking early causes OpenTelemetry context errors
         async for _ in runner.run_async(
             user_id=user_id,
             session_id=session_id,
@@ -340,25 +757,22 @@ async def run_analysis_via_adk(metrics: MetricsInput) -> dict:
         ):
             pass
     except Exception as e:
-        # ADK may throw on generator cleanup (OTel context) even after the tool ran
-        # successfully. Check _results FIRST before deciding to fall back.
         err_type = type(e).__name__
-        err_msg  = str(e)
+        err_msg = str(e)
         if result_key in _results:
-            # Tool ran and stored result before the exception — use it
             result = _results.pop(result_key)
-            logger.info("[ADK] Analysis complete via ADK agent (cleanup exc: %s %s): alert=%s",
-                        err_type, err_msg, result.get("alert"))
+            logger.info(
+                "[ADK] Pipeline complete (cleanup exc: %s %s): alert=%s",
+                err_type, err_msg, result.get("alert"),
+            )
             return result
-        logger.warning("[ADK] Agent run failed (%s: %s) — falling back", err_type, err_msg)
+        logger.warning("[ADK] Pipeline failed (%s: %s) — falling back to direct match", err_type, err_msg)
 
-    # Check for tool result (normal success path)
     if result_key in _results:
         result = _results.pop(result_key)
-        logger.info("[ADK] Analysis complete via ADK agent: alert=%s", result.get("alert"))
+        logger.info("[ADK] Pipeline complete: alert=%s", result.get("alert"))
         return result
 
-    # Tool never ran — true fallback to match_patterns directly
     logger.warning("[ADK] Tool result not captured — running direct match_patterns fallback")
     from backend.services.pattern_matcher import match_patterns
     match = await match_patterns(metrics)
@@ -367,3 +781,137 @@ async def run_analysis_via_adk(metrics: MetricsInput) -> dict:
                 "message": "No dangerous failure patterns detected."}
     return {"alert": True, "startup_name": metrics.startup_name,
             "pattern": match.model_dump(), "message": f"Pattern: {match.pattern_name}"}
+
+
+async def run_analysis_via_adk_stream(metrics: MetricsInput):
+    """
+    Async generator: runs the ADK SequentialAgent pipeline and yields SSE-format event dicts
+    in real time as each agent's tool functions execute.
+
+    Architecture:
+      - A shared asyncio.Queue is set as a ContextVar before the ADK pipeline starts
+      - Each tool function (_analyze_startup_metrics, _challenge_pattern_match, etc.)
+        emits events to the queue via _emit() when the ContextVar is set
+      - This generator reads from the queue and yields events as they arrive
+      - After the full pipeline completes, the final result/safe event is emitted
+
+    The streaming endpoint (/api/metrics/analyze/stream) routes through this function,
+    making the SSE terminal a genuine window into the ADK SequentialAgent execution.
+    """
+    from backend.services.pattern_matcher import (
+        compute_oracle_score, build_recovery_scenario, compute_escape_plan, match_patterns_top3,
+    )
+
+    queue: _asyncio.Queue = _asyncio.Queue()
+    sentinel = object()
+    token = _stream_queue_var.set(queue)
+
+    async def _run_pipeline():
+        try:
+            await _emit("step", icon="🤖", message=(
+                "Oracle Pipeline starting — ADK SequentialAgent: "
+                "Investigator → Challenger → Reporter"
+            ))
+            # Run ADK pipeline + multi-pattern cocktail matching in parallel
+            raw_result, cocktail = await _asyncio.gather(
+                run_analysis_via_adk(metrics),
+                match_patterns_top3(metrics),
+                return_exceptions=True,
+            )
+            if isinstance(raw_result, Exception):
+                raise raw_result
+            if isinstance(cocktail, Exception):
+                cocktail = None
+
+            if cocktail:
+                await _emit("step", icon="🍸", message=(
+                    f"Cocktail Alert: {len(cocktail.patterns)} co-occurring patterns — "
+                    f"compound survival rate {cocktail.compound_survival_rate*100:.0f}%"
+                ))
+
+            if raw_result.get("alert"):
+                pattern_data = raw_result["pattern"]
+                match_conf = pattern_data["confidence"]
+                oracle_score, score_band = compute_oracle_score(metrics, match_conf)
+                recovery = build_recovery_scenario(metrics, match_conf)
+                escape_raw = compute_escape_plan(metrics, pattern_data, match_conf)
+
+                # ── Cascade Graph ($graphLookup + ACID transaction write) ──────
+                cascade_dict = None
+                try:
+                    from backend.services.cascade import compute_full_cascade
+                    cascade_dict = await compute_full_cascade(
+                        metrics, pattern_data["pattern_id"], float(match_conf)
+                    )
+                    if cascade_dict and cascade_dict.get("cascade_steps"):
+                        n_steps = len(cascade_dict["cascade_steps"])
+                        worst_days = cascade_dict.get("worst_case_days", "?")
+                        max_depth = cascade_dict.get("max_depth", "?")
+                        n_ints = len([i for i in cascade_dict.get("interventions", []) if i.get("action") not in ("monitor", "reduce_risk")])
+                        int_hint = f", {n_ints} intervention point(s)" if n_ints > 0 else ""
+                        await _emit("step", icon="🔗", message=(
+                            f"$graphLookup cascade: {n_steps} failure mode(s), depth {max_depth}{int_hint} — "
+                            f"worst case {worst_days}d to crisis"
+                        ))
+                except Exception as ce:
+                    logger.warning("[ADK:Stream] Cascade computation failed: %s", ce)
+
+                await _emit("step", icon="📊", message=f"Oracle Score: {oracle_score}/100 ({score_band.upper()})")
+                if escape_raw:
+                    n = len(escape_raw["interventions"])
+                    await _emit("step", icon="🔓", message=(
+                        f"Escape Plan: {n} ranked interventions computed — "
+                        f"combined confidence drop: −{escape_raw['combined_drop']}pp"
+                    ))
+
+                await _emit("result",
+                            alert=True,
+                            startup_name=metrics.startup_name,
+                            message=raw_result.get("message", ""),
+                            pattern=pattern_data,
+                            cocktail=cocktail.model_dump() if cocktail else None,
+                            oracle_score=oracle_score,
+                            score_band=score_band,
+                            cascade=cascade_dict,
+                            recovery_scenario={
+                                "pattern_name": pattern_data["pattern_name"],
+                                "confidence": recovery["confidence"],
+                                "survival_rate": pattern_data["survival_rate"],
+                                "improvements": recovery["improvements"],
+                                "score_delta": recovery["score_delta"],
+                            },
+                            escape_plan=escape_raw)
+            else:
+                oracle_score, score_band = compute_oracle_score(metrics, 0.0)
+                await _emit("step", icon="📊", message=f"Oracle Score: {oracle_score}/100 ({score_band.upper()})")
+                await _emit("safe",
+                            message="No dangerous failure patterns detected. Your metrics look healthy for this stage.",
+                            oracle_score=oracle_score,
+                            score_band=score_band,
+                            cocktail=cocktail.model_dump() if cocktail else None)
+
+        except Exception as e:
+            logger.error("[ADK:Stream] Pipeline error: %s", e)
+            await _emit("step", icon="⚠️", message=f"Pipeline error: {e}")
+            await _emit("error", message=str(e))
+        finally:
+            await queue.put(sentinel)
+
+    task = _asyncio.create_task(_run_pipeline())
+
+    try:
+        while True:
+            item = await queue.get()
+            if item is sentinel:
+                break
+            yield item
+    except GeneratorExit:
+        pass
+    finally:
+        _stream_queue_var.reset(token)
+        if not task.done():
+            task.cancel()
+            try:
+                await task
+            except _asyncio.CancelledError:
+                pass

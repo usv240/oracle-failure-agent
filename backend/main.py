@@ -8,10 +8,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from backend.db.connection import ping, close
-from backend.routes import metrics, audit, patterns, stream, integrations, monitor, extract, portfolio, export, share
+from backend.routes import metrics, audit, patterns, stream, integrations, monitor, extract, portfolio, export, share, cascade
 from backend.config import OUTPUT_PATH, settings
 from backend.services.mcp_client import mcp
 from backend.services.monitor import start_monitor, stop_monitor
+from backend.services.change_stream import start_change_stream, stop_change_stream
+from backend.services import telemetry
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s — %(message)s")
 logger = logging.getLogger(__name__)
@@ -37,6 +39,58 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Index creation warning (may already exist): %s", e)
 
+    # Telemetry indexes — TTL 30d on telemetry_events
+    await telemetry.ensure_indexes()
+
+    # Apply $jsonSchema validators (validationLevel=moderate, validationAction=warn)
+    # This enforces document shape at the DB level without rejecting existing data.
+    try:
+        await _db.command({
+            "collMod": "startup_analyses",
+            "validator": {
+                "$jsonSchema": {
+                    "bsonType": "object",
+                    "required": ["startup_name", "checked_at", "alert"],
+                    "properties": {
+                        "startup_name": {"bsonType": "string", "minLength": 1},
+                        "checked_at":   {"bsonType": "date"},
+                        "alert":        {"bsonType": "bool"},
+                        "confidence":   {"bsonType": ["double", "null"], "minimum": 0, "maximum": 1},
+                        "days_to_crisis": {"bsonType": ["int", "null"]},
+                    },
+                }
+            },
+            "validationLevel": "moderate",
+            "validationAction": "warn",
+        })
+        logger.info("[OK] $jsonSchema validator applied to startup_analyses")
+    except Exception as e:
+        logger.warning("Schema validation (startup_analyses) skipped: %s", e)
+
+    try:
+        await _db.command({
+            "collMod": "failure_patterns",
+            "validator": {
+                "$jsonSchema": {
+                    "bsonType": "object",
+                    "required": ["pattern_id", "name", "category", "narrative"],
+                    "properties": {
+                        "pattern_id": {"bsonType": "string"},
+                        "name":       {"bsonType": "string"},
+                        "category":   {"bsonType": "string"},
+                        "narrative":  {"bsonType": "string"},
+                        "failure_count":  {"bsonType": ["int", "long"]},
+                        "survival_count": {"bsonType": ["int", "long"]},
+                    },
+                }
+            },
+            "validationLevel": "moderate",
+            "validationAction": "warn",
+        })
+        logger.info("[OK] $jsonSchema validator applied to failure_patterns")
+    except Exception as e:
+        logger.warning("Schema validation (failure_patterns) skipped: %s", e)
+
     # Start MongoDB MCP server in background
     await mcp.start()
     if mcp.available:
@@ -48,9 +102,14 @@ async def lifespan(app: FastAPI):
     start_monitor()
     logger.info("[OK] Background monitoring started (interval: 6h)")
 
+    # Start Change Stream watcher (event-driven alert detection)
+    start_change_stream()
+    logger.info("[OK] Change stream watcher started")
+
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────
+    await stop_change_stream()
     await stop_monitor()
     await mcp.stop()
     await close()
@@ -87,6 +146,7 @@ app.include_router(metrics.router, prefix="/api/metrics", tags=["metrics"])
 app.include_router(stream.router, prefix="/api/metrics", tags=["metrics"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(patterns.router, prefix="/api/patterns", tags=["patterns"])
+app.include_router(cascade.router, prefix="/api/cascade", tags=["cascade"])
 app.include_router(integrations.router, prefix="/api/integrations", tags=["integrations"])
 app.include_router(monitor.router, prefix="/api/metrics", tags=["monitoring"])
 app.include_router(extract.router, prefix="/api/metrics", tags=["extraction"])
@@ -97,15 +157,21 @@ app.include_router(share.router, prefix="/api/share", tags=["share"])
 
 @app.get("/api/stats")
 async def stats():
-    """Live platform stats pulled from MongoDB — used by the frontend live-stats bar."""
+    """Live platform stats pulled from MongoDB — used by the frontend live-stats bar.
+
+    Includes telemetry counts for MCP, vector search, and Gemini calls over the
+    last 24h. These prove the partner integrations are firing on every analysis
+    — not just decorative.
+    """
     from backend.db.connection import get_db
     from datetime import datetime, timezone, timedelta
     db = get_db()
     try:
-        total_analyses, monitored, pattern_count = await asyncio.gather(
+        total_analyses, monitored, pattern_count, tele_counts = await asyncio.gather(
             db["startup_analyses"].count_documents({}),
             db["watched_startups"].count_documents({}),
             db["failure_patterns"].count_documents({}),
+            telemetry.get_24h_counts(),
         )
         cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
         alerts_today = await db["startup_analyses"].count_documents({
@@ -113,12 +179,18 @@ async def stats():
             "checked_at": {"$gte": cutoff},
         })
     except Exception:
-        return {"total_analyses": 0, "startups_monitored": 0, "alerts_today": 0, "pattern_count": 0}
+        return {
+            "total_analyses": 0, "startups_monitored": 0, "alerts_today": 0, "pattern_count": 0,
+            "mcp_calls_24h": 0, "vector_searches_24h": 0, "gemini_calls_24h": 0,
+        }
     return {
         "total_analyses": total_analyses,
         "startups_monitored": monitored,
         "alerts_today": alerts_today,
         "pattern_count": pattern_count,
+        "mcp_calls_24h": tele_counts.get("mcp_call", 0),
+        "vector_searches_24h": tele_counts.get("vector_search", 0),
+        "gemini_calls_24h": tele_counts.get("gemini_call", 0),
     }
 
 

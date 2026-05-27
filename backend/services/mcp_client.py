@@ -164,6 +164,12 @@ class MCPManager:
             raise RuntimeError("MCP session not available")
         async with self._lock:
             result = await self._session.call_tool(tool_name, args)
+        # Fire-and-forget telemetry — never blocks, never raises
+        try:
+            from backend.services import telemetry
+            telemetry.inc("mcp_call")
+        except Exception:
+            pass
         return _parse_mcp_content(result.content)
 
     # ── Convenience helpers ──────────────────────────────────────────
@@ -216,6 +222,49 @@ class MCPManager:
         if isinstance(result, dict) and "documents" in result:
             return result["documents"]
         return []
+
+    async def insert_one(self, collection: str, document: dict) -> bool:
+        """
+        Insert a single document via MCP `insert-many` tool (single-element array).
+        The mongodb-mcp-server uses kebab-case tool names and `insert-many` covers
+        single inserts when passed a one-element `documents` array.
+        Returns True on success.
+        """
+        result = await self.call_tool("insert-many", {
+            "database": DB_NAME,
+            "collection": collection,
+            "documents": [document],
+        })
+        if isinstance(result, dict):
+            return "insertedIds" in result or result.get("acknowledged") is True
+        if isinstance(result, str):
+            lower = result.lower()
+            return "inserted" in lower or "success" in lower or "1 document" in lower
+        # Non-empty list means IDs were returned
+        if isinstance(result, list):
+            return len(result) > 0
+        return bool(result)
+
+    async def update_one(self, collection: str, filter_: dict, update: dict,
+                         upsert: bool = False) -> bool:
+        """
+        Update matching documents via MCP `update-many` tool.
+        When the filter targets a unique field the result is effectively updateOne.
+        Returns True on success.
+        """
+        result = await self.call_tool("update-many", {
+            "database": DB_NAME,
+            "collection": collection,
+            "filter": filter_,
+            "update": update,
+            "upsert": upsert,
+        })
+        if isinstance(result, dict):
+            return result.get("acknowledged") is True or "matchedCount" in result
+        if isinstance(result, str):
+            lower = result.lower()
+            return "updated" in lower or "matched" in lower or "modified" in lower
+        return bool(result)
 
 
 # Module-level singleton — imported by routes and services

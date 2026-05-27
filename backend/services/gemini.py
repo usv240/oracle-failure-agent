@@ -72,8 +72,18 @@ def _try_gemini3(call_fn, config=None):
     raise last_exc
 
 
+def _count_gemini_call() -> None:
+    """Fire-and-forget telemetry counter for any Gemini/Vertex/embedding call."""
+    try:
+        from backend.services import telemetry
+        telemetry.inc("gemini_call")
+    except Exception:
+        pass
+
+
 async def generate(prompt: str) -> str:
     """Generate text. Tries all Gemini 3 models, falls back to Vertex AI 2.5."""
+    _count_gemini_call()
     global active_gemini3_model, last_fallback_reason
     try:
         client = _get_api_key_client()
@@ -97,6 +107,7 @@ async def generate(prompt: str) -> str:
 
 async def generate_json(prompt: str) -> str:
     """JSON generation. Tries all Gemini 3 models, falls back to Vertex AI 2.5."""
+    _count_gemini_call()
     global active_gemini3_model, last_fallback_reason
     config3 = types.GenerateContentConfig(response_mime_type="application/json")
     try:
@@ -145,6 +156,7 @@ async def embed(text: str, input_type: str = "query") -> list[float]:
     input_type='document' when indexing patterns, 'query' when searching.
     Falls back to Google text-embedding-004 if VOYAGE_API_KEY not configured.
     """
+    _count_gemini_call()
     from backend.config import settings
     if settings.VOYAGE_API_KEY:
         try:
@@ -171,66 +183,68 @@ async def embed(text: str, input_type: str = "query") -> list[float]:
 
 
 async def generate_json_fast(prompt: str) -> str:
-    """Fast JSON scoring — Gemini 3 chain primary, Vertex AI 2.5 fallback.
-    thinking_budget=0 on all Gemini 3 models for maximum speed."""
+    """Fast JSON scoring — Vertex AI 2.5 Flash primary, Gemini 3 API chain fallback.
+    thinking_budget=0 on both paths for maximum speed."""
+    _count_gemini_call()
     global active_gemini3_model, last_fallback_reason
     config_fast = types.GenerateContentConfig(
         response_mime_type="application/json",
         thinking_config=types.ThinkingConfig(thinking_budget=0),
     )
+    # Primary: Vertex AI 2.5 Flash (consistent with DEVPOST — "Parallel Gemini 2.5 Flash Scoring")
     try:
-        client = _get_api_key_client()
-        last_exc = None
-        for model in _GEMINI3_CHAIN:
-            try:
-                response = client.models.generate_content(
-                    model=model, contents=prompt, config=config_fast)
-                active_gemini3_model = model
-                return response.text
-            except Exception as e:
-                logger.warning("Gemini 3 %s fast failed: %s", model, e)
-                last_exc = e
-        raise last_exc
-    except Exception as e:
-        last_fallback_reason = f"Gemini 3 quota exhausted ({type(e).__name__}) — switching to Vertex AI 2.5 Flash"
-        logger.warning("Gemini 3 fast chain failed, falling back to Vertex AI 2.5: %s", e)
         client = _get_vertex_client()
         response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
+            model=settings.GEMINI_MODEL, contents=prompt, config=config_fast)
         return response.text
+    except Exception as e:
+        last_fallback_reason = f"Vertex AI unavailable ({type(e).__name__}) — switching to Gemini 3 Flash"
+        logger.warning("Vertex AI %s fast failed, falling back to Gemini 3: %s", settings.GEMINI_MODEL, e)
+
+    # Fallback: Gemini 3 API key chain
+    client = _get_api_key_client()
+    last_exc = None
+    for model in _GEMINI3_CHAIN:
+        try:
+            response = client.models.generate_content(
+                model=model, contents=prompt, config=config_fast)
+            active_gemini3_model = model
+            return response.text
+        except Exception as e:
+            logger.warning("Gemini 3 %s fast failed: %s", model, e)
+            last_exc = e
+    raise last_exc
 
 
 async def generate_json_reasoned(prompt: str) -> str:
-    """Deliberate JSON reasoning — Gemini 3 chain with thinking enabled.
+    """Deliberate JSON reasoning — Vertex AI 2.5 Flash primary with thinking enabled.
     Used for decision auditing where deeper reasoning improves quality."""
+    _count_gemini_call()
     global active_gemini3_model, last_fallback_reason
     config_think = types.GenerateContentConfig(
         response_mime_type="application/json",
         thinking_config=types.ThinkingConfig(thinking_budget=1024),
     )
+    # Primary: Vertex AI 2.5 Flash with thinking (consistent with DEVPOST — "decision auditing")
     try:
-        client = _get_api_key_client()
-        last_exc = None
-        for model in _GEMINI3_CHAIN:
-            try:
-                response = client.models.generate_content(
-                    model=model, contents=prompt, config=config_think)
-                active_gemini3_model = model
-                return response.text
-            except Exception as e:
-                logger.warning("Gemini 3 %s reasoned failed: %s", model, e)
-                last_exc = e
-        raise last_exc
-    except Exception as e:
-        last_fallback_reason = f"Gemini 3 quota exhausted ({type(e).__name__}) — switching to Vertex AI 2.5 Flash"
-        logger.warning("Gemini 3 reasoned chain failed, falling back to Vertex AI 2.5: %s", e)
         client = _get_vertex_client()
         response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
-        )
+            model=settings.GEMINI_MODEL, contents=prompt, config=config_think)
         return response.text
+    except Exception as e:
+        last_fallback_reason = f"Vertex AI unavailable ({type(e).__name__}) — switching to Gemini 3 Flash"
+        logger.warning("Vertex AI %s reasoned failed, falling back to Gemini 3: %s", settings.GEMINI_MODEL, e)
+
+    # Fallback: Gemini 3 API key chain with thinking
+    client = _get_api_key_client()
+    last_exc = None
+    for model in _GEMINI3_CHAIN:
+        try:
+            response = client.models.generate_content(
+                model=model, contents=prompt, config=config_think)
+            active_gemini3_model = model
+            return response.text
+        except Exception as e:
+            logger.warning("Gemini 3 %s reasoned failed: %s", model, e)
+            last_exc = e
+    raise last_exc

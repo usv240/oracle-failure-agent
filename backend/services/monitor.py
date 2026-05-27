@@ -162,13 +162,39 @@ async def register_startup(metrics: MetricsInput) -> dict:
 
 
 async def get_watch_status(startup_name: str) -> dict | None:
-    """Get monitoring status for a startup."""
+    """
+    Get monitoring status for a startup, with the 5 most recent analyses
+    joined via MongoDB $lookup (cross-collection aggregation).
+    """
     db = get_db()
-    doc = await db["watched_startups"].find_one(
-        {"startup_name": startup_name},
-        {"_id": 0, "metrics": 0},
-    )
-    return doc
+    pipeline = [
+        {"$match": {"startup_name": startup_name}},
+        {"$project": {"_id": 0, "metrics": 0}},
+        {
+            "$lookup": {
+                "from": "startup_analyses",
+                "localField": "startup_name",
+                "foreignField": "startup_name",
+                "as": "analysis_history",
+                "pipeline": [
+                    {"$sort": {"checked_at": -1}},
+                    {"$limit": 5},
+                    {
+                        "$project": {
+                            "_id": 0,
+                            "checked_at": 1,
+                            "alert": 1,
+                            "pattern_name": 1,
+                            "confidence": 1,
+                            "days_to_crisis": 1,
+                        }
+                    },
+                ],
+            }
+        },
+    ]
+    docs = await db["watched_startups"].aggregate(pipeline).to_list(length=1)
+    return docs[0] if docs else None
 
 
 async def _check_all_watched() -> None:
@@ -200,10 +226,17 @@ async def _check_all_watched() -> None:
                 "days_to_crisis": match.days_to_crisis if match else None,
             }
 
-            # Save to startup_analyses for session memory
-            await db["startup_analyses"].insert_one(
-                {**alert_doc, "metrics_snapshot": doc["metrics"]}
-            )
+            # Save to startup_analyses — MCP primary, Motor fallback
+            from backend.services.mcp_client import mcp
+            full_doc = {**alert_doc, "metrics_snapshot": doc["metrics"]}
+            _saved = False
+            if mcp.available:
+                try:
+                    _saved = await mcp.insert_one("startup_analyses", full_doc)
+                except Exception as _e:
+                    logger.debug("MCP insert_one failed, using Motor: %s", _e)
+            if not _saved:
+                await db["startup_analyses"].insert_one(full_doc)
 
             # Update watch doc
             await db["watched_startups"].update_one(

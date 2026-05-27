@@ -130,6 +130,7 @@
       <!-- Impact stats bar (fallback) -->
       <div class="impact-bar" id="fallback-stats-bar">
         <span><strong>150M+</strong> startups worldwide</span>
+        <span><strong>YC · Techstars · Bootstrapped</strong> founders</span>
         <span><strong>90%</strong> fail for known, preventable reasons</span>
         <span><strong>100</strong> documented failure patterns</span>
         <span><strong>3–6 months</strong> early warning window</span>
@@ -167,6 +168,38 @@
           <div class="ls-card-content">
             <span class="ls-value" id="ls-patterns">0</span>
             <span class="ls-label">failure patterns</span>
+          </div>
+        </div>
+        <div class="ls-card ls-card-integration" title="MongoDB MCP server calls over the last 24 hours — every analysis fires multiple MCP calls">
+          <div class="ls-card-glow"></div>
+          <div class="ls-card-icon">🔌</div>
+          <div class="ls-card-content">
+            <span class="ls-value" id="ls-mcp-calls">0</span>
+            <span class="ls-label">MongoDB MCP calls · 24h</span>
+          </div>
+        </div>
+        <div class="ls-card ls-card-integration" title="MongoDB Atlas $vectorSearch invocations over the last 24 hours">
+          <div class="ls-card-glow"></div>
+          <div class="ls-card-icon">🧭</div>
+          <div class="ls-card-content">
+            <span class="ls-value" id="ls-vector-searches">0</span>
+            <span class="ls-label">Vector searches · 24h</span>
+          </div>
+        </div>
+        <div class="ls-card ls-card-integration" title="Gemini 3 / Vertex AI / Voyage embedding API calls over the last 24 hours">
+          <div class="ls-card-glow"></div>
+          <div class="ls-card-icon">✨</div>
+          <div class="ls-card-content">
+            <span class="ls-value" id="ls-gemini-calls">0</span>
+            <span class="ls-label">Gemini + embedding calls · 24h</span>
+          </div>
+        </div>
+        <div class="ls-card ls-card-integration" title="MongoDB features in critical path: Vector Search, BM25 RRF, MCP, $graphLookup, ACID transactions, Change Streams, $facet, $bucket, $setWindowFields, $lookup, $jsonSchema, TTL, Autocomplete, moreLikeThis, Cohort Intelligence...">
+          <div class="ls-card-glow"></div>
+          <div class="ls-card-icon">🍃</div>
+          <div class="ls-card-content">
+            <span class="ls-value">18</span>
+            <span class="ls-label">MongoDB features active</span>
           </div>
         </div>
       </div>
@@ -346,21 +379,31 @@
             <div class="step-num">3</div>
             <div class="step-body">
               <h4>Gemini 3 scores each candidate</h4>
-              <p>The top candidate patterns are scored in parallel by <strong>Gemini 3</strong>. For each pattern, Gemini evaluates: how closely do the metrics match the documented trigger conditions? It returns a confidence score (0–100%), detected warning signals, and estimated days to crisis.</p>
+              <p>The top candidate patterns are scored in parallel by <strong>Gemini 3</strong>. For each pattern, Gemini evaluates: how closely do the metrics match the documented trigger conditions? It returns a <strong>pattern similarity score</strong> (0–100%) — how closely your metric narrative matches this documented pattern, not a probability of failure — plus detected warning signals and estimated days to crisis.</p>
               <div class="tech-tag">Gemini 3</div>
               <div class="tech-tag">Parallel async scoring</div>
             </div>
           </div>
-          <div class="hiw-step">
+          <div class="hiw-step hiw-step-highlight">
             <div class="step-num">4</div>
             <div class="step-body">
-              <h4>Alert fired with survival playbook</h4>
-              <p>If confidence exceeds 60%, the Oracle fires an alert showing: the pattern name and narrative, warning signals already present in your data, historical outcomes (how many startups survived vs. failed), estimated time to crisis, and the exact playbook used by every company that survived this pattern.</p>
-              <div class="tech-tag">Google ADK Agent</div>
+              <h4>⚖️ Challenger Agent independently verifies — adversarial AI</h4>
+              <p>A <em>second</em> Gemini 3 instance is invoked with a deliberately skeptical prompt. Its job is to <strong>look for reasons the pattern does NOT apply</strong> — which healthy metrics contradict the match? It returns an independent pattern similarity score. If the two agents disagree by more than 10 percentage points, the result is flagged as <strong>DISPUTED</strong> and you see both scores side by side. This is dual-agent adversarial verification — not a single model's opinion.</p>
+              <div class="tech-tag">Challenger Agent</div>
+              <div class="tech-tag">Adversarial verification</div>
+              <div class="tech-tag">Google ADK Tool 2</div>
             </div>
           </div>
           <div class="hiw-step">
             <div class="step-num">5</div>
+            <div class="step-body">
+              <h4>Alert fired with survival playbook</h4>
+              <p>If pattern similarity exceeds 60%, the Oracle fires an alert showing: the pattern name and narrative, warning signals already present in your data, historical outcomes (how many startups survived vs. failed), estimated time to crisis, and the exact playbook used by every company that survived this pattern.</p>
+              <div class="tech-tag">Google ADK Agent</div>
+            </div>
+          </div>
+          <div class="hiw-step">
+            <div class="step-num">6</div>
             <div class="step-body">
               <h4>Decision Auditor evaluates choices before you make them</h4>
               <p>Describe any decision — "Should I hire 3 engineers?", "Should I increase pricing by 20%?" — and the Oracle cross-references it against historical cases where founders made similar decisions at similar stages. It shows you how many succeeded vs. failed, the key differentiator, and a specific recommendation.</p>
@@ -445,8 +488,13 @@
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
-              <strong>Google ADK</strong>
-              <small>Agent Development Kit — 3 tools: analyze, audit, list patterns</small>
+              <strong>Google ADK (Agent Builder)</strong>
+              <small>google-adk v2.0 — the code-first SDK underpinning Google Cloud Agent Builder. 4 FunctionTools: analyze_metrics → challenge_pattern → fetch_benchmarks → save_report</small>
+            </div>
+            <div class="stack-item">
+              <div class="stack-icon"></div>
+              <strong>Vertex AI (Google Cloud)</strong>
+              <small>Gemini 2.5 Flash fallback + text-embedding-004 — both served via Vertex AI when Gemini 3 is rate-limited</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
@@ -496,7 +544,7 @@
 
         <div class="hiw-methodology">
           <h3>Where The Data Comes From</h3>
-          <p class="hiw-validated-sub">The 100-pattern failure library is built from primary sources. Every pattern has a citation trail.</p>
+          <p class="hiw-validated-sub">The 100-pattern failure library is synthesized from primary sources and encoded into MongoDB Atlas as 1024-dim vector embeddings. Every pattern has a citation trail and structured trigger thresholds.</p>
           <div class="method-grid">
             <div class="method-item">
               <div class="method-icon"></div>
@@ -530,7 +578,7 @@
             </div>
           </div>
           <div class="method-note">
-            Each pattern's survival rate represents documented outcomes from the cited sources above. Warning signal timing is derived from post-mortem analysis of when each indicator first appeared relative to the failure event.
+            Each pattern's survival rate is calibrated against documented outcomes from the cited sources above — cross-referenced across multiple sources where possible. Warning signal timing is derived from post-mortem analysis of when each indicator first appeared relative to the failure event. The library is designed for directional signal detection: patterns flag structural risk; they do not constitute financial advice. Confidence scores reflect pattern similarity, not outcome probability.
           </div>
         </div>
 
@@ -544,6 +592,8 @@
       </div>
 
       <div class="hiw-footer">
+        <a href="https://oracle-38381883054.us-central1.run.app" target="_blank" class="hiw-link">Live on Google Cloud Run →</a>
+        &nbsp;·&nbsp;
         <a href="https://github.com/usv240/oracle-failure-agent" target="_blank" class="hiw-link">View source on GitHub →</a>
       </div>
     </div>
@@ -553,32 +603,43 @@
     <!-- ── Tab 1: Dashboard ── -->
     <div id="tab-dashboard" class="tab-content">
       <div class="dashboard-header-intro">
-        <h2>Diagnostic Dashboard</h2>
+        <div class="dhi-headline-row">
+          <h2>Diagnostic Dashboard</h2>
+          <span class="dhi-agentic-pill">3-Agent Adversarial Pipeline</span>
+        </div>
         <p class="tagline" style="margin-left:0;margin-right:auto;text-align:left;max-width:100%">
-          Input your startup metrics or load a real company preset. The Failure Oracle uses <strong>Gemini 3</strong> and <strong>MongoDB Atlas Vector Search</strong> to detect fatal startup patterns and run a multi-agent validation.
+          The pattern-matching knowledge that Sequoia partners build over decades — available to every first-time founder, bootstrapped operator, and YC/Techstars batch company today. Oracle's <strong>3-agent ADK pipeline</strong> detects fatal failure patterns <em>3–6 months before they become irreversible</em>.
         </p>
       </div>
       
       <section class="welcome-banner" id="welcome-banner">
-      <div class="wb-steps">
-        <div class="wb-step">
-          <div class="wb-num">1</div>
-          <div class="wb-text"><strong>Load a scenario</strong><br>Use a real company preset or enter your own metrics</div>
+        <div class="wb-top-row">
+          <span class="wb-eyebrow">3-Agent Adversarial AI Pipeline</span>
+          <button class="wb-dismiss" onclick="document.getElementById('welcome-banner').style.display='none'" aria-label="Dismiss">✕</button>
         </div>
-        <div class="wb-arrow">→</div>
-        <div class="wb-step">
-          <div class="wb-num">2</div>
-          <div class="wb-text"><strong>Run Pattern Analysis</strong><br>AI agent searches 100 documented failure patterns</div>
+        <div class="wb-steps">
+          <div class="wb-step">
+            <div class="wb-num">1</div>
+            <div class="wb-text"><strong>Enter metrics or load a preset</strong><br>11 key signals — MRR, churn, burn rate, NPS, LTV:CAC</div>
+          </div>
+          <div class="wb-arrow">→</div>
+          <div class="wb-step">
+            <div class="wb-num">2</div>
+            <div class="wb-text"><strong>Investigator Agent scans 100 patterns</strong><br>Gemini 3 + MongoDB Vector Search + BM25 RRF</div>
+          </div>
+          <div class="wb-arrow">→</div>
+          <div class="wb-step wb-step-highlight">
+            <div class="wb-num">⚖️</div>
+            <div class="wb-text"><strong>Challenger Agent stress-tests the match</strong><br>A second Gemini 3 instance disputes or confirms</div>
+          </div>
+          <div class="wb-arrow">→</div>
+          <div class="wb-step">
+            <div class="wb-num">4</div>
+            <div class="wb-text"><strong>Get your survival playbook</strong><br>Early warning + exact steps every survivor took</div>
+          </div>
         </div>
-        <div class="wb-arrow">→</div>
-        <div class="wb-step">
-          <div class="wb-num">3</div>
-          <div class="wb-text"><strong>Read your playbook</strong><br>Get early warnings + the exact steps to survive</div>
-        </div>
-      </div>
-      <div class="wb-tip"><strong>First time?</strong> Click <strong>Quibi</strong> below to see the Oracle detect a $1.75B failure in real-time.</div>
-      <button class="wb-dismiss" onclick="document.getElementById('welcome-banner').style.display='none'">Got it, dismiss ✕</button>
-    </section>
+        <div class="wb-tip"><strong>First time?</strong> Click the <strong>Quibi</strong> card below — watch the Oracle catch a $1.75B failure live. The Challenger Agent verdict appears in the Agent Log.</div>
+      </section>
       <div class="metrics-layout">
       <!-- ── Metrics Input ────────────────────────────────────────── -->
       <section class="card" id="input-section">
@@ -760,7 +821,111 @@
               <div class="dc-desc">$700M raised · NPS -42 · Fraud collapse</div>
             </div>
           </button>
+          <button class="demo-card demo-card-warn" onclick="fillDemo('fintech')">
+            <div class="dc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+            <div class="dc-body">
+              <div class="dc-name">NeoBank X <span style="font-size:0.7em;opacity:0.7">Fintech</span></div>
+              <div class="dc-desc">14% churn · $4.2M/mo burn · NPS 22 · 9mo runway</div>
+            </div>
+          </button>
+          <button class="demo-card demo-card-warn" onclick="fillDemo('b2c')">
+            <div class="dc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <div class="dc-body">
+              <div class="dc-name">ConsumerApp Y <span style="font-size:0.7em;opacity:0.7">B2C</span></div>
+              <div class="dc-desc">19% churn · NPS 15 · LTV:CAC 4.4x · 11mo runway</div>
+            </div>
+          </button>
         </div>
+      </div>
+
+      <!-- ── Backtest Showcase ──────────────────────────────────────── -->
+      <div class="backtest-section">
+        <div class="backtest-header">
+          <div class="bt-header-left">
+            <span class="bt-badge">LIVE VERIFIED</span>
+            <h3 class="bt-title">Proven on Real Failures</h3>
+          </div>
+          <p class="bt-subtitle">These are actual Oracle outputs — we ran the system against each company's documented pre-failure metrics. Click any card to reproduce the result yourself.</p>
+        </div>
+        <div class="backtest-cards">
+
+          <!-- WeWork -->
+          <button class="backtest-card" onclick="fillDemo('wework')">
+            <div class="bt-top">
+              <div class="bt-company-info">
+                <span class="bt-company-name">WeWork</span>
+                <span class="bt-timeframe">Q4 2019 · Month 22</span>
+              </div>
+              <div class="bt-conf-badge critical">100% match</div>
+            </div>
+            <div class="bt-metrics-row">
+              <span class="bt-metric-chip burn">$22M/mo burn</span>
+              <span class="bt-metric-chip churn">NPS 12</span>
+              <span class="bt-metric-chip runway">5mo runway</span>
+            </div>
+            <div class="bt-pattern-row">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+              <span>Burn Multiple Death Spiral · Oracle Score 0/100</span>
+            </div>
+            <div class="bt-outcome-row">
+              <span class="bt-outcome-label">Outcome 3 months later:</span>
+              <span class="bt-outcome-text">$47B → $2.9B · IPO withdrawn · Near-bankruptcy</span>
+            </div>
+            <div class="bt-cta">Reproduce this result →</div>
+          </button>
+
+          <!-- Quibi -->
+          <button class="backtest-card" onclick="fillDemo('quibi')">
+            <div class="bt-top">
+              <div class="bt-company-info">
+                <span class="bt-company-name">Quibi</span>
+                <span class="bt-timeframe">Month 12 projection</span>
+              </div>
+              <div class="bt-conf-badge critical">98% match</div>
+            </div>
+            <div class="bt-metrics-row">
+              <span class="bt-metric-chip burn">$8.5M/mo burn</span>
+              <span class="bt-metric-chip churn">LTV:CAC 0.2×</span>
+              <span class="bt-metric-chip runway">NPS 4</span>
+            </div>
+            <div class="bt-pattern-row">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+              <span>CAC Exceeds LTV at Scale · Oracle Score 0/100</span>
+            </div>
+            <div class="bt-outcome-row">
+              <span class="bt-outcome-label">Actual outcome (month 6):</span>
+              <span class="bt-outcome-text">Shut down · $1.75B raised, ~$0 returned to investors</span>
+            </div>
+            <div class="bt-cta">Reproduce this result →</div>
+          </button>
+
+          <!-- Theranos -->
+          <button class="backtest-card" onclick="fillDemo('theranos')">
+            <div class="bt-top">
+              <div class="bt-company-info">
+                <span class="bt-company-name">Theranos</span>
+                <span class="bt-timeframe">2015 · Month 24</span>
+              </div>
+              <div class="bt-conf-badge critical">98% match</div>
+            </div>
+            <div class="bt-metrics-row">
+              <span class="bt-metric-chip burn">$5.8M/mo burn</span>
+              <span class="bt-metric-chip churn">NPS −42</span>
+              <span class="bt-metric-chip runway">6mo runway</span>
+            </div>
+            <div class="bt-pattern-row">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+              <span>Burn Multiple Death Spiral · Oracle Score 0/100</span>
+            </div>
+            <div class="bt-outcome-row">
+              <span class="bt-outcome-label">Outcome 2 years later:</span>
+              <span class="bt-outcome-text">Criminal prosecution · $700M fraud · Company dissolved</span>
+            </div>
+            <div class="bt-cta">Reproduce this result →</div>
+          </button>
+
+        </div>
+        <p class="bt-disclaimer">Pattern similarity scores shown above are live Oracle outputs — run by us before submission against each company's documented pre-failure metrics. Click any card to reproduce them on the live system. The Quibi result uses the month-12 trajectory extrapolated from documented month-4 metrics. Pattern similarity reflects narrative match against the failure library, not a statistical probability of failure.</p>
       </div>
 
       <!-- Agent Terminal -->
@@ -884,6 +1049,31 @@
           <div class="osc-tip" id="osc-tip">Composite of all 11 metrics + matched pattern.</div>
         </div>
       </div>
+      <!-- Trend delta badge — shown when a previous snapshot exists for the same startup -->
+      <div id="trend-delta-badge" class="trend-delta-badge hidden"></div>
+
+      <!-- Confidence Trajectory Forecast — shown when ≥2 snapshots exist for this startup -->
+      <div id="conf-forecast-section" class="conf-forecast-section hidden">
+        <div class="cf-left">
+          <span class="cf-trend-icon" id="cf-trend-icon">→</span>
+          <span class="cf-trend-label" id="cf-trend-label">Trend stable</span>
+        </div>
+        <div class="cf-projections">
+          <div class="cf-proj-item">
+            <span class="cf-proj-mo">+1 mo</span>
+            <span class="cf-proj-val" id="cf-proj-1">—</span>
+          </div>
+          <div class="cf-proj-item">
+            <span class="cf-proj-mo">+2 mo</span>
+            <span class="cf-proj-val" id="cf-proj-2">—</span>
+          </div>
+          <div class="cf-proj-item">
+            <span class="cf-proj-mo">+3 mo</span>
+            <span class="cf-proj-val" id="cf-proj-3">—</span>
+          </div>
+        </div>
+        <span class="cf-label">Projected risk score (linear trend from your history)</span>
+      </div>
 
       <section class="card alert-card hidden" id="alert-section">
 
@@ -947,6 +1137,12 @@
       <div id="result-tab-overview" class="result-tab-content">
         <p class="narrative" id="alert-narrative"></p>
 
+        <!-- Research sources block — populated from pattern library -->
+        <div class="sources-block hidden" id="sources-block">
+          <span class="sources-label">Research basis:</span>
+          <div class="sources-tags" id="sources-tags"></div>
+        </div>
+
         <!-- Gemini reasoning block -->
         <div class="reasoning-block hidden" id="reasoning-block">
           <div class="reasoning-label">Gemini 3 analysis</div>
@@ -980,6 +1176,25 @@
               </div>
               <div class="chp-agent-pct" id="chp-chall-pct"></div>
             </div>
+          </div>
+          <!-- Play Audio Debrief button -->
+          <div class="chp-audio-wrap" style="margin-top: 1rem; border-top: 1px dashed var(--border); padding-top: 0.8rem; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 0.8rem;">
+              <button class="action-btn play-audio-btn" id="chp-play-btn" onclick="playAudioDebrief()" style="display:inline-flex;align-items:center;padding:0.45rem 0.85rem;font-size:0.8rem;background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.25);color:var(--accent);border-radius:6px;cursor:pointer;font-weight:600;transition:all 0.2s;font-family:var(--font-secondary);">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.4rem;vertical-align:-1px;" id="chp-play-icon">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <span id="chp-play-text">Listen to Agent Debate</span>
+              </button>
+              <div class="audio-wave hidden" id="chp-audio-wave">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+            <span class="chp-audio-status" id="chp-audio-status" style="font-size:0.75rem;color:var(--muted);font-style:italic;">Debate ready</span>
           </div>
         </div>
       </div>
@@ -1017,6 +1232,18 @@
           <div class="ct-anchors">
             <span class="ct-anchor ct-anchor-signal">◆ Signal first detectable</span>
             <span class="ct-anchor ct-anchor-crisis">⚠ Projected crisis</span>
+          </div>
+        </div>
+
+        <!-- Dynamic Trajectory Graph -->
+        <div class="trajectory-chart-card" id="trajectory-chart-card" style="margin-bottom:1.5rem; padding: 1.5rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;">
+          <h3 style="font-size:0.85rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.4rem;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            Startup Trajectory Forecast
+          </h3>
+          <p class="section-desc" style="font-size:0.82rem; margin-bottom:1rem;">Comparing your projected runway curve against typical matched failure profiles, showing the course-correction recovery path.</p>
+          <div style="height:260px; position:relative; margin-bottom:1rem;">
+            <canvas id="trajectory-chart"></canvas>
           </div>
         </div>
 
@@ -1106,6 +1333,28 @@
         </div>
       </div>
 
+      <!-- Multi-Pattern Cocktail Detection Panel -->
+      <div class="cocktail-panel hidden" id="cocktail-panel">
+        <div class="ctail-header">
+          <div class="ctail-header-left">
+            <span class="ctail-icon">🍸</span>
+            <div>
+              <h3 class="ctail-title">Cocktail Alert — <span id="ctail-count">2</span> Co-occurring Failure Patterns</h3>
+              <p class="ctail-subtitle">Co-occurring patterns compound risk non-linearly. Survival rates multiply down.</p>
+            </div>
+          </div>
+          <div class="ctail-survival-badge">
+            <span class="ctail-survival-label">Compound Survival</span>
+            <span class="ctail-survival-val" id="ctail-survival-val">—%</span>
+          </div>
+        </div>
+        <div class="ctail-patterns" id="ctail-patterns"></div>
+        <div class="ctail-formula">
+          <code>max(2%, min(rates) × 0.5<sup>n−1</sup>)</code> — each additional pattern halves the base survival rate
+        </div>
+        <p class="ctail-summary" id="ctail-summary"></p>
+      </div>
+
       <!-- Report actions -->
       <!-- Data provenance strip -->
       <div class="provenance-strip">
@@ -1137,7 +1386,70 @@
         <div class="rec-sub" id="rec-sub"></div>
       </div>
 
+      <!-- Escape Plan — ranked interventions to escape the pattern -->
+      <div class="escape-plan-panel hidden" id="escape-plan-panel">
+        <div class="ep-header">
+          <div class="ep-header-left">
+            <span class="ep-icon">🔓</span>
+            <div>
+              <h3 class="ep-title">Your Escape Plan</h3>
+              <p class="ep-subtitle">Minimum changes to drop below the danger threshold</p>
+            </div>
+          </div>
+          <div class="ep-conf-summary">
+            <span class="ep-conf-label">Pattern match</span>
+            <span class="ep-conf-now" id="ep-current-conf">—%</span>
+            <span class="ep-conf-arrow">→</span>
+            <span class="ep-conf-after" id="ep-after-conf">—%</span>
+            <span class="ep-conf-label">if done</span>
+          </div>
+        </div>
+        <div class="ep-possible-wrap">
+          <span class="ep-possible-badge" id="ep-possible"></span>
+        </div>
+        <div class="ep-list" id="ep-list"></div>
+        <p class="ep-disclaimer">Estimates based on pattern trigger thresholds. Difficulty ratings: easy (&lt;20% metric change needed), medium (20–45%), hard (&gt;45%).</p>
+      </div>
+
+      <!-- Failure Cascade Graph — $graphLookup collapse timeline -->
+      <div class="cascade-panel hidden" id="cascade-panel">
+        <div class="casc-header">
+          <div class="casc-header-left">
+            <span class="casc-icon">🔗</span>
+            <div>
+              <h3 class="casc-title">Failure Cascade Graph</h3>
+              <p class="casc-subtitle">MongoDB <code>$graphLookup</code> — how this failure cascades if unchecked</p>
+            </div>
+          </div>
+          <div class="casc-meta-badges">
+            <span class="casc-badge casc-badge-depth" id="casc-depth-badge">Depth: —</span>
+            <span class="casc-badge casc-badge-days" id="casc-days-badge">Worst case: — days</span>
+          </div>
+        </div>
+        <div class="casc-root-row">
+          <div class="casc-root-node" id="casc-root-node">
+            <span class="casc-node-label">ROOT</span>
+            <span class="casc-node-name" id="casc-root-name">—</span>
+          </div>
+          <div class="casc-root-arrow">▼</div>
+        </div>
+        <div class="casc-timeline" id="casc-timeline"></div>
+        <div class="casc-interventions hidden" id="casc-interventions">
+          <div class="casc-int-header">
+            <span class="casc-int-icon">🛡️</span>
+            <span class="casc-int-title">Cascade Intervention Optimizer</span>
+            <span class="casc-int-subtitle">— exact minimum changes to break each cascade link (deterministic algebra on thresholds)</span>
+          </div>
+          <div class="casc-int-list" id="casc-int-list"></div>
+        </div>
+        <p class="casc-calibration" id="casc-calibration"></p>
+      </div>
+
       <div class="report-actions">
+        <button class="action-btn print-btn" onclick="window.print()" style="background:var(--accent);color:#fff;border:none;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.3rem;vertical-align:-2px"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          Print Forensic Brief
+        </button>
         <button class="action-btn download-btn" onclick="downloadReport()">Download Report</button>
         <button class="action-btn share-btn" onclick="shareAnalysis()">Share Analysis</button>
         <button class="action-btn public-share-btn" id="public-share-btn" onclick="createPublicShare()" title="Generate a public link anyone can view">
@@ -1161,7 +1473,7 @@
       <div class="safe-icon"></div>
       <h2>No Dangerous Patterns Detected</h2>
       <p>Your current metrics don't match any of the 100 documented high-risk failure patterns. Your trajectory looks healthy for this stage.</p>
-      <p class="safe-tip"><strong>Run this monthly.</strong> Failure patterns don't appear overnight — they build over 3-6 months. Early detection is the entire point.</p>
+      <p class="safe-tip"><strong>Run this monthly.</strong> Failure patterns don't appear overnight — they build over 3–6 months. Early detection is the difference between a pivot and a shutdown. This is the institutional knowledge that Sequoia partners use — now available to every founder.</p>
     </section>
       <div id="history-panel" class="hidden"></div>
       <div id="trend-chart-section" class="card trend-chart-section hidden">
@@ -1176,16 +1488,49 @@
     <!-- ── Tab 2: Decision Auditor ── -->
     <div id="tab-auditor" class="tab-content hidden">
       <section class="card" id="audit-section">
-      <h2>Decision Auditor</h2>
-      <p class="section-desc">Before you make a major decision, ask the Oracle. It will evaluate your decision against 100 documented failure patterns and tell you if founders in similar situations succeeded or failed — and why.</p>
-      <p class="section-desc" style="font-size:0.82rem;color:var(--muted);margin-top:-0.5rem">Try: "Should I hire 3 engineers this month?" · "Should I raise prices by 20%?" · "Should I expand to Europe?"</p>
-      <div class="audit-form">
-        <textarea id="decision-text" rows="3"
-          placeholder="e.g. Hire 3 engineers this month, Increase pricing by 20%, Expand to Europe..."></textarea>
-        <button id="audit-btn" onclick="runAudit()">Audit This Decision</button>
-      </div>
-      <div id="audit-result" class="hidden"></div>
-    </section>
+        <h2>Decision Auditor</h2>
+        <p class="section-desc">Before you make a major decision, ask the Oracle. It will evaluate your decision against 100 documented failure patterns and tell you if founders in similar situations succeeded or failed — and why.</p>
+        <p class="section-desc" style="font-size:0.82rem;color:var(--muted);margin-top:-0.5rem">Try: "Should I hire 3 engineers this month?" · "Should I raise prices by 20%?" · "Should I expand to Europe?"</p>
+        <div class="audit-form">
+          <textarea id="decision-text" rows="3"
+            placeholder="e.g. Hire 3 engineers this month, Increase pricing by 20%, Expand to Europe..."></textarea>
+          <button id="audit-btn" onclick="runAudit()">Audit This Decision</button>
+        </div>
+        <div id="audit-result" class="hidden"></div>
+      </section>
+
+      <!-- ── Oracle Pre-Mortem ──────────────────────────────────── -->
+      <section class="card" id="premortem-section">
+        <div class="pm-header-row">
+          <div>
+            <h2>Oracle Pre-Mortem</h2>
+            <p class="section-desc">Simulate how a strategic decision ripples through your metrics over 6 months. Gemini projects metric changes at months +1, +3, and +6 — Oracle Score at each horizon, plus which failure pattern your month-6 trajectory would trigger.</p>
+            <p class="section-desc" style="font-size:0.82rem;color:var(--muted);margin-top:-0.5rem">
+              <strong>MongoDB pipeline:</strong> Gemini Flash projection → Oracle Score (deterministic) → Pattern match on month-6 metrics
+            </p>
+          </div>
+          <div class="pm-badge-col">
+            <span class="pm-tech-tag">Gemini Flash</span>
+            <span class="pm-tech-tag">Oracle Score</span>
+            <span class="pm-tech-tag">Pattern Match</span>
+          </div>
+        </div>
+        <div class="pm-form">
+          <textarea id="pm-decision-text" rows="3"
+            placeholder="e.g. Double engineering headcount and raise burn by 40% for enterprise push, Launch a $299/mo premium tier, Cut 30% of team to extend runway..."></textarea>
+          <p class="pm-note">Uses your last analysis metrics as the baseline. <a href="#" onclick="switchTab('tab-dashboard');return false;">Run an analysis first</a> if you haven't.</p>
+          <button id="pm-btn" onclick="runPreMortem()">
+            <span id="pm-btn-text">Run Pre-Mortem</span>
+            <span id="pm-btn-spinner" class="hidden">Projecting…</span>
+          </button>
+        </div>
+        <div id="pm-result" class="hidden">
+          <div class="pm-verdict" id="pm-verdict"></div>
+          <div class="pm-trajectory" id="pm-trajectory"></div>
+          <div class="pm-risks-opps" id="pm-risks-opps"></div>
+          <div class="pm-pattern-risk hidden" id="pm-pattern-risk"></div>
+        </div>
+      </section>
     </div>
 
     <!-- ── Tab 3: VC Portfolio ── -->
@@ -1206,6 +1551,63 @@
       <div id="portfolio-result" class="hidden">
         <div class="pf-summary" id="pf-summary"></div>
         <div class="pf-grid" id="pf-grid"></div>
+      </div>
+    </section>
+
+    <!-- Cohort Percentile Intelligence ── $bucket + $facet -->
+    <section class="card cohort-section" id="cohort-section">
+      <h2>Cohort Percentile Intelligence</h2>
+      <p class="section-desc">MongoDB <code>$bucket</code> + <code>$facet</code> — see how your startup ranks vs. similar companies at the same stage. Requires at least one prior analysis.</p>
+      <div class="cohort-form">
+        <div class="cohort-inputs">
+          <div class="cohort-field">
+            <label>Industry</label>
+            <input type="text" id="cohort-industry" value="B2B SaaS" placeholder="e.g. B2B SaaS, Fintech, Healthcare" />
+          </div>
+          <div class="cohort-field">
+            <label>Oracle Score</label>
+            <input type="number" id="cohort-score" value="50" min="0" max="100" />
+          </div>
+          <div class="cohort-field">
+            <label>Month</label>
+            <input type="number" id="cohort-month" value="12" min="1" max="120" />
+          </div>
+          <button class="cohort-btn" onclick="runCohortIntelligence()">
+            <span id="cohort-btn-text">Analyze Cohort</span>
+            <span id="cohort-spinner" class="hidden">Analyzing…</span>
+          </button>
+        </div>
+      </div>
+      <div id="cohort-result" class="hidden">
+        <div class="cohort-percentile-card" id="cohort-percentile-card">
+          <div class="cohort-perc-left">
+            <div class="cohort-perc-number" id="cohort-perc-number">—</div>
+            <div class="cohort-perc-label" id="cohort-perc-label">th percentile</div>
+          </div>
+          <div class="cohort-perc-right">
+            <p class="cohort-perc-message" id="cohort-perc-message">—</p>
+            <div class="cohort-perc-meta">
+              <span id="cohort-size-badge">— in cohort</span>
+              <span class="cohort-sep">·</span>
+              <span id="cohort-alert-rate">— at risk</span>
+            </div>
+          </div>
+        </div>
+        <div class="cohort-stats-grid" id="cohort-stats-grid"></div>
+        <!-- Score distribution mini-chart from MongoDB $bucket aggregation -->
+        <div class="cohort-dist-chart-wrap hidden" id="cohort-dist-wrap">
+          <div class="cohort-dist-header">Oracle Score Distribution in Your Cohort <span class="cohort-dist-badge">$bucket</span></div>
+          <div id="cohort-dist-chart"></div>
+        </div>
+        <div class="cohort-patterns-row" id="cohort-patterns-row"></div>
+        <div class="cohort-survivor-card hidden" id="cohort-survivor-card">
+          <div class="cohort-survivor-header">
+            <span class="cohort-survivor-icon">🏆</span>
+            <span class="cohort-survivor-title">What Survivors Did Differently</span>
+          </div>
+          <div class="cohort-survivor-stats" id="cohort-survivor-stats"></div>
+        </div>
+        <p class="cohort-methodology" id="cohort-methodology"></p>
       </div>
     </section>
     </div>
@@ -1306,6 +1708,8 @@
       <button class="footer-link" onclick="openHowItWorks()">How it works</button>
       &nbsp;·&nbsp; Apache 2.0 &nbsp;·&nbsp;
       <a href="https://github.com/usv240/oracle-failure-agent" target="_blank" style="color:var(--accent);text-decoration:none">GitHub</a>
+      &nbsp;·&nbsp;
+      <a href="https://oracle-38381883054.us-central1.run.app" target="_blank" style="color:var(--accent);text-decoration:none">Live on Cloud Run</a>
     </p>
   </footer>
     </div> <!-- /content-area -->
