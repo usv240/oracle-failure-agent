@@ -6197,8 +6197,8 @@ body {
   display: flex;
   align-items: flex-end;
   gap: 0.6rem;
-  height: 80px;
-  padding-bottom: 2rem;
+  padding-top: 1.4rem;   /* room for count labels floating above */
+  padding-bottom: 1.6rem; /* room for You label floating below */
   position: relative;
 }
 .cohort-dist-bar-group {
@@ -6206,7 +6206,7 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.2rem;
   position: relative;
 }
 .cohort-dist-bar-group.cohort-dist-bar-user .cohort-dist-bar-track {
@@ -6216,7 +6216,7 @@ body {
 }
 .cohort-dist-bar-track {
   width: 100%;
-  height: 60px;
+  height: 56px;
   background: var(--border);
   border-radius: 4px;
   overflow: hidden;
@@ -6226,25 +6226,25 @@ body {
 .cohort-dist-bar-fill {
   width: 100%;
   border-radius: 4px 4px 0 0;
-  transition: height 0.4s ease;
-  min-height: 2px;
+  transition: height 0.5s ease;
+  min-height: 3px;
 }
 .cohort-dist-bar-label {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   color: var(--muted);
   white-space: nowrap;
 }
 .cohort-dist-bar-count {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   color: var(--text);
   position: absolute;
-  top: -18px;
+  top: -1.2rem;
 }
 .cohort-dist-you {
   position: absolute;
-  bottom: -28px;
-  font-size: 0.65rem;
+  bottom: -1.4rem;
+  font-size: 0.63rem;
   font-weight: 700;
   color: var(--accent);
   white-space: nowrap;
