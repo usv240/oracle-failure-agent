@@ -407,6 +407,7 @@ async def get_cascade_chain(pattern_id: str) -> dict | None:
         "has_cascade": len(deduped) > 0,
         "total_chain_length": len(deduped),
         "worst_case_days": max((s["days_from_now"] for s in deduped), default=0),
+        "cascade_calibration": _build_calibration_note(deduped),
     }
 
 
@@ -539,11 +540,22 @@ def _build_calibration_note(steps: list[dict]) -> str:
     """Build a human-readable note about how well the cascade is calibrated."""
     total_observed = sum(s.get("observed_count", 0) for s in steps)
     if total_observed == 0:
-        return "Cascade probabilities based on research estimates — will self-calibrate from real oracle analyses."
+        return (
+            "Probabilities: research estimates (seed). "
+            "Self-improving via MongoDB Change Streams — each real A→B transition updates: "
+            "p = 0.3 × initial + 0.7 × (observed/total_starts)."
+        )
     elif total_observed < 10:
-        return f"Cascade partially calibrated from {total_observed} real-world oracle observations."
+        return (
+            f"Partially calibrated from {total_observed} real oracle observation(s). "
+            "Bayesian blend: p = 0.3 × initial + 0.7 × empirical. "
+            "Converges further with each new analysis."
+        )
     else:
-        return f"Cascade probabilities auto-calibrated from {total_observed} confirmed real-world transitions."
+        return (
+            f"Auto-calibrated from {total_observed} confirmed real-world transitions via Change Streams. "
+            "Bayesian blend: p = 0.3 × initial + 0.7 × empirical."
+        )
 
 
 # ── Self-improving: record a confirmed transition ─────────────────────────────
