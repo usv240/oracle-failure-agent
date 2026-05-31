@@ -193,6 +193,11 @@ def compute_cascade_intervention(
         # Option B: increase growth rate needed
         target_growth_rate = metrics.burn_rate / (metrics.mrr * safe_target) if metrics.mrr > 0 else 0
 
+        # Only show Option B when it's realistic (< 50% monthly growth target)
+        if target_growth_rate <= 0.5:
+            opt_b = f" Option B — Grow MRR growth rate to {target_growth_rate*100:.0f}%/month."
+        else:
+            opt_b = " (Revenue growth alone cannot fix this — burn reduction is the only viable path.)"
         action.update({
             "action": "reduce_burn_or_grow",
             "target_value": round(safe_target, 2),
@@ -200,8 +205,8 @@ def compute_cascade_intervention(
             "growth_rate_needed": round(target_growth_rate, 3),
             "message": (
                 f"Burn multiple is {derived_bm:.1f}× (danger: {threshold:.1f}×). "
-                f"Option A — Reduce burn by ${burn_reduction:,.0f}/month to reach {safe_target:.1f}×. "
-                f"Option B — Grow MRR growth rate to {target_growth_rate*100:.0f}%/month."
+                f"Reduce burn by ${burn_reduction:,.0f}/month to reach {safe_target:.1f}×."
+                f"{opt_b}"
             ),
         })
 
@@ -315,12 +320,16 @@ async def get_cascade_chain(pattern_id: str) -> dict | None:
                 "pattern_id": 1,
                 "name": 1,
                 "survival_rate": 1,
+                "failure_count": 1,
+                "survival_count": 1,
                 "days_to_crisis": 1,
                 "category": 1,
                 "transitions": 1,
                 "cascade_chain.pattern_id": 1,
                 "cascade_chain.name": 1,
                 "cascade_chain.survival_rate": 1,
+                "cascade_chain.failure_count": 1,
+                "cascade_chain.survival_count": 1,
                 "cascade_chain.days_to_crisis": 1,
                 "cascade_chain.category": 1,
                 "cascade_chain.cascade_depth": 1,
@@ -369,7 +378,10 @@ async def get_cascade_chain(pattern_id: str) -> dict | None:
                 "pattern_id": to_id,
                 "pattern_name": node["name"],
                 "category": node.get("category", ""),
-                "survival_rate": node.get("survival_rate", 0),
+                "survival_rate": node.get("survival_rate") or (
+                    node.get("survival_count", 0) /
+                    max(node.get("failure_count", 0) + node.get("survival_count", 0), 1)
+                ),
                 "days_to_crisis": node.get("days_to_crisis", 90),
                 "transition_probability": round(prob, 3),
                 "cumulative_probability": round(cum_prob, 3),
@@ -401,7 +413,10 @@ async def get_cascade_chain(pattern_id: str) -> dict | None:
     return {
         "root_pattern_id": pattern_id,
         "root_pattern_name": root["name"],
-        "root_survival_rate": root.get("survival_rate", 0),
+        "root_survival_rate": root.get("survival_rate") or (
+            root.get("survival_count", 0) /
+            max(root.get("failure_count", 0) + root.get("survival_count", 0), 1)
+        ),
         "cascade_steps": deduped,
         "max_depth": max((s["depth"] for s in deduped), default=0),
         "has_cascade": len(deduped) > 0,

@@ -8,10 +8,13 @@ class Settings(BaseSettings):
     GOOGLE_PROJECT_ID: str
     GOOGLE_LOCATION: str = "us-central1"
     GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-2.5-flash"  # Vertex AI fallback model
+    GEMINI_MODEL: str = "gemini-2.5-flash"          # Vertex AI scoring model
+    ADK_MODEL: str = "gemini-3-flash-preview"        # Gemini 3 Flash for ADK agents
+    VOYAGE_MODEL: str = "voyage-4-large"             # Primary embedding model
+    EMBED_FALLBACK_MODEL: str = "text-embedding-004" # Fallback embedding (Google)
     APP_PORT: int = 8080
     OUTPUT_DIR: str = "outputs"
-    VOYAGE_API_KEY: str = ""     # MongoDB Voyage AI — voyage-4-large embeddings
+    VOYAGE_API_KEY: str = ""     # MongoDB Voyage AI embeddings
     SLACK_WEBHOOK_URL: str = ""  # Optional — Slack incoming webhook for monitoring alerts
     APP_URL: str = "http://localhost:8080"  # Public URL of the deployed app (used in Slack alerts)
 

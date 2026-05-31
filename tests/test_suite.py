@@ -21,10 +21,10 @@ DEFAULT_BASE = "http://localhost:8089"
 REPORTS_DIR  = Path(__file__).parent / "reports"
 
 # Demo payloads
-HEALTHY = dict(startup_name="GrowthCo", current_month=12, mrr=120000,
-               mrr_growth_rate=0.22, churn_rate=0.03, burn_rate=80000,
-               runway_months=18, headcount=10, nps=58, cac=1200,
-               ltv=14000, industry="B2B SaaS")
+HEALTHY = dict(startup_name="GrowthCo", current_month=12, mrr=150000,
+               mrr_growth_rate=0.25, churn_rate=0.02, burn_rate=45000,
+               runway_months=24, headcount=8, nps=68, cac=900,
+               ltv=22000, industry="B2B SaaS")
 
 WARNING = dict(startup_name="AcmeSaaS", current_month=14, mrr=85000,
                mrr_growth_rate=0.18, churn_rate=0.09, burn_rate=120000,
@@ -1001,6 +1001,199 @@ def run_all(base=DEFAULT_BASE):
                 f"top_patterns={len(body['top_failure_patterns'])}, in {elapsed:.1f}s")
 
     run.test("GET /api/cascade/cohort/intelligence — $bucket+$facet cohort percentile", "mongodb", test_cohort_intelligence)
+
+    # ────────────────────────────────────────────────────────────
+    run.section("12. Cascade Accuracy & Intervention Algebra")
+
+    def test_wework_cascade_has_chain():
+        """WeWork analysis should produce an alert with a cascade chain of ≥2 steps."""
+        body, status, elapsed, err = post(B, "/api/cascade/analyze", WEWORK, timeout=90)
+        assert_eq(status, 200, f"HTTP status (err={err})")
+        assert_true(body.get("alert"), "WeWork should trigger alert")
+        cascade = body.get("cascade")
+        if cascade is None:
+            # cascade may be omitted if no transitions seeded — acceptable SKIP
+            return "SKIP — no cascade data (run seed_cascade_transitions.py)"
+        assert_true(cascade.get("has_cascade"), "WeWork cascade should have_cascade=True")
+        steps = cascade.get("cascade_steps", [])
+        assert_true(len(steps) >= 1,
+                    f"WeWork cascade should have ≥1 step, got {len(steps)}")
+        # Each step must have valid days_from_now and probability
+        for step in steps:
+            assert_true(step.get("days_from_now", 0) > 0,
+                        f"days_from_now must be >0: {step}")
+            prob = step.get("cumulative_probability", 0)
+            assert_true(0 < prob <= 1.0, f"cumulative_probability out of (0,1]: {prob}")
+        return (f"WeWork cascade: {len(steps)} steps, "
+                f"worst_case={cascade['worst_case_days']}d, in {elapsed:.1f}s")
+
+    run.test("WeWork cascade/analyze → alert with ≥1 cascade step", "cascade", test_wework_cascade_has_chain)
+
+    def test_cascade_intervention_algebra():
+        """
+        Verify the Cascade Intervention Optimizer produces specific numbers.
+        For a startup with runway_months < threshold, burn_reduction_needed must be > 0.
+        For a startup with high churn, churn_reduction_needed must be > 0 and mrr_at_risk > 0.
+        """
+        body, status, elapsed, err = post(B, "/api/cascade/analyze", WEWORK, timeout=90)
+        assert_eq(status, 200, f"HTTP status (err={err})")
+        cascade = body.get("cascade")
+        if cascade is None:
+            return "SKIP — no cascade data (run seed_cascade_transitions.py)"
+        interventions = cascade.get("interventions", [])
+        real_ivs = [iv for iv in interventions if iv.get("action") not in ("monitor", "reduce_risk", None)]
+        if not real_ivs:
+            return "SKIP — no computable interventions for this cascade (all triggers already met or missing)"
+        for iv in real_ivs:
+            # Must have action, urgency, message, days_to_act
+            for field in ["action", "urgency", "message", "days_to_act"]:
+                assert_true(field in iv, f"intervention missing field '{field}': {iv}")
+            assert_true(iv["urgency"] in ("CRITICAL", "WARNING"),
+                        f"invalid urgency: {iv['urgency']}")
+            assert_true(len(iv["message"]) > 20,
+                        f"intervention message too short: {iv['message']!r}")
+            assert_true(iv["days_to_act"] > 0,
+                        f"days_to_act must be positive: {iv['days_to_act']}")
+            # Algebra check: burn-reduction intervention should include dollar amount
+            if iv["action"] == "reduce_burn":
+                assert_true("burn_reduction_needed" in iv and iv["burn_reduction_needed"] > 0,
+                            f"reduce_burn missing positive burn_reduction_needed: {iv}")
+                assert_true("$" in iv["message"],
+                            "reduce_burn message should reference dollar amount")
+            # Churn reduction should reference MRR at risk
+            elif iv["action"] == "reduce_churn":
+                assert_true("mrr_at_risk_monthly" in iv and iv["mrr_at_risk_monthly"] > 0,
+                            f"reduce_churn missing mrr_at_risk_monthly: {iv}")
+        return (f"Intervention algebra valid: {len(real_ivs)} actionable intervention(s) — "
+                f"actions={[iv['action'] for iv in real_ivs]}, in {elapsed:.1f}s")
+
+    run.test("Cascade interventions have correct algebra (burn/churn reduction numbers)", "cascade", test_cascade_intervention_algebra)
+
+    def test_cascade_calibration_note():
+        """Cascade calibration note should be a non-empty string mentioning Bayesian blend."""
+        body, status, _, err = get(B, "/api/cascade/F-001", timeout=20)
+        if status == 404:
+            return "SKIP — F-001 has no cascade data (run seed_cascade_transitions.py)"
+        assert_eq(status, 200, f"HTTP status (err={err})")
+        note = body.get("cascade_calibration", "")
+        assert_true(isinstance(note, str) and len(note) > 10,
+                    f"cascade_calibration should be a non-empty string, got: {note!r}")
+        # Must mention the Bayesian formula
+        assert_true("0.3" in note or "Bayesian" in note or "empirical" in note,
+                    f"calibration note should reference Bayesian blend: {note!r}")
+        return f"Calibration note: {note[:80]}…"
+
+    run.test("$graphLookup cascade has Bayesian self-calibration note", "cascade", test_cascade_calibration_note)
+
+    def test_cascade_chain_structure_depth():
+        """F-001 cascade chain must have correct structure: ordered steps, non-decreasing days."""
+        body, status, _, err = get(B, "/api/cascade/F-001", timeout=20)
+        if status == 404:
+            return "SKIP — F-001 has no cascade data"
+        assert_eq(status, 200, f"HTTP status")
+        steps = body.get("cascade_steps", [])
+        if not steps:
+            return "SKIP — cascade_steps empty"
+        prev_days = 0
+        for step in steps:
+            assert_true(step["days_from_now"] >= prev_days,
+                        f"cascade_steps not in day-order: {step['days_from_now']} < {prev_days}")
+            prev_days = step["days_from_now"]
+            # Probability must decrease or stay as chain deepens
+            prob = step["cumulative_probability"]
+            assert_true(0 < prob <= 1.0,
+                        f"cumulative_probability out of (0,1]: {prob}")
+        # max_depth and worst_case_days must agree with steps
+        assert_true(body["max_depth"] == max(s["depth"] for s in steps),
+                    "max_depth mismatch with cascade_steps depths")
+        assert_true(body["worst_case_days"] == max(s["days_from_now"] for s in steps),
+                    "worst_case_days mismatch with cascade_steps")
+        return (f"Chain structure valid: {len(steps)} steps, max_depth={body['max_depth']}, "
+                f"worst_case={body['worst_case_days']}d")
+
+    run.test("Cascade chain steps are ordered and structurally consistent", "cascade", test_cascade_chain_structure_depth)
+
+    def test_cascade_acid_telemetry():
+        """ACID transaction must write telemetry_events — verify via /api/stats after cascade/analyze."""
+        body, status, _, err = post(B, "/api/cascade/analyze", QUIBI, timeout=90)
+        assert_eq(status, 200, f"cascade/analyze HTTP status (err={err})")
+        # The ACID transaction writes to telemetry_events — stats should be reachable
+        stats, s2, _, _ = get(B, "/api/stats")
+        assert_eq(s2, 200, "stats HTTP status")
+        # total_analyses must be positive (ACID write succeeded to startup_analyses)
+        assert_true(stats.get("total_analyses", 0) > 0,
+                    "total_analyses=0 — ACID transaction may have failed silently")
+        return (f"ACID telemetry confirmed: total_analyses={stats['total_analyses']}")
+
+    run.test("Cascade ACID transaction writes telemetry (verified via /api/stats)", "cascade", test_cascade_acid_telemetry)
+
+    # ────────────────────────────────────────────────────────────
+    run.section("13. Frontend Quality — SVG graph, messaging, Chart.js")
+
+    def test_html_cascade_graph_container():
+        html = (oracle_dir / "frontend" / "index.html").read_text(encoding="utf-8")
+        assert_true('id="cascade-graph-container"' in html,
+                    "cascade-graph-container missing — SVG graph div not in HTML")
+        assert_true('casc-flow-svg' in (oracle_dir / "frontend" / "style.css").read_text(encoding="utf-8"),
+                    "casc-flow-svg CSS class missing — SVG cascade styles not added")
+        assert_true('buildCascadeFlowSvg' in (oracle_dir / "frontend" / "app.js").read_text(encoding="utf-8"),
+                    "buildCascadeFlowSvg function missing from app.js")
+        return "cascade-graph-container in HTML, casc-flow-svg in CSS, buildCascadeFlowSvg in JS"
+
+    run.test("HTML: cascade-graph-container SVG div + CSS classes + JS function present", "frontend", test_html_cascade_graph_container)
+
+    def test_html_cohort_canvas():
+        html = (oracle_dir / "frontend" / "index.html").read_text(encoding="utf-8")
+        assert_true('id="cohort-dist-canvas"' in html,
+                    "cohort-dist-canvas missing — Chart.js canvas not in HTML")
+        assert_true('cohort-dist-canvas-wrap' in html,
+                    "cohort-dist-canvas-wrap missing from HTML")
+        js = (oracle_dir / "frontend" / "app.js").read_text(encoding="utf-8")
+        assert_true('new Chart(' in js,
+                    "new Chart() not found — Chart.js not used in app.js")
+        assert_true('youAreHerePlugin' in js,
+                    "youAreHerePlugin missing — YOU ARE HERE annotation not implemented")
+        return "cohort-dist-canvas canvas present, Chart.js used with youAreHerePlugin"
+
+    run.test("HTML: cohort Chart.js canvas + YOU ARE HERE plugin present", "frontend", test_html_cohort_canvas)
+
+    def test_html_state_machine_framing():
+        html = (oracle_dir / "frontend" / "index.html").read_text(encoding="utf-8")
+        assert_true("state machine" in html.lower(),
+                    "state machine framing missing from HTML — update pitch tagline")
+        assert_true("Self-Improving" in html or "self-improving" in html.lower(),
+                    "Self-Improving network effect missing from HTML")
+        assert_true("data flywheel" in html.lower() or "Change Streams" in html,
+                    "Change Streams / data flywheel not mentioned in HTML")
+        return "State machine framing, self-improving network effect, and data flywheel all present"
+
+    run.test("HTML: state machine framing + network effect moat language present", "frontend", test_html_state_machine_framing)
+
+    def test_js_svg_no_hardcoded_colors():
+        """Ensure buildCascadeFlowSvg does not inject color: #hex into the DOM (CSS class-based)."""
+        js = (oracle_dir / "frontend" / "app.js").read_text(encoding="utf-8")
+        import re
+        # The SVG uses CSS classes + fill attributes — no inline `color: #hex` anywhere
+        matches = re.findall(r'color:\s*#[0-9a-fA-F]{6}', js)
+        assert_true(len(matches) == 0,
+                    f"JS still has {len(matches)} hardcoded color(s): {matches}")
+        # Verify SVG uses class-based approach (classes built dynamically via ${cls}-rect template literal)
+        assert_true('${cls}-rect' in js and "'cnr'" in js,
+                    "SVG cascade uses CSS class template '${cls}-rect' with 'cnr' root class")
+        return "No hardcoded colors in JS, SVG uses CSS class-based styling"
+
+    run.test("JS: SVG cascade uses CSS classes, no hardcoded color: #hex", "frontend", test_js_svg_no_hardcoded_colors)
+
+    def test_html_no_casc_timeline():
+        """Old casc-timeline div should be replaced by cascade-graph-container."""
+        html = (oracle_dir / "frontend" / "index.html").read_text(encoding="utf-8")
+        assert_true('id="casc-timeline"' not in html,
+                    "Old casc-timeline div still present — should be replaced by cascade-graph-container")
+        assert_true('id="casc-root-node"' not in html,
+                    "Old casc-root-node div still present — should be removed with old timeline")
+        return "Old text timeline elements removed, SVG container in place"
+
+    run.test("HTML: old casc-timeline replaced by cascade-graph-container", "frontend", test_html_no_casc_timeline)
 
     return run
 

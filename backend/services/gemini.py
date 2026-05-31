@@ -14,13 +14,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Gemini 3 models tried in order — all via API key (not available on Vertex AI)
-_GEMINI3_CHAIN = [
-    "gemini-3-flash-preview",        # primary
-    "gemini-3.5-flash",              # fallback 1
-    "gemini-3.1-flash-lite",         # fallback 2
-    "gemini-3.1-flash-lite-preview", # fallback 3
+# Gemini 3 models tried in order — primary from ADK_MODEL env var, rest are hardcoded fallbacks
+_GEMINI3_FALLBACKS = [
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3.1-flash-lite-preview",
 ]
+_GEMINI3_CHAIN = [settings.ADK_MODEL] + [m for m in _GEMINI3_FALLBACKS if m != settings.ADK_MODEL]
 
 # Tracks which Gemini 3 model is currently active (for /api/health reporting)
 active_gemini3_model: str = _GEMINI3_CHAIN[0]
@@ -163,22 +163,22 @@ async def embed(text: str, input_type: str = "query") -> list[float]:
             import asyncio as _asyncio
             client = _get_voyage_client()
             result = await _asyncio.wait_for(
-                client.embed(texts=[text], model="voyage-4-large", input_type=input_type),
+                client.embed(texts=[text], model=settings.VOYAGE_MODEL, input_type=input_type),
                 timeout=15.0,
             )
             return _adjust_dimension(result.embeddings[0])
         except Exception as e:
-            logger.warning("Voyage AI embed failed (%s), falling back to text-embedding-004", e)
+            logger.warning("Voyage AI embed failed (%s), falling back to %s", e, settings.EMBED_FALLBACK_MODEL)
 
-    # Fallback: Google text-embedding-004 via Vertex AI
+    # Fallback: Google embedding via Vertex AI
     try:
         client = _get_vertex_client()
-        response = client.models.embed_content(model="text-embedding-004", contents=text)
+        response = client.models.embed_content(model=settings.EMBED_FALLBACK_MODEL, contents=text)
         return _adjust_dimension(response.embeddings[0].values)
     except Exception as e:
         logger.warning("Vertex AI embed failed (%s), falling back to API key client", e)
         client = _get_api_key_client()
-        response = client.models.embed_content(model="text-embedding-004", contents=text)
+        response = client.models.embed_content(model=settings.EMBED_FALLBACK_MODEL, contents=text)
         return _adjust_dimension(response.embeddings[0].values)
 
 

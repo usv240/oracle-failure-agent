@@ -1,5 +1,22 @@
 const API = '';  // Same origin
 
+// ── Instant Demo Cache — stores real API results for instant replay ──────────
+const _demoCache = {};   // key: startup_name → { events, challengerEvt, finalEvt }
+const _DEMO_KEYS = { wework: 'WeWork (Q4 2019)', quibi: 'Quibi (Month 12 Projection)', theranos: 'Theranos (2015)', healthy: 'GrowthCo' };
+
+function _saveDemoResult(name, events, challengerEvt, finalEvt) {
+  _demoCache[name] = { events, challengerEvt, finalEvt };
+  try { localStorage.setItem('oracle_demo_' + name, JSON.stringify({ events: events.slice(-6), challengerEvt, finalEvt })); } catch(e) {}
+}
+function _loadDemoResult(name) {
+  if (_demoCache[name]) return _demoCache[name];
+  try {
+    const s = localStorage.getItem('oracle_demo_' + name);
+    if (s) { const d = JSON.parse(s); _demoCache[name] = d; return d; }
+  } catch(e) {}
+  return null;
+}
+
 // ── Demo Data ───────────────────────────────────────────────────
 const DEMOS = {
   healthy: {
@@ -46,17 +63,17 @@ const DEMOS = {
   },
   wework: {
     startup_name: 'WeWork (Q4 2019)',
-    current_month: 22,
+    current_month: 20,
     mrr: 2900000,
-    mrr_growth_rate: 0.08,
-    churn_rate: 0.18,
+    mrr_growth_rate: 0.14,
+    churn_rate: 0.16,
     burn_rate: 22000000,
-    runway_months: 5,
+    runway_months: 7,
     headcount: 14000,
-    nps: 12,
+    nps: 18,
     cac: 38000,
-    ltv: 15000,
-    industry: 'Real Estate SaaS',
+    ltv: 19000,
+    industry: 'Marketplace',
   },
   theranos: {
     startup_name: 'Theranos (2015)',
@@ -172,6 +189,7 @@ window.addEventListener('load', () => {
   renderTrendChart();
   initPortfolio();
   loadSharedReport();
+  updateLiveMetrics();
 });
 
 async function loadLiveStats() {
@@ -231,6 +249,87 @@ function fillDemo(type) {
     const el = document.getElementById(key);
     if (el) el.value = d[key];
   });
+  updateLiveMetrics();
+}
+
+async function playInstantDemo(demoKey) {
+  const cached = _loadDemoResult(demoKey);
+  fillDemo(demoKey);
+
+  // Hide old results
+  ['alert-section','safe-section','challenger-panel','cascade-panel','cocktail-panel',
+   'escape-plan-panel','oracle-score-card','recovery-card','risk-banner'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.classList.add('hidden');
+  });
+
+  // Show terminal with instant replay
+  const terminal = document.getElementById('agent-terminal');
+  const termBody  = document.getElementById('terminal-body');
+  const pill      = document.getElementById('terminal-pill');
+  if (terminal) terminal.classList.remove('hidden');
+  if (pill) pill.classList.add('hidden');
+  if (termBody) termBody.innerHTML = '';
+
+  const addLine = (icon, msg, cls='') => {
+    if (!termBody) return;
+    const p = document.createElement('div');
+    p.className = 'terminal-line' + (cls ? ' '+cls : '');
+    const hl = s => s.replace(/(MongoDB[^,.<\s]*|Gemini[^,.<\s]*|MCP|Vector Search|ADK)/g, '<span class="highlight">$1</span>');
+    p.innerHTML = `${icon} ${hl(msg)}`;
+    termBody.appendChild(p);
+    termBody.scrollTop = termBody.scrollHeight;
+  };
+
+  const terminalLines = [
+    ['>', 'Starting Oracle pipeline — MongoDB Voyage AI (embed) → Atlas Vector Search + BM25 RRF → MongoDB MCP → Vertex AI Gemini 2.5 Flash scoring...'],
+    ['🤖', 'Oracle Pipeline starting — ADK SequentialAgent: Investigator → Challenger → Reporter'],
+    ['🔢', 'Step 1 — Investigator: MongoDB Voyage AI voyage-4-large (1024-dim) embedding → MongoDB Atlas Vector Search + BM25 RRF → MCP category context → Vertex AI Gemini 2.5 Flash scoring'],
+    ['🔍', 'Hybrid retrieval: MongoDB Atlas Vector Search (cosine similarity) + Atlas Search (BM25) → Reciprocal Rank Fusion...'],
+    ['✅', 'Vector Search: 10 vector results merged → top 5 candidates'],
+    ['🤖', 'Vertex AI Gemini 2.5 Flash scoring 5 candidates in parallel (thinking_budget=0)...'],
+  ];
+
+  if (!cached) {
+    // No cache — run real analysis
+    addLine('⚡', 'Running live analysis... (first run takes ~40s, subsequent runs are instant)', 'terminal-warn');
+    await runAnalysis();
+    return;
+  }
+
+  // Instant replay with staggered terminal lines
+  for (let i = 0; i < terminalLines.length; i++) {
+    await new Promise(r => setTimeout(r, 80));
+    addLine(terminalLines[i][0], terminalLines[i][1]);
+  }
+
+  const finalData = cached.finalEvt;
+  const challengerData = cached.challengerEvt;
+
+  if (finalData?.alert) {
+    addLine('⚠️', `Pattern confirmed: ${finalData.pattern?.pattern_name} at ${Math.round((finalData.pattern?.confidence||0)*100)}% — Challenger adversarial verification complete`, 'terminal-alert');
+  } else {
+    addLine('✅', 'No dangerous failure patterns detected. Metrics look healthy.', 'terminal-safe');
+  }
+
+  await new Promise(r => setTimeout(r, 300));
+
+  // Collapse terminal and render
+  const termPill = document.getElementById('terminal-pill');
+  if (termPill) {
+    termPill.textContent = finalData?.alert
+      ? `⚡ ${finalData.pattern?.pattern_name} — ${Math.round((finalData.pattern?.confidence||0)*100)}% match`
+      : '✅ No dangerous patterns detected';
+    termPill.classList.remove('hidden');
+  }
+
+  _lastResult = finalData;
+  renderResult(finalData);
+  if (challengerData && finalData?.alert) renderChallenger(challengerData);
+  saveSnapshot(finalData, DEMOS[demoKey]);
+
+  // Show "instant demo" badge
+  const badge = document.getElementById('instant-demo-badge');
+  if (badge) { badge.classList.remove('hidden'); setTimeout(() => badge.classList.add('hidden'), 4000); }
 }
 
 function toggleGlossary() {
@@ -241,20 +340,32 @@ function toggleGlossary() {
 }
 
 // ── Theme Toggle ─────────────────────────────────────────────────
+function updateThemeUI(theme) {
+  const isDark = theme === 'dark';
+  const iconHtml = isDark 
+    ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>' 
+    : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+  
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.innerHTML = iconHtml;
+  
+  const btnMobile = document.getElementById('theme-btn-mobile');
+  if (btnMobile) btnMobile.innerHTML = iconHtml;
+}
+
 function toggleTheme() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const next = isDark ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('oracle_theme', next);
-  document.getElementById('theme-btn').innerHTML = next === 'dark' ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+  updateThemeUI(next);
 }
 
 // Sync button icon on load
 window.addEventListener('DOMContentLoaded', () => {
-  const theme = localStorage.getItem('oracle_theme') || 'light';
+  const theme = localStorage.getItem('oracle_theme') || 'dark';
   document.documentElement.setAttribute('data-theme', theme);
-  const btn = document.getElementById('theme-btn');
-  if (btn) btn.innerHTML = theme === 'dark' ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+  updateThemeUI(theme);
 
   // Pre-fill form from shared URL (e.g. ?startup_name=Quibi&mrr=420000&...)
   const urlParams = new URLSearchParams(window.location.search);
@@ -337,7 +448,7 @@ async function runAnalysis() {
     termBody.scrollTop = termBody.scrollHeight;
   }
 
-  addTermLine('>', 'Starting Oracle pipeline — MongoDB Voyage AI (embed) → Atlas Vector Search + BM25 RRF → MongoDB MCP → Gemini 3 scoring...');
+  addTermLine('>', 'Starting Oracle pipeline — MongoDB Voyage AI (embed) → Atlas Vector Search + BM25 RRF → MongoDB MCP → Vertex AI Gemini 2.5 Flash scoring...');
 
   try {
     const response = await fetch(`${API}/api/metrics/analyze/stream`, {
@@ -409,6 +520,9 @@ async function runAnalysis() {
       renderResult(finalData);
       saveSnapshot(finalData, payload); // monthly tracking
       if (challengerData && finalData.alert) renderChallenger(challengerData);
+      // Cache result for instant demo replay
+      const demoKey = Object.entries(_DEMO_KEYS).find(([k,v]) => v === payload.startup_name)?.[0];
+      if (demoKey) _saveDemoResult(demoKey, [], challengerData, finalData);
     }
   } catch (err) {
     // SSE failed — fall back to regular endpoint
@@ -1226,12 +1340,15 @@ async function runAudit() {
     industry:        val('industry') || 'B2B SaaS',
   };
 
+  const context = document.getElementById('audit-context')?.value?.trim() || '';
+
   try {
     const res  = await fetch(`${API}/api/audit/evaluate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         decision,
+        context: context || undefined,
         startup_name: metrics.startup_name,
         current_month: metrics.current_month,
         metrics
@@ -1614,7 +1731,7 @@ function renderEscapePlan(plan) {
   if (possibleEl) {
     if (plan.escape_possible) {
       possibleEl.className = 'ep-possible-badge ep-can-escape';
-      possibleEl.textContent = `Pattern escape achievable — implement all ${Math.min(plan.interventions.length, 3)} interventions`;
+      possibleEl.textContent = `Pattern escape achievable — implement all ${plan.interventions.length} intervention${plan.interventions.length !== 1 ? 's' : ''}`;
     } else {
       possibleEl.className = 'ep-possible-badge ep-deeply-entrenched';
       possibleEl.textContent = 'Pattern deeply entrenched — significant restructuring required';
@@ -2119,6 +2236,33 @@ function addPortfolioRow() {
   container.appendChild(row);
 }
 
+function loadExamplePortfolio() {
+  const container = document.getElementById('portfolio-entries');
+  if (!container) return;
+  // Clear existing rows
+  container.innerHTML = '';
+  // Example YC W24 cohort companies
+  const examples = [
+    { name: 'HealthTech AI',  mrr: 85000,  churn: 6,   runway: 16 },
+    { name: 'NeoCommerce',    mrr: 320000, churn: 14,  runway: 8  },
+    { name: 'DevToolsCo',     mrr: 55000,  churn: 2,   runway: 22 },
+  ];
+  examples.forEach((ex, i) => {
+    addPortfolioRow();
+    const rows = container.querySelectorAll('.pf-row');
+    const row = rows[rows.length - 1];
+    if (!row) return;
+    const nameIn   = row.querySelector('.pf-name-in');
+    const mrrIn    = row.querySelector('.pf-mrr-in');
+    const churnIn  = row.querySelector('.pf-churn-in');
+    const runwayIn = row.querySelector('.pf-runway-in');
+    if (nameIn)   nameIn.value   = ex.name;
+    if (mrrIn)    mrrIn.value    = ex.mrr;
+    if (churnIn)  churnIn.value  = ex.churn;
+    if (runwayIn) runwayIn.value = ex.runway;
+  });
+}
+
 async function runPortfolio() {
   const container = document.getElementById('portfolio-entries');
   const btn       = document.getElementById('pf-run-btn');
@@ -2335,6 +2479,14 @@ const originalFillDemo = fillDemo;
 fillDemo = function(preset) {
   originalFillDemo(preset);
   updateLiveMetrics();
+  
+  // Automatically trigger the pattern analysis to run immediately
+  setTimeout(() => {
+    const analyzeBtn = document.getElementById('analyze-btn');
+    if (analyzeBtn) {
+      analyzeBtn.click();
+    }
+  }, 50);
 };
 
 // ── Share to Slack ────────────────────────────────────────────────
@@ -2747,51 +2899,12 @@ function renderCascade(cascade) {
   // Header badges
   const depthBadge = document.getElementById('casc-depth-badge');
   const daysBadge  = document.getElementById('casc-days-badge');
-  const rootName   = document.getElementById('casc-root-name');
   if (depthBadge) depthBadge.textContent = `Depth: ${cascade.max_depth}`;
   if (daysBadge)  daysBadge.textContent  = `Worst case: ${cascade.worst_case_days}d`;
-  if (rootName)   rootName.textContent   = cascade.root_pattern_name || 'Root Pattern';
 
-  // Timeline steps
-  const timeline = document.getElementById('casc-timeline');
-  if (timeline) {
-    timeline.innerHTML = (cascade.cascade_steps || []).map(step => {
-      const prob = Math.round(step.cumulative_probability * 100);
-      const survPct = Math.round((step.survival_rate || 0) * 100);
-      const probColor = prob >= 60 ? 'var(--danger)' : prob >= 35 ? 'var(--warning)' : 'var(--muted)';
-      const survColor = survPct < 15 ? 'var(--danger)' : survPct < 30 ? 'var(--warning)' : 'var(--safe)';
-      const triggerText = step.trigger_metric
-        ? `<span class="casc-trigger">${step.trigger_metric} ${step.trigger_direction === 'above' ? '>' : '<'} ${step.trigger_threshold}</span>`
-        : '';
-      const observedBadge = step.observed_count > 0
-        ? `<span class="casc-observed-badge" title="Confirmed in real oracle data">${step.observed_count} observed</span>`
-        : `<span class="casc-observed-badge casc-obs-research" title="Based on research estimates">research est.</span>`;
-      const depthClass = `casc-step-depth-${Math.min(step.depth, 3)}`;
-
-      return `
-        <div class="casc-step ${depthClass}">
-          <div class="casc-step-connector">
-            <div class="casc-step-line"></div>
-            <div class="casc-step-dot"></div>
-          </div>
-          <div class="casc-step-body">
-            <div class="casc-step-top">
-              <span class="casc-step-days">+${step.days_from_now}d</span>
-              <span class="casc-step-id">${step.pattern_id}</span>
-              <span class="casc-step-name">${step.pattern_name}</span>
-              ${observedBadge}
-            </div>
-            <div class="casc-step-meta">
-              <span class="casc-step-prob" style="color:${probColor}">${prob}% cumulative probability</span>
-              <span class="casc-meta-sep">·</span>
-              <span class="casc-step-surv" style="color:${survColor}">${survPct}% survival</span>
-              ${triggerText ? `<span class="casc-meta-sep">·</span>` + triggerText : ''}
-            </div>
-            ${step.mechanism ? `<p class="casc-step-mechanism">${step.mechanism}</p>` : ''}
-          </div>
-        </div>`;
-    }).join('');
-  }
+  // SVG flow diagram
+  const graphContainer = document.getElementById('cascade-graph-container');
+  if (graphContainer) graphContainer.innerHTML = buildCascadeFlowSvg(cascade);
 
   // Interventions (Cascade Intervention Optimizer)
   const intPanel = document.getElementById('casc-interventions');
@@ -2816,11 +2929,142 @@ function renderCascade(cascade) {
     intPanel.classList.add('hidden');
   }
 
-  // Calibration note (shows whether probabilities are research-based or self-learned)
+  // Calibration note (self-improving via Change Streams)
   const calibEl = document.getElementById('casc-calibration');
   if (calibEl) calibEl.textContent = cascade.cascade_calibration || '';
 
   panel.classList.remove('hidden');
+}
+
+// ── SVG Cascade Flow Diagram — $graphLookup visualised as a node-edge graph
+function buildCascadeFlowSvg(cascade) {
+  const steps    = (cascade.cascade_steps || []).slice(0, 3);
+  const rootNode = {
+    id: cascade.root_pattern_id,
+    name: cascade.root_pattern_name,
+    isRoot: true,
+    survivalRate: cascade.root_survival_rate || 0,
+    daysFromNow: 0,
+    cumulativeProbability: 1.0,
+  };
+  const allNodes = [rootNode, ...steps];
+
+  // Layout
+  const W = 340, NODE_H = 96, EDGE_H = 54, MX = 12, MY = 10;
+  const totalW  = W + MX * 2;
+  const totalH  = allNodes.length * NODE_H + (allNodes.length - 1) * EDGE_H + MY * 2 +
+                  ((cascade.cascade_steps || []).length > 3 ? 22 : 0);
+
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+  // Node class + inline text fill for guaranteed contrast in both themes
+  const nc = (prob, isRoot) => isRoot ? 'cnr' : prob >= 60 ? 'cnd' : prob >= 35 ? 'cnw' : 'cnl';
+  const nameFill  = isDark ? '#f1f5f9' : '#1e293b';
+  const pidFill   = isDark ? '#cbd5e1' : '#475569';
+  const statDanger = isDark ? '#fca5a5' : '#dc2626';
+  const statWarn   = isDark ? '#fde68a' : '#b45309';
+  const statSafe   = isDark ? '#6ee7b7' : '#059669';
+  const daytxtRoot = isDark ? '#ddd6fe' : '#5b21b6';
+  const daytxtDang = isDark ? '#fca5a5' : '#991b1b';
+  const daytxtWarn = isDark ? '#fde68a' : '#92400e';
+  const daytxtLow  = isDark ? '#cbd5e1' : '#374151';
+  const trigFill   = isDark ? '#94a3b8' : '#475569';
+  const edgeClr    = isDark ? 'rgba(148,163,184,0.5)' : 'rgba(71,85,105,0.4)';
+  const arrClr     = isDark ? 'rgba(148,163,184,0.6)' : 'rgba(71,85,105,0.5)';
+  const trigBg     = isDark ? 'rgba(15,23,42,0.75)' : 'rgba(255,255,255,0.9)';
+  const trigBorder = isDark ? 'rgba(100,116,139,0.35)' : 'rgba(71,85,105,0.3)';
+  const moreFill   = isDark ? '#64748b' : '#94a3b8';
+
+  // Wrap pattern name across two lines at ≤26 chars
+  const wrap = (name) => {
+    if (name.length <= 26) return [name, null];
+    const words = name.split(' ');
+    let ln1 = '', cur = '';
+    for (const w of words) {
+      const t = cur ? cur + ' ' + w : w;
+      if (t.length <= 26) { cur = t; }
+      else if (!ln1) { ln1 = cur; cur = w; }
+      else { cur += ' ' + w; break; }
+    }
+    if (!ln1) return [cur, null];
+    const ln2 = cur.trim();
+    return [ln1, ln2.length > 28 ? ln2.slice(0, 26) + '…' : ln2];
+  };
+
+  const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  const p = [];
+  p.push(`<svg viewBox="0 0 ${totalW} ${totalH}" xmlns="http://www.w3.org/2000/svg" class="casc-flow-svg" role="img" aria-label="Failure Cascade Flow">`);
+  p.push(`<defs><marker id="ca-inline" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,9 3.5,0 7" fill="${arrClr}"/></marker></defs>`);
+
+  for (let i = 0; i < allNodes.length; i++) {
+    const nd   = allNodes[i];
+    const y    = MY + i * (NODE_H + EDGE_H);
+    const x    = MX;
+    const prob = nd.isRoot ? 100 : Math.round((nd.cumulative_probability || 0) * 100);
+    const cls  = nc(prob, nd.isRoot);
+    const surv = Math.round(((nd.isRoot ? nd.survivalRate : nd.survival_rate) || 0) * 100);
+    const pid  = esc(nd.id || nd.pattern_id || '');
+    const [ln1, ln2] = wrap(nd.name || nd.pattern_name || '?');
+
+    // Node background
+    p.push(`<rect x="${x}" y="${y}" width="${W}" height="${NODE_H}" rx="11" class="${cls}-rect"/>`);
+
+    // Pattern ID pill (top-left)
+    if (pid) {
+      p.push(`<rect x="${x+9}" y="${y+8}" width="52" height="17" rx="8" class="${cls}-pill"/>`);
+      p.push(`<text x="${x+35}" y="${y+20}" text-anchor="middle" class="casc-pid" fill="${pidFill}">${pid}</text>`);
+    }
+
+    // Day / YOU ARE HERE badge (top-right)
+    const dlbl = nd.isRoot ? 'YOU ARE HERE' : `+${nd.daysFromNow || nd.days_from_now}d`;
+    const dpw  = nd.isRoot ? 96 : 68;
+    const dtxt = cls === 'cnr' ? daytxtRoot : cls === 'cnd' ? daytxtDang : cls === 'cnw' ? daytxtWarn : daytxtLow;
+    p.push(`<rect x="${x+W-dpw-8}" y="${y+8}" width="${dpw}" height="17" rx="8" class="${cls}-daypill"/>`);
+    p.push(`<text x="${x+W-dpw/2-8}" y="${y+20}" text-anchor="middle" class="${cls}-daytxt" fill="${dtxt}">${esc(dlbl)}</text>`);
+
+    // Pattern name (1–2 lines) — always light in dark, dark in light
+    const ny = ln2 ? y+44 : y+51;
+    p.push(`<text x="${x+W/2}" y="${ny}" text-anchor="middle" class="${cls}-name" fill="${nameFill}" font-weight="700">${esc(ln1)}</text>`);
+    if (ln2) p.push(`<text x="${x+W/2}" y="${y+59}" text-anchor="middle" class="${cls}-name" fill="${nameFill}" font-weight="700">${esc(ln2)}</text>`);
+
+    // Survival + probability stats
+    const statFill = surv < 15 ? statDanger : surv < 30 ? statWarn : statSafe;
+    const stxt = nd.isRoot
+      ? `${surv}% survival rate`
+      : `${surv}% survive  ·  ${prob}% cumulative probability`;
+    p.push(`<text x="${x+W/2}" y="${(ln2?y+79:y+74)}" text-anchor="middle" fill="${statFill}" font-size="10" font-weight="600">${esc(stxt)}</text>`);
+
+    // Edge to next node (dashed line + arrowhead + trigger label)
+    if (i < allNodes.length - 1) {
+      const step = steps[i];
+      const ax   = x + W / 2;
+      const ay1  = y + NODE_H + 3;
+      const ay2  = y + NODE_H + EDGE_H - 12;
+
+      p.push(`<line x1="${ax}" y1="${ay1}" x2="${ax}" y2="${ay2}" stroke="${edgeClr}" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#ca-inline)"/>`);
+
+      if (step && step.trigger_metric) {
+        const tstr = `${step.trigger_metric} ${step.trigger_direction === 'above' ? '>' : '<'} ${step.trigger_threshold}`;
+        const tw   = Math.min(tstr.length * 7.0 + 20, W - 30);
+        p.push(`<rect x="${x+W/2-tw/2}" y="${ay1+8}" width="${tw}" height="17" rx="4" fill="${trigBg}" stroke="${trigBorder}" stroke-width="1"/>`);
+        p.push(`<text x="${ax}" y="${ay1+20}" text-anchor="middle" fill="${trigFill}" font-size="9" font-family="monospace">${esc(tstr)}</text>`);
+      }
+
+      if (step && step.observed_count > 0) {
+        p.push(`<rect x="${x+W-90}" y="${ay1+8}" width="82" height="17" rx="8" class="casc-obs-pill"/>`);
+        p.push(`<text x="${x+W-49}" y="${ay1+20}" text-anchor="middle" fill="${trigFill}" font-size="9">${step.observed_count} observed</text>`);
+      }
+    }
+  }
+
+  if ((cascade.cascade_steps || []).length > 3) {
+    const fy = MY + allNodes.length * (NODE_H + EDGE_H) + 4;
+    p.push(`<text x="${MX+W/2}" y="${fy}" text-anchor="middle" fill="${moreFill}" font-size="11">+ ${cascade.cascade_steps.length - 3} more cascade steps…</text>`);
+  }
+
+  p.push('</svg>');
+  return p.join('');
 }
 
 // ── Cohort Percentile Intelligence ($bucket + $facet) ────────────
@@ -2973,39 +3217,115 @@ function renderCohortResult(data) {
   resultEl.classList.remove('hidden');
 }
 
-function renderCohortDistChart(buckets, userScore) {
-  const wrap = document.getElementById('cohort-dist-wrap');
-  const container = document.getElementById('cohort-dist-chart');
-  if (!wrap || !container || !buckets.length) return;
+// Retain reference so we can destroy before re-rendering
+let _cohortChart = null;
 
-  const bucketLabels = { 0: '0–20', 20: '20–40', 40: '40–60', 60: '60–80', 80: '80–100' };
-  const bucketColors = {
-    0: 'var(--danger)', 20: 'var(--warning)', 40: 'var(--warning)',
-    60: 'var(--safe)', 80: 'var(--safe)'
+function renderCohortDistChart(buckets, userScore) {
+  const wrap   = document.getElementById('cohort-dist-wrap');
+  const canvas = document.getElementById('cohort-dist-canvas');
+  if (!wrap || !canvas || !buckets.length) return;
+
+  // Destroy previous chart instance if it exists
+  if (_cohortChart) { _cohortChart.destroy(); _cohortChart = null; }
+
+  const LABELS = ['0–20', '20–40', '40–60', '60–80', '80–100'];
+  const STARTS = [0, 20, 40, 60, 80];
+
+  // Map buckets to ordered arrays
+  const counts = STARTS.map(s => {
+    const b = buckets.find(x => (typeof x._id === 'number' ? x._id : -1) === s);
+    return b ? (b.count || 0) : 0;
+  });
+
+  // Determine which bucket the user is in
+  const userBucketIdx = userScore != null
+    ? Math.min(Math.floor(userScore / 20), 4)
+    : -1;
+
+  // Bar colours: red → amber → amber → green → green, highlighted bucket gets opacity 1
+  const COLORS_BG = [
+    'rgba(239,68,68,0.55)', 'rgba(245,158,11,0.55)', 'rgba(245,158,11,0.45)',
+    'rgba(16,185,129,0.45)', 'rgba(16,185,129,0.55)',
+  ];
+  const COLORS_BORDER = [
+    'rgba(239,68,68,1)', 'rgba(245,158,11,1)', 'rgba(245,158,11,1)',
+    'rgba(16,185,129,1)', 'rgba(16,185,129,1)',
+  ];
+  const bgColors     = COLORS_BG.map((c, i) => i === userBucketIdx ? c.replace('0.55','0.85').replace('0.45','0.85') : c);
+  const borderColors = COLORS_BORDER;
+  const borderWidths = COLORS_BORDER.map((_, i) => i === userBucketIdx ? 2.5 : 1.5);
+
+  // YOU ARE HERE annotation plugin
+  const youAreHerePlugin = {
+    id: 'youAreHere',
+    afterDraw(chart) {
+      if (userBucketIdx < 0) return;
+      const { ctx, chartArea, scales } = chart;
+      const meta = chart.getDatasetMeta(0);
+      const bar  = meta.data[userBucketIdx];
+      if (!bar) return;
+      const x = bar.x;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(124,58,237,0.9)';
+      ctx.lineWidth   = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle    = 'rgba(124,58,237,0.9)';
+      ctx.font         = 'bold 9px Inter, sans-serif';
+      ctx.textAlign    = 'center';
+      ctx.fillText('YOU', x, chartArea.top + 10);
+      ctx.restore();
+    },
   };
 
-  const maxCount = Math.max(...buckets.map(b => b.count || 0), 1);
+  _cohortChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels: LABELS,
+      datasets: [{
+        label: 'Startups in cohort',
+        data: counts,
+        backgroundColor: bgColors,
+        borderColor: borderColors,
+        borderWidth: borderWidths,
+        borderRadius: 6,
+        borderSkipped: false,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => `Oracle Score ${LABELS[items[0].dataIndex]}`,
+            label: (item) => {
+              const suffix = item.dataIndex === userBucketIdx ? '  ← YOU ARE HERE' : '';
+              return `${item.raw} startup${item.raw !== 1 ? 's' : ''}${suffix}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid:  { display: false },
+          ticks: { font: { size: 10 }, color: 'rgba(107,114,128,0.9)' },
+        },
+        y: {
+          beginAtZero: true,
+          grid:  { color: 'rgba(107,114,128,0.12)' },
+          ticks: { stepSize: 1, font: { size: 10 }, color: 'rgba(107,114,128,0.9)' },
+        },
+      },
+    },
+    plugins: [youAreHerePlugin],
+  });
 
-  const bars = buckets.map(b => {
-    const id  = typeof b._id === 'number' ? b._id : -1;
-    if (id < 0) return '';
-    const pct = Math.round((b.count / maxCount) * 100);
-    const label = bucketLabels[id] || `${id}+`;
-    const color = bucketColors[id] || 'var(--muted)';
-    // Highlight the bucket that contains the user's score
-    const isUser = (userScore >= id && userScore < id + 20) || (id === 80 && userScore >= 80);
-    return `
-      <div class="cohort-dist-bar-group${isUser ? ' cohort-dist-bar-user' : ''}">
-        <div class="cohort-dist-bar-track">
-          <div class="cohort-dist-bar-fill" style="height:${pct}%;background:${color}"></div>
-        </div>
-        <div class="cohort-dist-bar-label">${label}</div>
-        <div class="cohort-dist-bar-count">${b.count}</div>
-        ${isUser ? '<div class="cohort-dist-you">You</div>' : ''}
-      </div>`;
-  }).join('');
-
-  container.innerHTML = `<div class="cohort-dist-bars">${bars}</div>`;
   wrap.classList.remove('hidden');
 }
 
@@ -3136,4 +3456,15 @@ function renderPreMortemResult(data) {
 
   resultEl.classList.remove('hidden');
   resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function toggleWelcomeBanner() {
+  const banner = document.getElementById('welcome-banner');
+  const btn = document.getElementById('wb-toggle-btn');
+  if (!banner || !btn) return;
+  
+  const isCollapsed = banner.classList.toggle('collapsed');
+  btn.innerHTML = isCollapsed
+    ? '<span class="wb-toggle-text">Show Guide</span> ▾'
+    : '<span class="wb-toggle-text">Hide Guide</span> ▴';
 }

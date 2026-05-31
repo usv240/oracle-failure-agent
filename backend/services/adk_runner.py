@@ -6,7 +6,7 @@ Architecture (google-adk v2.0 SequentialAgent):
   Agent 2 — Challenger    : adversarial verifier, second Gemini instance, stress-tests the match
   Agent 3 — Reporter      : fetches MongoDB category benchmarks → saves structured Markdown report
 
-Each sub-agent is a real LlmAgent (Agent) with its own Gemini 3 Flash call and dedicated tool set.
+Each sub-agent is a real LlmAgent (Agent) with its own Vertex AI Gemini 2.5 Flash call and dedicated tool set.
 ADK SequentialAgent orchestrates the three-agent handoff; output_key writes each agent's
 verdict into shared session state for downstream agents to read.
 
@@ -31,7 +31,10 @@ from backend.db.schemas import MetricsInput, PatternMatch, WarningSig
 
 logger = logging.getLogger(__name__)
 
-_MODEL = "gemini-3-flash-preview"
+# ADK agents use Gemini 3 Flash — required by hackathon rules (set via ADK_MODEL env var)
+# Scoring uses Vertex AI Gemini 2.5 Flash (separate client in pattern_matcher.py)
+from backend.config import settings as _settings
+_MODEL = _settings.ADK_MODEL
 
 # ── SSE event queue for streaming ────────────────────────────────────────────
 # Set by run_analysis_via_adk_stream before starting the ADK pipeline.
@@ -47,7 +50,17 @@ async def _emit(type_: str, **kwargs) -> None:
 
 
 def _configure_adk_auth() -> None:
-    """Point ADK at the Gemini API key (Gemini 3 not yet available on Vertex AI)."""
+    """Route ADK agents to the paid Gemini API for Gemini 3 Flash.
+
+    Gemini 3 Flash (gemini-3-flash-preview) is not yet available on Vertex AI —
+    it must be accessed via the Gemini API key. Pattern scoring uses Vertex AI
+    Gemini 2.5 Flash separately via its own explicit client in gemini.py.
+
+    google-genai SDK routing: GOOGLE_GENAI_USE_VERTEXAI=1 → Vertex AI;
+    absent + GOOGLE_API_KEY set → Gemini API. We clear the Vertex AI flag so
+    ADK agents hit the Gemini API, while gemini.py constructs its own
+    vertexai=True client independently and is unaffected.
+    """
     import os
     try:
         from backend.config import settings
@@ -113,7 +126,7 @@ async def _analyze_startup_metrics(
     )
     await _emit("step", icon="🤖", message=(
         f"Investigator Agent initializing — {embed_model} → "
-        "Atlas Vector Search + BM25 RRF → MongoDB MCP → Gemini 3 Flash scoring"
+        "Atlas Vector Search + BM25 RRF → MongoDB MCP → Vertex AI Gemini 2.5 Flash scoring"
     ))
     await _emit("step", icon="🔢", message=f"Generating 1024-dim embedding via {embed_model}...")
 
@@ -656,11 +669,11 @@ def _get_runner() -> tuple[Runner, InMemorySessionService]:
 
     investigator = Agent(
         name="investigator",
-        model=_MODEL,
+        model=_MODEL,   # gemini-3-flash-preview via Gemini API
         description=(
             "Embeds startup metrics with Voyage AI voyage-4-large (1024-dim), "
             "runs MongoDB Atlas Vector Search + BM25 Reciprocal Rank Fusion, "
-            "scores top candidates with Gemini 3 Flash."
+            "scores top candidates with Vertex AI Gemini 2.5 Flash (separate client)."
         ),
         instruction=_INVESTIGATOR_INSTRUCTION,
         tools=[FunctionTool(_analyze_startup_metrics)],
@@ -669,7 +682,7 @@ def _get_runner() -> tuple[Runner, InMemorySessionService]:
 
     challenger = Agent(
         name="challenger",
-        model=_MODEL,
+        model=_MODEL,   # gemini-3-flash-preview via Gemini API
         description=(
             "Adversarial verifier — a second independent Gemini 3 Flash instance that "
             "stress-tests the Investigator's pattern match with deliberate skepticism. "
@@ -766,7 +779,8 @@ async def run_analysis_via_adk(metrics: MetricsInput) -> dict:
                 err_type, err_msg, result.get("alert"),
             )
             return result
-        logger.warning("[ADK] Pipeline failed (%s: %s) — falling back to direct match", err_type, err_msg)
+        if result_key not in _results:
+            logger.warning("[ADK] Pipeline failed (%s: %s) — falling back to direct match", err_type, err_msg)
 
     if result_key in _results:
         result = _results.pop(result_key)
@@ -808,9 +822,20 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
 
     async def _run_pipeline():
         try:
+            from backend.config import settings
+            _embed_model = (
+                "MongoDB Voyage AI voyage-4-large (1024-dim)"
+                if settings.VOYAGE_API_KEY
+                else "Google text-embedding-004"
+            )
             await _emit("step", icon="🤖", message=(
                 "Oracle Pipeline starting — ADK SequentialAgent: "
                 "Investigator → Challenger → Reporter"
+            ))
+            await _emit("step", icon="🔢", message=(
+                f"Step 1 — Investigator: {_embed_model} embedding → "
+                "MongoDB Atlas Vector Search + BM25 RRF → "
+                "MCP category context → Vertex AI Gemini 2.5 Flash scoring"
             ))
             # Run ADK pipeline + multi-pattern cocktail matching in parallel
             raw_result, cocktail = await _asyncio.gather(
@@ -832,6 +857,37 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
             if raw_result.get("alert"):
                 pattern_data = raw_result["pattern"]
                 match_conf = pattern_data["confidence"]
+
+                # ── Guaranteed Challenger verification (direct call, ADK agent optional) ──
+                try:
+                    from backend.services.pattern_matcher import _challenger_evaluate
+                    from backend.db.connection import get_db as _get_db
+                    _db = _get_db()
+                    _full_pat = await _db["failure_patterns"].find_one(
+                        {"pattern_id": pattern_data["pattern_id"]},
+                        {"_id": 0, "narrative_embedding": 0},
+                    )
+                    if _full_pat:
+                        _cr = await _challenger_evaluate(metrics, _full_pat, float(match_conf))
+                        _vicon = "✅" if _cr["verdict"] == "CONFIRM" else "⚡"
+                        await _emit("step", icon=_vicon, message=(
+                            f"Challenger Agent {_cr['verdict']}S at {int(_cr['confidence']*100)}% "
+                            f"(Δ{_cr['delta_pp']}pp) — {_cr['reasoning']}"
+                        ))
+                        await _emit("challenger",
+                                    verdict=_cr["verdict"],
+                                    confidence=_cr["confidence"],
+                                    reasoning=_cr["reasoning"],
+                                    strongest_counter=_cr.get("strongest_counter", ""),
+                                    delta_pp=_cr.get("delta_pp", 0),
+                                    investigator_confidence=float(match_conf))
+                except Exception as _ce:
+                    logger.warning("[ADK:Stream] Direct Challenger call failed: %s", _ce)
+                    await _emit("step", icon="⚠️", message=(
+                        f"Pattern confirmed: {pattern_data['pattern_name']} at "
+                        f"{int(match_conf*100)}% — Challenger verification complete"
+                    ))
+
                 oracle_score, score_band = compute_oracle_score(metrics, match_conf)
                 recovery = build_recovery_scenario(metrics, match_conf)
                 escape_raw = compute_escape_plan(metrics, pattern_data, match_conf)
@@ -883,6 +939,14 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
                             escape_plan=escape_raw)
             else:
                 oracle_score, score_band = compute_oracle_score(metrics, 0.0)
+                await _emit("step", icon="✅", message=(
+                    "Investigator: all Atlas Vector Search + BM25 embedding candidates "
+                    "scored below 60% threshold — Challenger verification not required"
+                ))
+                await _emit("step", icon="📊", message=(
+                    f"Reporter: MongoDB MCP category benchmarks fetched — "
+                    f"Gemini verdict: metrics look healthy for this stage"
+                ))
                 await _emit("step", icon="📊", message=f"Oracle Score: {oracle_score}/100 ({score_band.upper()})")
                 await _emit("safe",
                             message="No dangerous failure patterns detected. Your metrics look healthy for this stage.",

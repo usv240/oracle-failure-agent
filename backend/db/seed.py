@@ -39,7 +39,7 @@ async def seed_patterns():
                 await asyncio.sleep(65)
             texts = [f"{p['name']}: {p['narrative']}" for p in batch]
             try:
-                result = await vo.embed(texts=texts, model="voyage-4-large", input_type="document")
+                result = await vo.embed(texts=texts, model=settings.VOYAGE_MODEL, input_type="document")
                 for p, emb in zip(batch, result.embeddings):
                     p["narrative_embedding"] = emb
                 start = b_idx * batch_size
