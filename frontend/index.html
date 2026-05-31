@@ -1167,7 +1167,7 @@
             <div class="cf-proj-item"><span class="cf-proj-mo">+3 mo</span><span class="cf-proj-val" id="cf-osc-3">—</span></div>
           </div>
         </div>
-        <span class="cf-label">Projected trajectory — linear regression over your analysis history. Needs ≥2 monthly snapshots. Risk % = pattern match confidence; Oracle Score = composite health (100=perfect).</span>
+        <span class="cf-label">Projected trajectory — linear regression from MongoDB analysis history (primary) or localStorage (fallback). Needs ≥2 runs with the same startup name. Oracle Score = composite health 0–100.</span>
       </div>
 
       <section class="card alert-card hidden" id="alert-section">

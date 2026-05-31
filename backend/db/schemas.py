@@ -126,6 +126,7 @@ class AlertResponse(BaseModel):
     escape_plan: Optional[EscapePlan] = None
     cascade: Optional[dict] = None  # Failure cascade graph ($graphLookup result)
     uncharted: Optional[dict] = None  # Set when best match < 60%: {is_uncharted, best_confidence, closest_pattern}
+    trajectory: Optional[dict] = None  # {direction, oracle_score_delta, oracle_score_velocity, ...}
     message: str = ""
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 

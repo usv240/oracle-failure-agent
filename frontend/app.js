@@ -507,6 +507,7 @@ async function runAnalysis() {
               oracle_score: evt.oracle_score,
               score_band: evt.score_band,
               oracle_breakdown: evt.oracle_breakdown || null,
+              trajectory: evt.trajectory || null,
               recovery_scenario: evt.recovery_scenario,
               escape_plan: evt.escape_plan,
             };
@@ -520,6 +521,7 @@ async function runAnalysis() {
               oracle_score: evt.oracle_score,
               score_band: evt.score_band,
               oracle_breakdown: evt.oracle_breakdown || null,
+              trajectory: evt.trajectory || null,
               uncharted: evt.uncharted || null,
             };
           } else if (evt.type === 'challenger') {
@@ -765,10 +767,10 @@ function renderResult(data) {
     renderOracleScore(data.oracle_score, data.score_band || 'watch', data.oracle_breakdown);
   }
 
-  // Trend delta + confidence trajectory forecast vs prior snapshots
+  // Trend delta + confidence trajectory forecast — backend trajectory preferred, localStorage fallback
   const startupName = _lastPayload?.startup_name || data.startup_name || '';
   renderTrendDelta(data, startupName);
-  renderConfidenceForecast(startupName);
+  renderConfidenceForecast(startupName, data.trajectory);
 
   if (!data.alert) {
     hide('risk-banner');
@@ -1884,34 +1886,77 @@ function _linearProject(values, stepsAhead) {
   return { slope, project: ahead => Math.max(0, Math.min(100, Math.round(intercept + slope * (n - 1 + ahead)))) };
 }
 
-function renderConfidenceForecast(startupName) {
+function renderConfidenceForecast(startupName, backendTrajectory) {
   const section = document.getElementById('conf-forecast-section');
   if (!section) return;
 
   try {
+    // ── Prefer backend trajectory projections (MongoDB-based) ───────────
+    if (backendTrajectory && backendTrajectory.snapshots_used >= 2) {
+      const t       = backendTrajectory;
+      const dir     = t.direction;
+      const vel     = t.oracle_score_velocity;
+      const osc1    = t.projected_score_1mo;
+      const osc3    = t.projected_score_3mo;
+
+      const trendIcon  = dir === 'deteriorating' ? '↑' : dir === 'recovering' ? '↓' : '→';
+      const trendColor = dir === 'deteriorating' ? 'var(--danger)' : dir === 'recovering' ? 'var(--safe)' : 'var(--warning)';
+
+      const velEl = document.getElementById('cf-velocity');
+      if (velEl && vel != null && Math.abs(vel) >= 0.5) {
+        velEl.textContent = `Oracle Score ${dir} ~${Math.abs(vel).toFixed(1)} pts/run · ${t.snapshots_used} MongoDB runs`;
+        velEl.style.color = vel < 0 ? 'var(--safe)' : vel > 0 ? 'var(--danger)' : 'var(--muted)';
+      } else if (velEl) { velEl.textContent = `${t.snapshots_used} MongoDB snapshots`; velEl.style.color = 'var(--muted)'; }
+
+      document.getElementById('cf-trend-icon').textContent  = trendIcon;
+      document.getElementById('cf-trend-label').textContent = `Risk ${dir}`;
+      document.getElementById('cf-trend-icon').style.color  = trendColor;
+
+      // Risk % — show — for +2/+3 since backend only gives 1mo and 3mo Oracle Score
+      [1, 2, 3].forEach(m => {
+        const el = document.getElementById(`cf-proj-${m}`);
+        if (el) { el.textContent = '—'; el.style.color = 'var(--muted)'; }
+      });
+
+      // Oracle Score projections from backend
+      [[1, osc1], [3, osc3]].forEach(([m, val]) => {
+        const el = document.getElementById(`cf-osc-${m}`);
+        if (el && val != null) {
+          el.textContent = `${val}`;
+          el.style.color = val < 25 ? 'var(--danger)' : val < 50 ? 'var(--warning)' : 'var(--safe)';
+        }
+      });
+      const mid = document.getElementById('cf-osc-2');
+      if (mid && osc1 != null && osc3 != null) {
+        const midVal = Math.round((osc1 + osc3) / 2);
+        mid.textContent = `~${midVal}`;
+        mid.style.color = midVal < 25 ? 'var(--danger)' : midVal < 50 ? 'var(--warning)' : 'var(--safe)';
+      }
+
+      section.classList.remove('hidden');
+      return;
+    }
+
+    // ── Fallback: localStorage history ───────────────────────────────────
     const all = JSON.parse(localStorage.getItem('oracle_snapshots') || '[]');
     const snapshots = all
       .filter(s => s.startup_name?.toLowerCase().trim() === startupName?.toLowerCase().trim())
       .slice(0, 8)
-      .reverse(); // oldest first
+      .reverse();
 
     if (snapshots.length < 2) { section.classList.add('hidden'); return; }
 
-    // Risk % projection (match confidence)
-    const confReg = _linearProject(snapshots.map(s => (s.match_score || 0) * 100));
-    const proj    = [1, 2, 3].map(a => confReg.project(a));
-
-    // Oracle Score projection
+    const confReg  = _linearProject(snapshots.map(s => (s.match_score || 0) * 100));
+    const proj     = [1, 2, 3].map(a => confReg.project(a));
     const oscValues = snapshots.map(s => s.oracle_score).filter(v => typeof v === 'number');
-    const oscReg    = oscValues.length >= 2 ? _linearProject(oscValues) : null;
-    const oscProj   = oscReg ? [1, 2, 3].map(a => oscReg.project(a)) : null;
+    const oscReg   = oscValues.length >= 2 ? _linearProject(oscValues) : null;
+    const oscProj  = oscReg ? [1, 2, 3].map(a => oscReg.project(a)) : null;
 
     const slope     = confReg.slope;
     const trend     = slope > 1.5 ? 'worsening' : slope < -1.5 ? 'improving' : 'stable';
     const trendColor = trend === 'worsening' ? 'var(--danger)' : trend === 'improving' ? 'var(--safe)' : 'var(--warning)';
     const trendIcon  = trend === 'worsening' ? '↑' : trend === 'improving' ? '↓' : '→';
 
-    // Velocity label from Oracle Score slope (more intuitive than %)
     const velEl = document.getElementById('cf-velocity');
     if (velEl && oscReg && Math.abs(oscReg.slope) >= 0.5) {
       const dir = oscReg.slope < 0 ? 'deteriorating' : 'recovering';
@@ -1945,62 +1990,92 @@ function renderTrendDelta(currentResult, startupName) {
   if (!badge) return;
 
   try {
+    // ── Prefer backend trajectory (MongoDB multi-snapshot) ──────────────
+    const t = currentResult.trajectory;
+    if (t && t.snapshots_used >= 2) {
+      const dir        = t.direction;          // deteriorating | recovering | stable
+      const delta      = t.oracle_score_delta; // pts vs last run (signed)
+      const vel        = t.oracle_score_velocity; // pts/run (signed: + = worsening)
+      const confDelta  = t.confidence_delta_pp;
+      const daysAgo    = t.days_since_last;
+
+      const dateLabel  = daysAgo != null
+        ? (daysAgo === 0 ? 'today' : daysAgo === 1 ? '1 day ago' : `${daysAgo}d ago`)
+        : '';
+
+      let arrow, cls, parts = [];
+      if (dir === 'deteriorating') {
+        arrow = '↑'; cls = 'delta-up';
+      } else if (dir === 'recovering') {
+        arrow = '↓'; cls = 'delta-down';
+      } else {
+        arrow = '→'; cls = 'delta-flat';
+      }
+
+      if (delta != null && Math.abs(delta) >= 2)
+        parts.push(`Oracle Score ${delta > 0 ? '+' : ''}${delta}`);
+      if (Math.abs(confDelta) >= 2)
+        parts.push(`match ${confDelta > 0 ? '+' : ''}${confDelta}pp`);
+      if (vel != null && Math.abs(vel) >= 1)
+        parts.push(`velocity ~${Math.abs(vel).toFixed(1)} pts/run`);
+
+      const changePart = parts.length ? parts.join(' · ') : 'no significant change';
+      const dirLabel   = dir === 'stable' ? 'Stable' : dir === 'deteriorating' ? 'Risk increasing' : 'Risk decreasing';
+      const text       = `${dirLabel} — ${changePart}${dateLabel ? ` (last run: ${dateLabel})` : ''} · ${t.snapshots_used} MongoDB snapshots`;
+
+      badge.className = `trend-delta-badge ${cls}`;
+      badge.innerHTML = `<span class="tdb-arrow">${arrow}</span><span class="tdb-text">${text}</span>`;
+      badge.classList.remove('hidden');
+      return;
+    }
+
+    // ── Fallback: localStorage history ──────────────────────────────────
     const all = JSON.parse(localStorage.getItem('oracle_snapshots') || '[]');
     const history = all.filter(s =>
       s.startup_name && startupName &&
       s.startup_name.toLowerCase().trim() === startupName.toLowerCase().trim()
     );
-
-    const prior = history[0]; // most recent prior (renderResult runs before saveSnapshot)
+    const prior = history[0];
     if (!prior) { badge.classList.add('hidden'); return; }
 
-    const currentConf  = currentResult.pattern?.confidence ?? 0;
-    const priorConf    = prior.match_score ?? 0;
-    const deltaPp      = Math.round((currentConf - priorConf) * 100);
+    const currentConf = currentResult.pattern?.confidence ?? 0;
+    const priorConf   = prior.match_score ?? 0;
+    const deltaPp     = Math.round((currentConf - priorConf) * 100);
     const currentScore = currentResult.oracle_score ?? null;
     const priorScore   = prior.oracle_score ?? null;
     const deltaScore   = (currentScore !== null && priorScore !== null)
-                         ? Math.round(currentScore - priorScore) : null;
+                          ? Math.round(currentScore - priorScore) : null;
 
-    // Compute Oracle Score velocity across all snapshots (pts/analysis)
     let velocityLabel = '';
-    const scoreHistory = history
-      .map(s => s.oracle_score)
-      .filter(v => typeof v === 'number');
+    const scoreHistory = history.map(s => s.oracle_score).filter(v => typeof v === 'number');
     if (scoreHistory.length >= 2 && currentScore !== null) {
       const allScores = [currentScore, ...scoreHistory];
-      const n = allScores.length;
-      const xMean = (n - 1) / 2;
-      const yMean = allScores.reduce((a, b) => a + b, 0) / n;
+      const n = allScores.length, xm = (n - 1) / 2, ym = allScores.reduce((a, b) => a + b) / n;
       let num = 0, den = 0;
-      allScores.forEach((y, x) => { num += (x - xMean) * (y - yMean); den += (x - xMean) ** 2; });
-      const slope = den > 0 ? -(num / den) : 0; // negative because index 0 = newest
-      if (Math.abs(slope) >= 1) {
-        const dir = slope > 0 ? 'deteriorating' : 'recovering';
-        velocityLabel = ` · Oracle Score ${dir} ~${Math.abs(slope).toFixed(1)} pts/run`;
-      }
+      allScores.forEach((y, x) => { num += (x - xm) * (y - ym); den += (x - xm) ** 2; });
+      const slope = den > 0 ? -(num / den) : 0;
+      if (Math.abs(slope) >= 1)
+        velocityLabel = ` · ~${Math.abs(slope).toFixed(1)} pts/run`;
     }
 
     const priorDate = new Date(prior.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
     let arrow, cls, text;
     if (Math.abs(deltaPp) < 2 && (deltaScore === null || Math.abs(deltaScore) < 2)) {
       arrow = '→'; cls = 'delta-flat';
-      text = `No significant change vs last analysis (${priorDate})${velocityLabel}`;
+      text = `No significant change vs ${priorDate}${velocityLabel}`;
     } else if (deltaPp > 0 || (deltaScore !== null && deltaScore < 0)) {
       arrow = '↑'; cls = 'delta-up';
       const parts = [];
-      if (Math.abs(deltaPp) >= 2) parts.push(`match score +${deltaPp}pp`);
+      if (Math.abs(deltaPp) >= 2) parts.push(`match +${deltaPp}pp`);
       if (deltaScore !== null && Math.abs(deltaScore) >= 2) parts.push(`Oracle Score ${deltaScore > 0 ? '+' : ''}${deltaScore}`);
-      text = `Risk increasing — ${parts.join(', ')} vs last analysis${velocityLabel}`;
+      text = `Risk increasing — ${parts.join(', ')} vs ${priorDate}${velocityLabel}`;
     } else {
       arrow = '↓'; cls = 'delta-down';
       const parts = [];
-      if (Math.abs(deltaPp) >= 2) parts.push(`match score ${deltaPp}pp`);
+      if (Math.abs(deltaPp) >= 2) parts.push(`match ${deltaPp}pp`);
       if (deltaScore !== null && Math.abs(deltaScore) >= 2) parts.push(`Oracle Score ${deltaScore > 0 ? '+' : ''}${deltaScore}`);
-      text = `Risk decreasing — ${parts.join(', ')} vs last analysis${velocityLabel}`;
+      text = `Risk decreasing — ${parts.join(', ')} vs ${priorDate}${velocityLabel}`;
     }
-
     badge.className = `trend-delta-badge ${cls}`;
     badge.innerHTML = `<span class="tdb-arrow">${arrow}</span><span class="tdb-text">${text}</span><span class="tdb-date">${priorDate}</span>`;
     badge.classList.remove('hidden');

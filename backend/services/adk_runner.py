@@ -347,6 +347,23 @@ async def _analyze_startup_metrics(
                 f"at {int(best_score*100)}%. Below 60% alert threshold."
             )
 
+        # Persist safe run to MongoDB for trajectory tracking
+        try:
+            from datetime import datetime, timezone
+            from backend.services.pattern_matcher import compute_oracle_score as _cos
+            _safe_score = _cos(metrics, 0.0)[0]
+            await db["startup_analyses"].insert_one({
+                "startup_name": startup_name,
+                "checked_at": datetime.now(timezone.utc),
+                "alert": False,
+                "pattern_name": None,
+                "confidence": round(best_score, 2),
+                "oracle_score": _safe_score,
+                "metrics_snapshot": metrics.model_dump(),
+            })
+        except Exception:
+            pass
+
         result = {
             "alert": False,
             "startup_name": startup_name,
@@ -402,15 +419,17 @@ async def _analyze_startup_metrics(
     except Exception:
         pass
 
-    # Persist to MongoDB for session memory (previous analysis context in future queries)
+    # Persist to MongoDB for session memory + trajectory tracking
     try:
         from datetime import datetime, timezone
+        from backend.services.pattern_matcher import compute_oracle_score as _cos
         await db["startup_analyses"].insert_one({
             "startup_name": startup_name,
             "checked_at": datetime.now(timezone.utc),
             "alert": True,
             "pattern_name": best_match["name"],
             "confidence": round(best_score, 2),
+            "oracle_score": _cos(metrics, best_score)[0],
             "days_to_crisis": best_scoring.get("days_to_crisis", 90),
             "metrics_snapshot": metrics.model_dump(),
         })
@@ -851,6 +870,7 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
     from backend.services.pattern_matcher import (
         compute_oracle_score, compute_oracle_score_breakdown,
         build_recovery_scenario, compute_escape_plan, match_patterns_top3,
+        compute_trajectory,
     )
 
     queue: _asyncio.Queue = _asyncio.Queue()
@@ -958,6 +978,17 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
                         f"combined confidence drop: −{escape_raw['combined_drop']}pp"
                     ))
 
+                # ── Trajectory (MongoDB multi-snapshot regression) ─────────
+                trajectory = await compute_trajectory(
+                    metrics.startup_name, oracle_score, float(match_conf)
+                )
+                if trajectory:
+                    _dir = trajectory["direction"]
+                    _vel = trajectory.get("oracle_score_velocity")
+                    _vel_str = f" (~{abs(_vel):.1f} pts/run)" if _vel is not None else ""
+                    await _emit("step", icon="📈" if _dir == "recovering" else "📉" if _dir == "deteriorating" else "➡️",
+                                message=f"Trajectory ({trajectory['snapshots_used']} snapshots): {_dir.upper()}{_vel_str}")
+
                 await _emit("result",
                             alert=True,
                             startup_name=metrics.startup_name,
@@ -967,6 +998,7 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
                             oracle_score=oracle_score,
                             score_band=score_band,
                             oracle_breakdown=oracle_breakdown,
+                            trajectory=trajectory,
                             cascade=cascade_dict,
                             recovery_scenario={
                                 "pattern_name": pattern_data["pattern_name"],
@@ -995,11 +1027,22 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
                     f"Gemini verdict: metrics look healthy for this stage"
                 ))
                 await _emit("step", icon="📊", message=f"Oracle Score: {oracle_score}/100 ({score_band.upper()})")
+
+                # ── Trajectory (MongoDB multi-snapshot regression) ─────────
+                trajectory = await compute_trajectory(metrics.startup_name, oracle_score, 0.0)
+                if trajectory:
+                    _dir = trajectory["direction"]
+                    _vel = trajectory.get("oracle_score_velocity")
+                    _vel_str = f" (~{abs(_vel):.1f} pts/run)" if _vel is not None else ""
+                    await _emit("step", icon="📈" if _dir == "recovering" else "📉" if _dir == "deteriorating" else "➡️",
+                                message=f"Trajectory ({trajectory['snapshots_used']} snapshots): {_dir.upper()}{_vel_str}")
+
                 await _emit("safe",
                             message=raw_result.get("message", "No dangerous failure patterns detected. Your metrics look healthy for this stage."),
                             oracle_score=oracle_score,
                             score_band=score_band,
                             oracle_breakdown=oracle_breakdown,
+                            trajectory=trajectory,
                             cocktail=cocktail.model_dump() if cocktail else None,
                             uncharted=_uncharted)
 

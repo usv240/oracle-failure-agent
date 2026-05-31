@@ -365,6 +365,95 @@ async def _candidate_patterns(metrics: MetricsInput) -> list[dict]:
     return results
 
 
+async def compute_trajectory(
+    startup_name: str,
+    current_oracle_score: int,
+    current_confidence: float = 0.0,
+) -> dict | None:
+    """
+    Query MongoDB for up to 8 prior analyses of this startup and compute a
+    trajectory object: direction, velocity, delta vs last run, and 1/3-month
+    Oracle Score projections.
+
+    Returns None when fewer than 2 prior snapshots exist (can't compute trend).
+    Called AFTER oracle_score is known so the current run can anchor the regression.
+    """
+    try:
+        from backend.db.connection import get_db
+        from datetime import datetime, timezone
+        db = get_db()
+        cursor = db["startup_analyses"].find(
+            {"startup_name": startup_name},
+            sort=[("checked_at", -1)],
+            projection={"_id": 0, "oracle_score": 1, "confidence": 1,
+                        "checked_at": 1, "pattern_name": 1},
+        ).limit(8)
+        docs = await cursor.to_list(length=8)
+    except Exception:
+        return None
+
+    if not docs:
+        return None  # no history at all
+
+    last = docs[0]
+    last_score = last.get("oracle_score")
+    last_conf  = float(last.get("confidence") or 0.0)
+
+    # Delta vs most recent prior run
+    score_delta = (current_oracle_score - last_score) if last_score is not None else None
+    conf_delta  = round((current_confidence - last_conf) * 100, 1)
+
+    # Linear regression over [current, ...historical] for velocity + projection
+    raw_scores = [current_oracle_score] + [
+        d["oracle_score"] for d in docs if d.get("oracle_score") is not None
+    ]
+    velocity = projected_1mo = projected_3mo = None
+    if len(raw_scores) >= 2:
+        n      = len(raw_scores)
+        x_mean = (n - 1) / 2
+        y_mean = sum(raw_scores) / n
+        num = sum((i - x_mean) * (v - y_mean) for i, v in enumerate(raw_scores))
+        den = sum((i - x_mean) ** 2 for i in range(n))
+        slope     = num / den if den > 0 else 0.0
+        intercept = y_mean - slope * x_mean
+        # index 0 = newest → negative slope means score is falling over time
+        velocity     = round(-slope, 2)
+        projected_1mo = max(0, min(100, round(intercept + slope * n)))
+        projected_3mo = max(0, min(100, round(intercept + slope * (n + 2))))
+
+    # Direction
+    vel_sig    = velocity is not None and abs(velocity) >= 1.0
+    delta_sig  = score_delta is not None and abs(score_delta) >= 2
+    if vel_sig:
+        direction = "deteriorating" if velocity < 0 else "recovering"
+    elif delta_sig:
+        direction = "deteriorating" if score_delta < 0 else "recovering"
+    else:
+        direction = "stable"
+
+    # Days since last analysis
+    days_ago = None
+    checked = last.get("checked_at")
+    if checked:
+        if isinstance(checked, str):
+            checked = datetime.fromisoformat(checked.replace("Z", "+00:00"))
+        if checked.tzinfo is None:
+            checked = checked.replace(tzinfo=timezone.utc)
+        days_ago = (datetime.now(timezone.utc) - checked).days
+
+    return {
+        "direction":             direction,
+        "oracle_score_delta":    score_delta,
+        "oracle_score_velocity": velocity,
+        "confidence_delta_pp":   conf_delta,
+        "snapshots_used":        len(raw_scores),
+        "days_since_last":       days_ago,
+        "last_pattern":          last.get("pattern_name"),
+        "projected_score_1mo":   projected_1mo,
+        "projected_score_3mo":   projected_3mo,
+    }
+
+
 async def _get_previous_analysis(startup_name: str) -> dict | None:
     """Fetch the most recent analysis from MongoDB for session memory context."""
     try:
@@ -797,6 +886,7 @@ async def match_patterns(metrics: MetricsInput) -> PatternMatch | None:
             "alert": True,
             "pattern_name": best_match["name"],
             "confidence": round(best_score, 2),
+            "oracle_score": compute_oracle_score(metrics, best_score)[0],
             "days_to_crisis": best_scoring.get("days_to_crisis", 90),
             "metrics_snapshot": metrics.model_dump(),
         }
