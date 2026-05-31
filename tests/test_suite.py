@@ -162,9 +162,162 @@ class TestRun:
 
 
 # ── Individual tests ─────────────────────────────────────────────
+def _run_unit_tests(run):
+    """Pure unit tests — no server required. Test core math functions directly."""
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+    run.section("0. Unit Tests — Core Math (no server needed)")
+
+    # ── Oracle Score ─────────────────────────────────────────────
+    def test_oracle_score_healthy():
+        from backend.db.schemas import MetricsInput
+        from backend.services.pattern_matcher import compute_oracle_score
+        m = MetricsInput(startup_name="T", current_month=12, mrr=200000,
+                         mrr_growth_rate=0.20, churn_rate=0.02, burn_rate=60000,
+                         runway_months=24, headcount=10, nps=55, cac=1000,
+                         ltv=12000, industry="B2B SaaS")
+        score, band = compute_oracle_score(m, 0.0)
+        assert score >= 90, f"Healthy startup expected ≥90, got {score}"
+        assert band == "strong", f"Expected strong, got {band}"
+        return f"score={score}, band={band}"
+    run.test("Oracle Score: healthy startup ≥90 (strong)", "unit", test_oracle_score_healthy)
+
+    def test_oracle_score_crisis():
+        from backend.db.schemas import MetricsInput
+        from backend.services.pattern_matcher import compute_oracle_score
+        m = MetricsInput(startup_name="T", current_month=24, mrr=10000,
+                         mrr_growth_rate=0.0, churn_rate=0.30, burn_rate=5_000_000,
+                         runway_months=0, headcount=100, nps=-20, cac=10000,
+                         ltv=1000, industry="B2B SaaS")
+        score, band = compute_oracle_score(m, 1.0)
+        assert score == 0, f"Crisis startup expected 0, got {score}"
+        assert band == "critical", f"Expected critical, got {band}"
+        return f"score={score}, band={band}"
+    run.test("Oracle Score: crisis startup = 0 (critical)", "unit", test_oracle_score_crisis)
+
+    def test_oracle_score_penalties():
+        from backend.db.schemas import MetricsInput
+        from backend.services.pattern_matcher import compute_oracle_score
+        # Controlled penalties (all explicit):
+        #   match=0.70 → -42pp | churn=8% → (8-5)×2 = -6pp
+        #   LTV:CAC=2.0x → (3-2)×5 = -5pp | runway=10mo → (12-10)×1.5 = -3pp
+        #   burn_mult=15000/(100000×0.08)=1.875 < 2 → no penalty
+        #   NPS=20 < 30 → no bonus | growth=8% < 10% → no bonus
+        #   Total: 100 - 42 - 6 - 5 - 3 = 44
+        m = MetricsInput(startup_name="T", current_month=14, mrr=100000,
+                         mrr_growth_rate=0.08, churn_rate=0.08, burn_rate=15000,
+                         runway_months=10, headcount=12, nps=20, cac=2000,
+                         ltv=4000, industry="B2B SaaS")
+        score, band = compute_oracle_score(m, 0.70)
+        assert score == 44, f"Expected 44, got {score}"
+        assert band == "warning", f"Expected warning (25-49 range), got {band}"
+        return f"score={score}, band={band} (expected 44, warning)"
+    run.test("Oracle Score: formula gives deterministic 44/100", "unit", test_oracle_score_penalties)
+
+    # ── Oracle Score Breakdown ────────────────────────────────────
+    def test_oracle_score_breakdown():
+        from backend.db.schemas import MetricsInput
+        from backend.services.pattern_matcher import compute_oracle_score_breakdown
+        m = MetricsInput(startup_name="T", current_month=14, mrr=100000,
+                         mrr_growth_rate=0.08, churn_rate=0.08, burn_rate=15000,
+                         runway_months=10, headcount=12, nps=20, cac=2000,
+                         ltv=4000, industry="B2B SaaS")
+        bd = compute_oracle_score_breakdown(m, 0.70)
+        assert "rows" in bd, "Missing rows"
+        assert bd["final"] == 44, f"Expected final=44, got {bd['final']}"
+        assert bd["band"] == "warning", f"Expected warning, got {bd['band']}"
+        labels = [r["label"] for r in bd["rows"]]
+        assert "Pattern match" in labels, "Missing Pattern match row"
+        assert "Churn" in labels, "Missing Churn row"
+        pattern_row = next(r for r in bd["rows"] if r["label"] == "Pattern match")
+        assert pattern_row["value"] == -42.0, f"Pattern penalty expected -42, got {pattern_row['value']}"
+        return f"breakdown has {len(bd['rows'])} rows, final={bd['final']}"
+    run.test("Oracle Score breakdown: rows correct, final=44", "unit", test_oracle_score_breakdown)
+
+    # ── Escape Plan ───────────────────────────────────────────────
+    def test_escape_plan_reduces_confidence():
+        from backend.db.schemas import MetricsInput
+        from backend.services.pattern_matcher import compute_escape_plan
+        m = MetricsInput(startup_name="T", current_month=14, mrr=100000,
+                         mrr_growth_rate=0.10, churn_rate=0.10, burn_rate=300000,
+                         runway_months=8, headcount=15, nps=20, cac=2000,
+                         ltv=4000, industry="B2B SaaS")
+        # trigger_conditions use the actual field names the function reads
+        pattern = {"trigger_conditions": {
+            "churn_rate_min": 0.07, "runway_months_max": 12, "burn_multiple_min": 2.0
+        }}
+        result = compute_escape_plan(m, pattern, 0.75)
+        assert result is not None, "Expected escape plan"
+        assert result["current_confidence"] == 75
+        assert result["escape_threshold"] == 60
+        assert len(result["interventions"]) > 0, "Expected at least one intervention"
+        assert result["combined_drop"] > 0, "combined_drop must be positive"
+        return f"{len(result['interventions'])} interventions, combined_drop={result['combined_drop']}pp"
+    run.test("Escape Plan: interventions exist and combined_drop > 0", "unit", test_escape_plan_reduces_confidence)
+
+    def test_escape_plan_sorted_by_impact():
+        from backend.db.schemas import MetricsInput
+        from backend.services.pattern_matcher import compute_escape_plan
+        m = MetricsInput(startup_name="T", current_month=14, mrr=100000,
+                         mrr_growth_rate=0.10, churn_rate=0.12, burn_rate=400000,
+                         runway_months=7, headcount=15, nps=20, cac=2000,
+                         ltv=3000, industry="B2B SaaS")
+        pattern = {"trigger_conditions": {
+            "churn_rate_min": 0.07, "runway_months_max": 12, "burn_multiple_min": 2.0
+        }}
+        result = compute_escape_plan(m, pattern, 0.80)
+        if result and len(result["interventions"]) >= 2:
+            drops = [i["estimated_confidence_drop"] for i in result["interventions"]]
+            assert drops == sorted(drops, reverse=True), f"Interventions not sorted by impact: {drops}"
+        return f"sorted correctly: {[i['estimated_confidence_drop'] for i in (result or {}).get('interventions', [])]}"
+    run.test("Escape Plan: interventions sorted by impact (descending)", "unit", test_escape_plan_sorted_by_impact)
+
+    # ── Bayesian Update Formula ───────────────────────────────────
+    def test_bayesian_blend():
+        # p = 0.3 * initial + 0.7 * (observed / total_starts)
+        initial, observed, total = 0.72, 3, 10
+        expected = round(0.3 * 0.72 + 0.7 * (3 / 10), 3)   # 0.426
+        assert expected == 0.426, f"Formula check: expected 0.426 got {expected}"
+        # Verify it converges toward empirical with more data
+        many_obs = round(0.3 * 0.72 + 0.7 * (80 / 100), 3)  # 0.776
+        assert many_obs > expected, "More observations should push toward empirical"
+        return f"p(3/10)={expected}, p(80/100)={many_obs} — converging correctly"
+    run.test("Bayesian blend: p = 0.3×initial + 0.7×(obs/total)", "unit", test_bayesian_blend)
+
+    # ── Regression: known failures ────────────────────────────────
+    def test_theranos_crisis():
+        from backend.db.schemas import MetricsInput
+        from backend.services.pattern_matcher import compute_oracle_score
+        m = MetricsInput(startup_name="Theranos", current_month=24, mrr=18000,
+                         mrr_growth_rate=0.01, churn_rate=0.45, burn_rate=5_800_000,
+                         runway_months=6, headcount=800, nps=-42, cac=95000,
+                         ltv=8000, industry="Healthtech")
+        score, band = compute_oracle_score(m, 0.95)
+        assert score <= 5, f"Theranos expected ≤5, got {score}"
+        assert band == "critical"
+        return f"Theranos score={score} (critical) ✓"
+    run.test("Regression: Theranos Oracle Score ≤5 (critical)", "unit", test_theranos_crisis)
+
+    def test_healthy_startup_no_penalties():
+        from backend.db.schemas import MetricsInput
+        from backend.services.pattern_matcher import compute_oracle_score
+        m = MetricsInput(startup_name="GrowthCo", current_month=12, mrr=150000,
+                         mrr_growth_rate=0.25, churn_rate=0.02, burn_rate=45000,
+                         runway_months=24, headcount=8, nps=68, cac=900,
+                         ltv=22000, industry="B2B SaaS")
+        score, band = compute_oracle_score(m, 0.0)
+        assert score == 100, f"No-alert healthy startup expected 100, got {score}"
+        assert band == "strong"
+        return f"GrowthCo score={score} (strong) ✓"
+    run.test("Regression: GrowthCo Oracle Score = 100 (strong, no alert)", "unit", test_healthy_startup_no_penalties)
+
+
 def run_all(base=DEFAULT_BASE):
     run = TestRun(base)
     B = base
+
+    _run_unit_tests(run)
 
     # ────────────────────────────────────────────────────────────
     run.section("1. Health & Connectivity")

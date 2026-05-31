@@ -312,16 +312,50 @@ async def _analyze_startup_metrics(
 
     # ── Step 6: Build result ──────────────────────────────────────────
     if best_score < 0.60 or best_match is None:
+        is_uncharted = best_match is None or best_score < 0.40
+        uncharted_info = {
+            "is_uncharted": is_uncharted,
+            "best_confidence": int(best_score * 100),
+            "closest_pattern": best_match["name"] if best_match else None,
+            "closest_pattern_id": best_match["pattern_id"] if best_match else None,
+        } if best_match is not None else {
+            "is_uncharted": True,
+            "best_confidence": 0,
+            "closest_pattern": None,
+            "closest_pattern_id": None,
+        }
+
+        if is_uncharted:
+            step_icon, step_msg = "🌐", (
+                f"UNCHARTED TERRITORY — best match {int(best_score*100)}% "
+                f"({'no candidates retrieved' if best_match is None else best_match['name']}). "
+                "Metrics don't closely resemble any of the 100 known failure patterns."
+            )
+            msg = (
+                f"Uncharted territory — your metrics don't closely match known failure patterns "
+                f"(best match: {int(best_score*100)}%"
+                + (f", closest: {best_match['name']}" if best_match else "")
+                + "). Low-confidence result — treat with caution."
+            )
+        else:
+            step_icon, step_msg = "✅", (
+                f"Best match score {int(best_score*100)}% — below 60% threshold. "
+                f"Closest pattern: {best_match['name']}. No dangerous pattern confirmed."
+            )
+            msg = (
+                f"Low-confidence signal — closest pattern: {best_match['name']} "
+                f"at {int(best_score*100)}%. Below 60% alert threshold."
+            )
+
         result = {
             "alert": False,
             "startup_name": startup_name,
-            "message": "No dangerous failure patterns detected. Metrics look healthy.",
+            "message": msg,
+            "uncharted": uncharted_info,
         }
         if _result_key:
             _results[_result_key] = result
-        await _emit("step", icon="✅", message=(
-            f"Best match score {int(best_score*100)}% — below 60% threshold. No dangerous pattern confirmed."
-        ))
+        await _emit("step", icon=step_icon, message=step_msg)
         return json.dumps({
             "status": "complete", "alert": False,
             "pattern_name": "none", "pattern_id": "none", "category": "none", "confidence": 0,
@@ -344,6 +378,7 @@ async def _analyze_startup_metrics(
     total = best_match["failure_count"] + best_match["survival_count"]
     survival_rate = best_match["survival_count"] / total if total > 0 else 0.0
 
+    from backend.services.pattern_matcher import compute_trigger_breakdown
     match = PatternMatch(
         pattern_id=best_match["pattern_id"],
         pattern_name=best_match["name"],
@@ -358,6 +393,7 @@ async def _analyze_startup_metrics(
         days_to_crisis=best_scoring.get("days_to_crisis", 90),
         match_reasoning=best_scoring.get("match_reasoning"),
         trigger_conditions=best_match.get("trigger_conditions"),
+        trigger_breakdown=compute_trigger_breakdown(metrics, best_match),
     )
 
     try:
@@ -813,7 +849,8 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
     making the SSE terminal a genuine window into the ADK SequentialAgent execution.
     """
     from backend.services.pattern_matcher import (
-        compute_oracle_score, build_recovery_scenario, compute_escape_plan, match_patterns_top3,
+        compute_oracle_score, compute_oracle_score_breakdown,
+        build_recovery_scenario, compute_escape_plan, match_patterns_top3,
     )
 
     queue: _asyncio.Queue = _asyncio.Queue()
@@ -889,6 +926,7 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
                     ))
 
                 oracle_score, score_band = compute_oracle_score(metrics, match_conf)
+                oracle_breakdown = compute_oracle_score_breakdown(metrics, match_conf)
                 recovery = build_recovery_scenario(metrics, match_conf)
                 escape_raw = compute_escape_plan(metrics, pattern_data, match_conf)
 
@@ -928,6 +966,7 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
                             cocktail=cocktail.model_dump() if cocktail else None,
                             oracle_score=oracle_score,
                             score_band=score_band,
+                            oracle_breakdown=oracle_breakdown,
                             cascade=cascade_dict,
                             recovery_scenario={
                                 "pattern_name": pattern_data["pattern_name"],
@@ -939,20 +978,30 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
                             escape_plan=escape_raw)
             else:
                 oracle_score, score_band = compute_oracle_score(metrics, 0.0)
-                await _emit("step", icon="✅", message=(
-                    "Investigator: all Atlas Vector Search + BM25 embedding candidates "
-                    "scored below 60% threshold — Challenger verification not required"
-                ))
+                oracle_breakdown = compute_oracle_score_breakdown(metrics, 0.0)
+                _uncharted = raw_result.get("uncharted")
+                if _uncharted and _uncharted.get("is_uncharted"):
+                    await _emit("step", icon="🌐", message=(
+                        f"Investigator: best match {_uncharted['best_confidence']}% — "
+                        "below 40% floor. Metrics don't closely resemble known failure patterns (UNCHARTED TERRITORY)."
+                    ))
+                else:
+                    await _emit("step", icon="✅", message=(
+                        "Investigator: all Atlas Vector Search + BM25 embedding candidates "
+                        "scored below 60% threshold — Challenger verification not required"
+                    ))
                 await _emit("step", icon="📊", message=(
                     f"Reporter: MongoDB MCP category benchmarks fetched — "
                     f"Gemini verdict: metrics look healthy for this stage"
                 ))
                 await _emit("step", icon="📊", message=f"Oracle Score: {oracle_score}/100 ({score_band.upper()})")
                 await _emit("safe",
-                            message="No dangerous failure patterns detected. Your metrics look healthy for this stage.",
+                            message=raw_result.get("message", "No dangerous failure patterns detected. Your metrics look healthy for this stage."),
                             oracle_score=oracle_score,
                             score_band=score_band,
-                            cocktail=cocktail.model_dump() if cocktail else None)
+                            oracle_breakdown=oracle_breakdown,
+                            cocktail=cocktail.model_dump() if cocktail else None,
+                            uncharted=_uncharted)
 
         except Exception as e:
             logger.error("[ADK:Stream] Pipeline error: %s", e)

@@ -467,9 +467,13 @@
           <div class="hiw-step">
             <div class="step-num">5</div>
             <div class="step-body">
-              <h4>Alert fired with survival playbook</h4>
-              <p>If pattern similarity exceeds 60%, the Oracle fires an alert showing: the pattern name and narrative, warning signals already present in your data, historical outcomes (how many startups survived vs. failed), estimated time to crisis, and the exact playbook used by every company that survived this pattern.</p>
-              <div class="tech-tag">Google ADK Agent</div>
+              <h4>Full analysis output — transparent, actionable, self-improving</h4>
+              <p>When a pattern match exceeds 60%: <strong>Oracle Score</strong> (0–100, transparent formula you can audit line-by-line) · <strong>Trigger Breakdown</strong> (exactly which conditions you crossed) · <strong>Escape Plan</strong> (minimum metric changes to drop below danger threshold — deterministic algebra, not AI) · <strong>Cascade Graph</strong> (MongoDB <code>$graphLookup</code> showing where this failure leads in 3 steps, with Bayesian self-improving probabilities) · <strong>Survival Playbook</strong> (what every surviving startup did). If metrics are below every known pattern (&lt;40% match): <strong>Uncharted Territory</strong> — honest uncertainty rather than a forced match.</p>
+              <div class="tech-tag">Oracle Score (deterministic)</div>
+              <div class="tech-tag">Escape Plan (algebra)</div>
+              <div class="tech-tag">$graphLookup Cascade</div>
+              <div class="tech-tag">Bayesian self-improvement</div>
+              <div class="tech-tag">Uncharted Territory</div>
             </div>
           </div>
           <div class="hiw-step">
@@ -545,28 +549,28 @@
           <div class="stack-grid">
             <div class="stack-item">
               <div class="stack-icon"></div>
-              <strong>Vertex AI — Gemini 2.5 Flash</strong>
-              <small>PRIMARY scorer — parallel pattern scoring with thinking_budget=0 for 3–5s response. Also handles decision auditing via Vertex AI API.</small>
+              <strong>Vertex AI — Gemini 2.5 Flash (Scorer)</strong>
+              <small>Primary pattern scorer — parallel scoring of all candidates with <code>thinking_budget=0</code> for maximum speed. Also handles decision auditing with <code>thinking_budget=1024</code> for deeper reasoning. Why Vertex AI? Consistent latency SLA + enterprise billing.</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
-              <strong>Gemini 3 Flash (ADK agents)</strong>
-              <small>Investigator, Challenger, and Reporter agents each run on Gemini 3 Flash via paid Gemini API + Google ADK SequentialAgent orchestration.</small>
+              <strong>Gemini 3 Flash (ADK Agents)</strong>
+              <small>All three ADK agents (Investigator, Challenger, Reporter) run on Gemini 3 Flash via paid Gemini API. Gemini 3 Flash is not yet available on Vertex AI, so agents route via the Gemini API key. This dual-model architecture is intentional: best model for each job.</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
-              <strong>MongoDB Voyage AI</strong>
-              <small>voyage-4-large generates 1024-dim embeddings for all 100 patterns and every query (asymmetric retrieval)</small>
+              <strong>MongoDB Voyage AI — voyage-4-large</strong>
+              <small>1024-dimensional embeddings for all 100 patterns and every query. Asymmetric retrieval: patterns encoded as "documents," queries as "queries" — different encodings optimize for search vs. storage. Falls back to Google text-embedding-004 if Voyage is unavailable.</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
-              <strong>MongoDB Atlas</strong>
-              <small>Vector Search (cosine) + Atlas Search (BM25) merged via Reciprocal Rank Fusion · $graphLookup cascade · ACID transactions · Change Streams</small>
+              <strong>MongoDB Atlas — 6 Features</strong>
+              <small>Vector Search (cosine similarity) + Atlas Search (BM25 text) merged via Reciprocal Rank Fusion · <code>$graphLookup</code> cascade traversal · ACID multi-document transactions · Change Streams (Bayesian probability updates) · MCP server (tool-based reads) · <code>$bucket/$facet</code> cohort aggregations.</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
-              <strong>Google ADK (Agent Development Kit)</strong>
-              <small>google-adk — SequentialAgent orchestrating 3 LlmAgents: Investigator → Challenger → Reporter, each with dedicated FunctionTools and session state via output_key</small>
+              <strong>Google ADK — SequentialAgent Pipeline</strong>
+              <small>google-adk orchestrates 3 LlmAgents: Investigator (finds pattern) → Challenger (disputes it) → Reporter (synthesises + saves report). Each agent has dedicated <code>FunctionTools</code> and passes results via <code>output_key</code> through shared session state. Real-time events streamed via SSE + <code>asyncio.Queue</code>.</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
@@ -699,25 +703,25 @@
         <div class="wb-steps">
           <div class="wb-step">
             <div class="wb-num">1</div>
-            <div class="wb-text"><strong>Enter metrics or load a preset</strong><br>11 key signals — MRR, churn, burn rate, NPS, LTV:CAC</div>
+            <div class="wb-text"><strong>Enter 11 metrics</strong><br>MRR, churn, burn, NPS, LTV:CAC, runway — the signals that predict failure 3–6 months early</div>
           </div>
           <div class="wb-arrow">→</div>
           <div class="wb-step">
             <div class="wb-num">2</div>
-            <div class="wb-text"><strong>Investigator Agent scans 100 patterns</strong><br>Gemini 3 Flash + MongoDB Vector Search + BM25 RRF</div>
+            <div class="wb-text"><strong>Investigator Agent finds the match</strong><br>Voyage AI embedding → Atlas Vector Search + BM25 RRF → Vertex AI Gemini 2.5 Flash parallel scoring → top pattern selected</div>
           </div>
           <div class="wb-arrow">→</div>
           <div class="wb-step wb-step-highlight">
             <div class="wb-num">⚖️</div>
-            <div class="wb-text"><strong>Challenger Agent stress-tests the match</strong><br>A second Gemini 3 Flash instance disputes or confirms</div>
+            <div class="wb-text"><strong>Challenger Agent disputes or confirms</strong><br>Second independent Gemini 3 Flash instance — actively seeks counter-evidence. &gt;10pp divergence triggers DISPUTE and catches false positives.</div>
           </div>
           <div class="wb-arrow">→</div>
           <div class="wb-step">
             <div class="wb-num">4</div>
-            <div class="wb-text"><strong>Get your survival playbook</strong><br>Early warning + exact steps every survivor took</div>
+            <div class="wb-text"><strong>Reporter synthesises + Oracle outputs</strong><br>Oracle Score (transparent formula) · Escape Plan (deterministic algebra) · Cascade Graph ($graphLookup) · Survival Playbook</div>
           </div>
         </div>
-        <div class="wb-tip"><strong>First time?</strong> Click the <strong>Quibi</strong> card below — watch the Oracle catch a $1.75B failure live. The Challenger Agent verdict appears in the Agent Log.</div>
+        <div class="wb-tip"><strong>First time?</strong> Click the <strong>Quibi</strong> card below — watch the Oracle catch a $1.75B failure live. The Challenger verdict and Δpp confidence gap appear in the Agent Log. Want to see a DISPUTE? Try <strong>HighVelocity AI</strong> in the demos.</div>
       </section>
       <div class="metrics-layout">
       <!-- ── Metrics Input ────────────────────────────────────────── -->
@@ -1116,7 +1120,7 @@
       <!-- Oracle Score™ — single composite startup-health number (shown for both alert and safe paths) -->
       <div class="oracle-score-card hidden" id="oracle-score-card">
         <div class="osc-left">
-          <div class="osc-label">ORACLE SCORE</div>
+          <div class="osc-label" title="Composite startup health: 100 = perfect, 0 = crisis. Starts at 100, penalized for each unhealthy metric and pattern match strength.">ORACLE SCORE</div>
           <div class="osc-value" id="osc-value">—</div>
           <div class="osc-band" id="osc-band">—</div>
         </div>
@@ -1124,8 +1128,20 @@
           <div class="osc-bar-wrap">
             <div class="osc-bar-fill" id="osc-bar-fill"></div>
           </div>
-          <div class="osc-tip" id="osc-tip">Composite of all 11 metrics + matched pattern.</div>
+          <div class="osc-tip" id="osc-tip">Composite of all 11 metrics + pattern match. Starts at 100 — penalties for churn, burn multiple, low runway, weak LTV:CAC, pattern confidence. Bonuses for NPS &gt;30 and growth &gt;10%/mo.</div>
+          <button class="osc-audit-btn hidden" id="osc-audit-btn" title="See every penalty and bonus with your actual numbers plugged in — no black box">Audit formula ▾</button>
         </div>
+        <div class="osc-breakdown hidden" id="osc-breakdown"></div>
+      </div>
+      <!-- Oracle Score band legend — always visible below the score card -->
+      <div class="osc-legend hidden" id="osc-legend">
+        <span class="osc-legend-item osc-legend-strong" title="75–100: All key metrics healthy, no dangerous pattern match">75–100 STRONG</span>
+        <span class="osc-legend-sep">·</span>
+        <span class="osc-legend-item osc-legend-watch" title="50–74: Some metrics need attention, monitor weekly">50–74 WATCH</span>
+        <span class="osc-legend-sep">·</span>
+        <span class="osc-legend-item osc-legend-warning" title="25–49: Multiple warning signals, course-correct now">25–49 WARNING</span>
+        <span class="osc-legend-sep">·</span>
+        <span class="osc-legend-item osc-legend-critical" title="0–24: Crisis-level signal, action required this week">0–24 CRITICAL</span>
       </div>
       <!-- Trend delta badge — shown when a previous snapshot exists for the same startup -->
       <div id="trend-delta-badge" class="trend-delta-badge hidden"></div>
@@ -1135,22 +1151,23 @@
         <div class="cf-left">
           <span class="cf-trend-icon" id="cf-trend-icon">→</span>
           <span class="cf-trend-label" id="cf-trend-label">Trend stable</span>
+          <span class="cf-velocity" id="cf-velocity"></span>
         </div>
         <div class="cf-projections">
-          <div class="cf-proj-item">
-            <span class="cf-proj-mo">+1 mo</span>
-            <span class="cf-proj-val" id="cf-proj-1">—</span>
+          <div class="cf-proj-col">
+            <span class="cf-proj-header">Risk %</span>
+            <div class="cf-proj-item"><span class="cf-proj-mo">+1 mo</span><span class="cf-proj-val" id="cf-proj-1">—</span></div>
+            <div class="cf-proj-item"><span class="cf-proj-mo">+2 mo</span><span class="cf-proj-val" id="cf-proj-2">—</span></div>
+            <div class="cf-proj-item"><span class="cf-proj-mo">+3 mo</span><span class="cf-proj-val" id="cf-proj-3">—</span></div>
           </div>
-          <div class="cf-proj-item">
-            <span class="cf-proj-mo">+2 mo</span>
-            <span class="cf-proj-val" id="cf-proj-2">—</span>
-          </div>
-          <div class="cf-proj-item">
-            <span class="cf-proj-mo">+3 mo</span>
-            <span class="cf-proj-val" id="cf-proj-3">—</span>
+          <div class="cf-proj-col">
+            <span class="cf-proj-header">Oracle Score</span>
+            <div class="cf-proj-item"><span class="cf-proj-mo">+1 mo</span><span class="cf-proj-val" id="cf-osc-1">—</span></div>
+            <div class="cf-proj-item"><span class="cf-proj-mo">+2 mo</span><span class="cf-proj-val" id="cf-osc-2">—</span></div>
+            <div class="cf-proj-item"><span class="cf-proj-mo">+3 mo</span><span class="cf-proj-val" id="cf-osc-3">—</span></div>
           </div>
         </div>
-        <span class="cf-label">Projected risk score (linear trend from your history)</span>
+        <span class="cf-label">Projected trajectory — linear regression over your analysis history. Needs ≥2 monthly snapshots. Risk % = pattern match confidence; Oracle Score = composite health (100=perfect).</span>
       </div>
 
       <section class="card alert-card hidden" id="alert-section">
@@ -1227,6 +1244,10 @@
           <p id="reasoning-text"></p>
         </div>
 
+        <!-- Trigger breakdown — which pattern conditions are met by current metrics -->
+        <!-- header + rows injected by renderResult() via trigger_breakdown from backend -->
+        <div class="trigger-breakdown hidden" id="trigger-breakdown"></div>
+
         <!-- Multi-agent Challenger panel -->
         <div class="challenger-panel hidden" id="challenger-panel">
           <div class="chp-header">
@@ -1234,9 +1255,10 @@
             <span class="chp-title" id="chp-title"></span>
             <span class="chp-badge" id="chp-badge"></span>
           </div>
+          <p class="chp-what">A second independent Gemini 3 Flash instance re-evaluates the match with deliberate skepticism — actively looking for counter-evidence. If their confidence assessments diverge by <strong>&gt;10 percentage points</strong>, a <strong>DISPUTE</strong> is triggered. This catches false positives a single agent would miss.</p>
           <p class="chp-reasoning" id="chp-reasoning"></p>
           <p class="chp-counter hidden" id="chp-counter-wrap">
-            <span class="chp-counter-label">Strongest counter-evidence:</span>
+            <span class="chp-counter-label">Strongest counter-evidence found by Challenger:</span>
             <span id="chp-counter"></span>
           </p>
           <div class="chp-scores">
@@ -1246,6 +1268,9 @@
                 <div class="chp-agent-bar chp-bar-inv" id="chp-bar-inv"></div>
               </div>
               <div class="chp-agent-pct" id="chp-inv-pct"></div>
+            </div>
+            <div class="chp-delta-col" title="Confidence gap between agents. >10pp = DISPUTE triggered. Agents use the same Gemini 3 Flash model but different prompts — Investigator finds evidence FOR the match, Challenger finds evidence AGAINST.">
+              <span class="chp-delta" id="chp-delta"></span>
             </div>
             <div class="chp-agent">
               <div class="chp-agent-label">Challenger</div>
@@ -1418,7 +1443,7 @@
             <span class="ctail-icon">🍸</span>
             <div>
               <h3 class="ctail-title">Cocktail Alert — <span id="ctail-count">2</span> Co-occurring Failure Patterns</h3>
-              <p class="ctail-subtitle">Co-occurring patterns compound risk non-linearly. Survival rates multiply down.</p>
+              <p class="ctail-subtitle">Two or more failure patterns active simultaneously. Risk compounds non-linearly — each additional pattern roughly halves the survival probability. Triggered when ≥2 patterns exceed 60% confidence.</p>
             </div>
           </div>
           <div class="ctail-survival-badge">
@@ -1428,7 +1453,7 @@
         </div>
         <div class="ctail-patterns" id="ctail-patterns"></div>
         <div class="ctail-formula">
-          <code>max(2%, min(rates) × 0.5<sup>n−1</sup>)</code> — each additional pattern halves the base survival rate
+          <code>max(2%, min(rates) × 0.5<sup>n−1</sup>)</code> — compound survival: take the lowest individual survival rate and halve it for each additional co-occurring pattern (floor 2%). Example: 20% survival + 2nd pattern = 10%, + 3rd = 5%.
         </div>
         <p class="ctail-summary" id="ctail-summary"></p>
       </div>
@@ -1436,20 +1461,20 @@
       <!-- Report actions -->
       <!-- Data provenance strip -->
       <div class="provenance-strip">
-        <span class="prov-item" title="Query embedded via MongoDB Voyage AI voyage-4-large">
+        <span class="prov-item" title="Step 1 — Your metrics are converted to a 1024-dimensional vector using MongoDB's Voyage AI voyage-4-large embedding model. Asymmetric retrieval: 'query' encoding for search, 'document' encoding for the stored patterns.">
           <span class="prov-dot prov-mongo"></span>MongoDB Voyage AI · voyage-4-large · 1024-dim
         </span>
         <span class="prov-sep">·</span>
-        <span class="prov-item" title="Pattern matched via MongoDB Atlas Vector Search + BM25 RRF">
+        <span class="prov-item" title="Step 2 — Two parallel searches: Atlas Vector Search (cosine similarity on embeddings) + Atlas Search (BM25 keyword). Results merged via Reciprocal Rank Fusion — handles rank disagreement better than simple score averaging.">
           <span class="prov-dot prov-mongo"></span>Atlas Vector Search + BM25 RRF
         </span>
         <span class="prov-sep">·</span>
-        <span class="prov-item" title="Scored by Vertex AI Gemini 2.5 Flash · ADK SequentialAgent (Investigator, Challenger, Reporter) on Gemini 3 Flash">
-          <span class="prov-dot prov-google"></span>Gemini 3 Flash · ADK ×3
+        <span class="prov-item" title="Step 3 — Vertex AI Gemini 2.5 Flash scores all candidates in parallel (thinking_budget=0 for speed). Then: ADK SequentialAgent runs Investigator → Challenger → Reporter, all three on Gemini 3 Flash via paid Gemini API (Gemini 3 not yet on Vertex AI).">
+          <span class="prov-dot prov-google"></span>Vertex AI 2.5 Flash scorer · Gemini 3 Flash ADK ×3
         </span>
         <span class="prov-sep">·</span>
-        <span class="prov-item" title="Pattern data stored in MongoDB Atlas">
-          <span class="prov-dot prov-mongo"></span>MongoDB Atlas
+        <span class="prov-item" title="Step 4 — Analysis result, cascade graph, and transition probabilities stored atomically in MongoDB Atlas via ACID transaction. Bayesian probability updates written via Change Streams as real-world transitions are observed.">
+          <span class="prov-dot prov-mongo"></span>MongoDB Atlas · ACID write
         </span>
       </div>
 
@@ -1471,7 +1496,7 @@
             <span class="ep-icon">🔓</span>
             <div>
               <h3 class="ep-title">Your Escape Plan</h3>
-              <p class="ep-subtitle">Minimum changes to drop below the danger threshold — <strong>deterministic threshold algebra</strong>, not AI-generated advice</p>
+              <p class="ep-subtitle">Minimum metric changes to drop your pattern match below <strong>60%</strong> (the alert threshold). Each intervention is exact: "reduce churn from X% to Y%." Ranked by confidence impact. <strong>Pure algebra on the pattern's trigger conditions</strong> — no AI, reproducible every time.</p>
             </div>
           </div>
           <div class="ep-conf-summary">
@@ -1496,7 +1521,7 @@
             <span class="casc-icon">🔗</span>
             <div>
               <h3 class="casc-title">Failure Cascade Graph</h3>
-              <p class="casc-subtitle">MongoDB <code>$graphLookup</code> — how this failure cascades if unchecked · written atomically via <code>ACID transaction</code> · probabilities self-calibrate via <code>Change Streams</code></p>
+              <p class="casc-subtitle">Failure isn't a single event — it's a chain. Each node is a failure mode that triggers the next. Transition probabilities start as research estimates and self-improve via <strong>Bayesian blending</strong> as real-world cases are observed (p = 0.3×initial + 0.7×empirical). Graph traversal via MongoDB <code>$graphLookup</code> · written atomically in an <code>ACID transaction</code> · probabilities updated live via <code>Change Streams</code>.</p>
             </div>
           </div>
           <div class="casc-meta-badges">
@@ -1511,7 +1536,7 @@
           <div class="casc-int-header">
             <span class="casc-int-icon">🛡️</span>
             <span class="casc-int-title">Cascade Intervention Optimizer</span>
-            <span class="casc-int-subtitle">— exact minimum changes to break each cascade link (deterministic algebra on thresholds)</span>
+            <span class="casc-int-subtitle">— for each cascade link, the exact minimum metric change needed to break that link before the failure propagates. Deterministic algebra on trigger thresholds — not AI-generated advice.</span>
           </div>
           <div class="casc-int-list" id="casc-int-list"></div>
         </div>

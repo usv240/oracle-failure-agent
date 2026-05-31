@@ -412,6 +412,22 @@ button[type="submit"]:active { transform: translateY(0); }
   font-style: italic;
 }
 
+/* Trigger breakdown — which pattern conditions are met */
+.trigger-breakdown { margin-bottom: 1.25rem; }
+.tbd-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+.tbd-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.tbd-summary { font-size: 0.72rem; color: var(--muted); }
+.tbd-rows { display: flex; flex-direction: column; gap: 0.3rem; }
+.tbd-row { display: grid; grid-template-columns: 1.2rem 110px 1fr auto; align-items: center; gap: 0.5rem; padding: 0.3rem 0.6rem; border-radius: 5px; font-size: 0.8rem; }
+.tbd-met    { background: rgba(239,68,68,0.08);  border: 1px solid rgba(239,68,68,0.2); }
+.tbd-not-met{ background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.15); }
+.tbd-icon   { font-weight: 700; font-size: 0.85rem; }
+.tbd-met .tbd-icon    { color: #ef4444; }
+.tbd-not-met .tbd-icon{ color: #10b981; }
+.tbd-metric   { font-weight: 600; color: var(--text); }
+.tbd-threshold{ color: var(--muted); font-size: 0.75rem; }
+.tbd-current  { font-weight: 700; color: var(--text); text-align: right; }
+
 /* ── Challenger Agent Panel ──────────────────────────────────────── */
 .challenger-panel {
   margin-bottom: 1.5rem;
@@ -460,6 +476,14 @@ button[type="submit"]:active { transform: translateY(0); }
   color: #f59e0b;
   border: 1px solid rgba(245,158,11,0.35);
 }
+.chp-what {
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 2px solid var(--border);
+}
 .chp-reasoning {
   font-size: 0.87rem;
   line-height: 1.6;
@@ -479,15 +503,20 @@ button[type="submit"]:active { transform: translateY(0); }
 }
 .chp-scores {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.75rem;
 }
 .chp-agent {
+  flex: 1;
   display: grid;
-  grid-template-columns: 90px 1fr 40px;
+  grid-template-columns: 70px 1fr 38px;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
+.chp-delta-col { display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.chp-delta { font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.4rem; border-radius: 4px; }
+.chp-delta-dispute { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+.chp-delta-confirm { background: rgba(16,185,129,0.1); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
 .chp-agent-label {
   font-size: 0.73rem;
   font-weight: 600;
@@ -761,6 +790,10 @@ button[type="submit"]:active { transform: translateY(0); }
 .safe-card h2 { color: var(--safe); margin-bottom: 0.5rem; }
 .safe-card p { color: var(--muted); }
 .safe-tip { margin-top: 1rem; font-size: 0.85rem; color: var(--muted); }
+.uncharted-card { border-color: rgba(234,179,8,0.4) !important; background: rgba(234,179,8,0.04) !important; }
+.uncharted-card h2 { color: #b45309 !important; }
+[data-theme="dark"] .uncharted-card { border-color: rgba(234,179,8,0.3) !important; background: rgba(234,179,8,0.06) !important; }
+[data-theme="dark"] .uncharted-card h2 { color: #fbbf24 !important; }
 
 /* ── Audit Section ─────────────────────────────────────────────── */
 .section-desc { color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem; }
@@ -1268,6 +1301,13 @@ textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3
 .osc-band[data-band="watch"]    { color: #f59e0b; }
 .osc-band[data-band="warning"]  { color: #f97316; }
 .osc-band[data-band="critical"] { color: #ef4444; }
+.osc-legend { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 0.5rem; }
+.osc-legend-item { font-size: 0.68rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 3px; letter-spacing: 0.04em; cursor: default; }
+.osc-legend-sep { color: var(--border); font-size: 0.7rem; }
+.osc-legend-strong  { background: rgba(16,185,129,0.12); color: #10b981; }
+.osc-legend-watch   { background: rgba(245,158,11,0.12); color: #f59e0b; }
+.osc-legend-warning { background: rgba(249,115,22,0.12); color: #f97316; }
+.osc-legend-critical{ background: rgba(239,68,68,0.12);  color: #ef4444; }
 .osc-right { display: flex; flex-direction: column; gap: 0.5rem; }
 .osc-bar-wrap {
   height: 10px;
@@ -1286,6 +1326,25 @@ textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3
 .osc-bar-fill[data-band="warning"]  { background: #f97316; }
 .osc-bar-fill[data-band="critical"] { background: #ef4444; }
 .osc-tip { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+
+/* ── Oracle Score Audit ──────────────────────────────────────────── */
+.osc-audit-btn {
+  margin-top: 0.3rem; padding: 0.25rem 0.65rem; font-size: 0.75rem;
+  border: 1px solid var(--border); border-radius: 4px; background: transparent;
+  color: var(--muted); cursor: pointer; align-self: flex-start; transition: color 0.15s;
+}
+.osc-audit-btn:hover { color: var(--text); }
+.osc-breakdown { grid-column: 1 / -1; margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.osc-audit-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.osc-audit-table th { text-align: left; padding: 0.25rem 0.5rem; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+.osc-audit-table td { padding: 0.3rem 0.5rem; color: var(--text); vertical-align: top; }
+.osc-audit-table tr:hover td { background: rgba(255,255,255,0.03); }
+.osc-audit-table td:nth-child(2) { font-variant-numeric: tabular-nums; min-width: 4rem; }
+.osc-audit-base td { color: var(--muted); }
+.osc-audit-total td { border-top: 1px solid var(--border); font-size: 0.85rem; }
+.osc-penalty { color: #ef4444; }
+.osc-bonus   { color: #10b981; }
+.osc-neutral { color: var(--muted); }
 
 /* ── Backtest Showcase ───────────────────────────────────────────── */
 .backtest-section {
@@ -5098,10 +5157,12 @@ body {
 
 .cf-left {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  flex-direction: column;
+  gap: 0.25rem;
   min-width: 140px;
 }
+.cf-left > :first-child { display: flex; align-items: center; gap: 0.4rem; }
+.cf-velocity { font-size: 0.72rem; color: var(--muted); }
 
 .cf-trend-icon {
   font-size: 1.3rem;
@@ -5117,7 +5178,20 @@ body {
 
 .cf-projections {
   display: flex;
-  gap: 1.25rem;
+  gap: 1.5rem;
+}
+.cf-proj-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.cf-proj-header {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.1rem;
 }
 
 .cf-proj-item {

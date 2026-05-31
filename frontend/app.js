@@ -2,7 +2,7 @@ const API = '';  // Same origin
 
 // ── Instant Demo Cache — stores real API results for instant replay ──────────
 const _demoCache = {};   // key: startup_name → { events, challengerEvt, finalEvt }
-const _DEMO_KEYS = { wework: 'WeWork (Q4 2019)', quibi: 'Quibi (Month 12 Projection)', theranos: 'Theranos (2015)', healthy: 'GrowthCo' };
+const _DEMO_KEYS = { wework: 'WeWork (Q4 2019)', quibi: 'Quibi (Month 12 Projection)', theranos: 'Theranos (2015)', healthy: 'GrowthCo', dispute: 'HighVelocity AI' };
 
 function _saveDemoResult(name, events, challengerEvt, finalEvt) {
   _demoCache[name] = { events, challengerEvt, finalEvt };
@@ -116,6 +116,21 @@ const DEMOS = {
     cac: 48,
     ltv: 210,
     industry: 'B2C',
+  },
+  // Mixed-signal scenario: some failure flags + strong counter-evidence → designed to trigger Challenger DISPUTE
+  dispute: {
+    startup_name: 'HighVelocity AI',
+    current_month: 10,
+    mrr: 260000,
+    mrr_growth_rate: 0.38,   // 38% MoM — exceptional growth (strong counter-evidence)
+    churn_rate: 0.07,         // 7% — above 5% threshold (failure signal)
+    burn_rate: 750000,        // high burn relative to MRR (failure signal)
+    runway_months: 9,         // short runway (failure signal)
+    headcount: 28,
+    nps: 68,                  // NPS 68 — excellent customer satisfaction (strong counter-evidence)
+    cac: 2200,
+    ltv: 18000,               // 8.2x LTV:CAC — exceptional unit economics (strong counter-evidence)
+    industry: 'B2B SaaS',
   },
 };
 
@@ -408,6 +423,7 @@ async function runAnalysis() {
   hide('accuracy-showcase');
   hide('alert-lib-link');
   hide('oracle-score-card');
+  hide('osc-legend');
   hide('recovery-card');
   hide('escape-plan-panel');
   hide('cocktail-panel');
@@ -490,11 +506,12 @@ async function runAnalysis() {
               message: evt.message,
               oracle_score: evt.oracle_score,
               score_band: evt.score_band,
+              oracle_breakdown: evt.oracle_breakdown || null,
               recovery_scenario: evt.recovery_scenario,
               escape_plan: evt.escape_plan,
             };
           } else if (evt.type === 'safe') {
-            addTermLine('', evt.message, 'terminal-safe');
+            addTermLine('', evt.message, evt.uncharted?.is_uncharted ? 'terminal-warn' : 'terminal-safe');
             finalData = {
               alert: false,
               startup_name: payload.startup_name,
@@ -502,6 +519,8 @@ async function runAnalysis() {
               message: evt.message,
               oracle_score: evt.oracle_score,
               score_band: evt.score_band,
+              oracle_breakdown: evt.oracle_breakdown || null,
+              uncharted: evt.uncharted || null,
             };
           } else if (evt.type === 'challenger') {
             challengerData = evt;
@@ -614,6 +633,21 @@ function renderChallenger(c) {
   document.getElementById('chp-inv-pct').textContent   = `${invPct}%`;
   document.getElementById('chp-chall-pct').textContent = `${challPct}%`;
 
+  // Delta between agents
+  const deltaEl = document.getElementById('chp-delta');
+  if (deltaEl) {
+    const dp = c.delta_pp ?? Math.abs(invPct - challPct);
+    if (!isConfirm) {
+      deltaEl.textContent = `Δ${dp}pp`;
+      deltaEl.className = 'chp-delta chp-delta-dispute';
+      deltaEl.title = `Confidence gap: ${dp}pp — agents disagree (>10pp threshold for DISPUTE)`;
+    } else {
+      deltaEl.textContent = dp > 0 ? `Δ${dp}pp` : '=';
+      deltaEl.className = 'chp-delta chp-delta-confirm';
+      deltaEl.title = `Confidence gap: ${dp}pp — within 10pp agreement threshold`;
+    }
+  }
+
   // Animate bars
   const invBar   = document.getElementById('chp-bar-inv');
   const challBar = document.getElementById('chp-bar-chall');
@@ -646,16 +680,17 @@ function animateCounter(el, target, suffix = '', duration = 1200) {
 }
 
 // ── Result Rendering ─────────────────────────────────────────────
-function renderOracleScore(score, band) {
+function renderOracleScore(score, band, breakdown) {
   const card = document.getElementById('oracle-score-card');
   if (!card || typeof score !== 'number') return;
 
-  const valEl  = document.getElementById('osc-value');
-  const bandEl = document.getElementById('osc-band');
-  const barEl  = document.getElementById('osc-bar-fill');
-  const tipEl  = document.getElementById('osc-tip');
+  const valEl       = document.getElementById('osc-value');
+  const bandEl      = document.getElementById('osc-band');
+  const barEl       = document.getElementById('osc-bar-fill');
+  const tipEl       = document.getElementById('osc-tip');
+  const auditBtn    = document.getElementById('osc-audit-btn');
+  const breakdownEl = document.getElementById('osc-breakdown');
 
-  // Band labels and tips come from backend's score_band field
   const bandText = {
     strong:   'STRONG · Healthy trajectory',
     watch:    'WATCH · Monitor weekly',
@@ -668,8 +703,41 @@ function renderOracleScore(score, band) {
   if (barEl)  { barEl.dataset.band = band; barEl.style.width = '0%'; setTimeout(() => barEl.style.width = `${score}%`, 80); }
   if (tipEl)  { tipEl.textContent = `Composite of all 11 metrics + pattern match. ${score}/100.`; }
 
+  // Audit breakdown
+  if (auditBtn && breakdownEl && breakdown?.rows) {
+    auditBtn.classList.remove('hidden');
+    auditBtn.textContent = 'Audit formula ▾';
+    breakdownEl.classList.add('hidden');
+
+    const rows = breakdown.rows.filter(r => r.label !== 'Base score');
+    breakdownEl.innerHTML = `
+      <table class="osc-audit-table">
+        <thead><tr><th>Component</th><th>Impact</th><th>Calculation</th></tr></thead>
+        <tbody>
+          <tr class="osc-audit-base"><td>Base score</td><td>100</td><td>Starting point</td></tr>
+          ${rows.map(r => {
+            const v = r.value;
+            const cls = v > 0 ? 'osc-bonus' : v < 0 ? 'osc-penalty' : 'osc-neutral';
+            const sign = v > 0 ? '+' : '';
+            return `<tr><td>${r.label}</td><td class="${cls}">${sign}${v}</td><td>${r.detail}</td></tr>`;
+          }).join('')}
+          <tr class="osc-audit-total"><td><strong>Final score</strong></td><td><strong>${score}</strong></td><td>${band.toUpperCase()}</td></tr>
+        </tbody>
+      </table>`;
+
+    auditBtn.onclick = () => {
+      const open = !breakdownEl.classList.contains('hidden');
+      breakdownEl.classList.toggle('hidden', open);
+      auditBtn.textContent = open ? 'Audit formula ▾' : 'Audit formula ▴';
+    };
+  } else if (auditBtn) {
+    auditBtn.classList.add('hidden');
+  }
+
   card.dataset.band = band;
   card.classList.remove('hidden');
+  const legend = document.getElementById('osc-legend');
+  if (legend) legend.classList.remove('hidden');
 }
 
 function renderRecovery(scenario) {
@@ -694,7 +762,7 @@ function renderRecovery(scenario) {
 function renderResult(data) {
   // Render Oracle Score on both paths (alert and safe)
   if (typeof data.oracle_score === 'number') {
-    renderOracleScore(data.oracle_score, data.score_band || 'watch');
+    renderOracleScore(data.oracle_score, data.score_band || 'watch', data.oracle_breakdown);
   }
 
   // Trend delta + confidence trajectory forecast vs prior snapshots
@@ -704,6 +772,25 @@ function renderResult(data) {
 
   if (!data.alert) {
     hide('risk-banner');
+    const safeSection = document.getElementById('safe-section');
+    if (safeSection) {
+      const u = data.uncharted;
+      if (u && u.is_uncharted) {
+        safeSection.querySelector('h2').textContent = 'Uncharted Territory';
+        safeSection.querySelector('p').innerHTML =
+          `Your metrics don't closely resemble any of the 100 documented failure patterns ` +
+          `(best match: <strong>${u.best_confidence}%</strong>` +
+          (u.closest_pattern ? ` with <em>${u.closest_pattern}</em>` : '') +
+          `). This could mean you're operating outside known failure modes — or in an early stage ` +
+          `before patterns become visible. Treat as low-confidence and re-run monthly.`;
+        safeSection.classList.add('uncharted-card');
+      } else {
+        safeSection.querySelector('h2').textContent = 'No Dangerous Patterns Detected';
+        safeSection.querySelector('p').innerHTML =
+          `Your current metrics don't match any of the 100 documented high-risk failure patterns. Your trajectory looks healthy for this stage.`;
+        safeSection.classList.remove('uncharted-card');
+      }
+    }
     show('safe-section');
     return;
   }
@@ -867,6 +954,30 @@ function renderResult(data) {
   const runwayTrigger = tc.runway_months_max != null ? `<${tc.runway_months_max}mo` : '>18mo';
   const runwayBad = tc.runway_months_max != null ? pl.runway_months <= tc.runway_months_max : pl.runway_months < 9;
   matchRows.push({ metric: 'Runway', yours: `${pl.runway_months}mo`, threshold: runwayTrigger, status: runwayBad ? 'bad' : pl.runway_months < 18 ? 'warn' : 'good' });
+
+  // Backend trigger breakdown — which pattern conditions are met
+  const trigBreakdownEl = document.getElementById('trigger-breakdown');
+  if (trigBreakdownEl && p.trigger_breakdown?.length) {
+    const metCount = p.trigger_breakdown.filter(r => r.met).length;
+    const total    = p.trigger_breakdown.length;
+    trigBreakdownEl.innerHTML = `
+      <div class="tbd-header">
+        <span class="tbd-title">Why this pattern matched</span>
+        <span class="tbd-summary">${metCount}/${total} trigger conditions met · ✗ = threshold crossed (drives match) · ✓ = safe</span>
+      </div>
+      <div class="tbd-rows">
+        ${p.trigger_breakdown.map(r => `
+          <div class="tbd-row ${r.met ? 'tbd-met' : 'tbd-not-met'}">
+            <span class="tbd-icon">${r.met ? '✗' : '✓'}</span>
+            <span class="tbd-metric">${r.metric}</span>
+            <span class="tbd-threshold">threshold: ${r.threshold}</span>
+            <span class="tbd-current">${r.current}</span>
+          </div>`).join('')}
+      </div>`;
+    trigBreakdownEl.classList.remove('hidden');
+  } else if (trigBreakdownEl) {
+    trigBreakdownEl.classList.add('hidden');
+  }
 
   const statusIcon = { good: '✓', warn: '▲', bad: '✗' };
   const matchTable = document.getElementById('match-table');
@@ -1761,6 +1872,18 @@ function renderEscapePlan(plan) {
 }
 
 // ── Confidence Trajectory Forecast ──────────────────────────────
+function _linearProject(values, stepsAhead) {
+  const n = values.length;
+  if (n < 2) return null;
+  const xMean = (n - 1) / 2;
+  const yMean = values.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  values.forEach((y, x) => { num += (x - xMean) * (y - yMean); den += (x - xMean) ** 2; });
+  const slope = den > 0 ? num / den : 0;
+  const intercept = yMean - slope * xMean;
+  return { slope, project: ahead => Math.max(0, Math.min(100, Math.round(intercept + slope * (n - 1 + ahead)))) };
+}
+
 function renderConfidenceForecast(startupName) {
   const section = document.getElementById('conf-forecast-section');
   if (!section) return;
@@ -1774,37 +1897,40 @@ function renderConfidenceForecast(startupName) {
 
     if (snapshots.length < 2) { section.classList.add('hidden'); return; }
 
-    // Linear regression on confidence scores
-    const scores = snapshots.map(s => (s.match_score || 0) * 100);
-    const n = scores.length;
-    const xMean = (n - 1) / 2;
-    const yMean = scores.reduce((a, b) => a + b, 0) / n;
-    let num = 0, den = 0;
-    scores.forEach((y, x) => { num += (x - xMean) * (y - yMean); den += (x - xMean) ** 2; });
-    const slope = den > 0 ? num / den : 0;
-    const intercept = yMean - slope * xMean;
+    // Risk % projection (match confidence)
+    const confReg = _linearProject(snapshots.map(s => (s.match_score || 0) * 100));
+    const proj    = [1, 2, 3].map(a => confReg.project(a));
 
-    // Project 3 months forward
-    const proj = [1, 2, 3].map(ahead => {
-      const val = Math.max(0, Math.min(100, intercept + slope * (n - 1 + ahead)));
-      return Math.round(val);
-    });
+    // Oracle Score projection
+    const oscValues = snapshots.map(s => s.oracle_score).filter(v => typeof v === 'number');
+    const oscReg    = oscValues.length >= 2 ? _linearProject(oscValues) : null;
+    const oscProj   = oscReg ? [1, 2, 3].map(a => oscReg.project(a)) : null;
 
-    const trend = slope > 1.5 ? 'worsening' : slope < -1.5 ? 'improving' : 'stable';
+    const slope     = confReg.slope;
+    const trend     = slope > 1.5 ? 'worsening' : slope < -1.5 ? 'improving' : 'stable';
     const trendColor = trend === 'worsening' ? 'var(--danger)' : trend === 'improving' ? 'var(--safe)' : 'var(--warning)';
     const trendIcon  = trend === 'worsening' ? '↑' : trend === 'improving' ? '↓' : '→';
+
+    // Velocity label from Oracle Score slope (more intuitive than %)
+    const velEl = document.getElementById('cf-velocity');
+    if (velEl && oscReg && Math.abs(oscReg.slope) >= 0.5) {
+      const dir = oscReg.slope < 0 ? 'deteriorating' : 'recovering';
+      velEl.textContent = `Oracle Score ${dir} ~${Math.abs(oscReg.slope).toFixed(1)} pts/run`;
+      velEl.style.color = oscReg.slope < 0 ? 'var(--danger)' : 'var(--safe)';
+    } else if (velEl) { velEl.textContent = ''; }
 
     document.getElementById('cf-trend-icon').textContent  = trendIcon;
     document.getElementById('cf-trend-label').textContent = `Risk ${trend}`;
     document.getElementById('cf-trend-icon').style.color  = trendColor;
-    document.getElementById('cf-proj-1').textContent = `${proj[0]}%`;
-    document.getElementById('cf-proj-2').textContent = `${proj[1]}%`;
-    document.getElementById('cf-proj-3').textContent = `${proj[2]}%`;
 
-    // Colour each projected value
     [1, 2, 3].forEach((m, i) => {
       const el = document.getElementById(`cf-proj-${m}`);
-      if (el) el.style.color = proj[i] >= 75 ? 'var(--danger)' : proj[i] >= 60 ? 'var(--warning)' : 'var(--safe)';
+      if (el) { el.textContent = `${proj[i]}%`; el.style.color = proj[i] >= 75 ? 'var(--danger)' : proj[i] >= 60 ? 'var(--warning)' : 'var(--safe)'; }
+      const oscEl = document.getElementById(`cf-osc-${m}`);
+      if (oscEl && oscProj) {
+        oscEl.textContent = `${oscProj[i]}`;
+        oscEl.style.color = oscProj[i] < 25 ? 'var(--danger)' : oscProj[i] < 50 ? 'var(--warning)' : 'var(--safe)';
+      } else if (oscEl) { oscEl.textContent = '—'; }
     });
 
     section.classList.remove('hidden');
@@ -1819,41 +1945,60 @@ function renderTrendDelta(currentResult, startupName) {
   if (!badge) return;
 
   try {
-    const snapshots = JSON.parse(localStorage.getItem('oracle_snapshots') || '[]');
-    // renderResult is called before saveSnapshot, so index 0 is the actual prior run
-    const prior = snapshots.find(s =>
+    const all = JSON.parse(localStorage.getItem('oracle_snapshots') || '[]');
+    const history = all.filter(s =>
       s.startup_name && startupName &&
       s.startup_name.toLowerCase().trim() === startupName.toLowerCase().trim()
     );
 
+    const prior = history[0]; // most recent prior (renderResult runs before saveSnapshot)
     if (!prior) { badge.classList.add('hidden'); return; }
 
-    const currentConf = currentResult.pattern?.confidence ?? 0;
-    const priorConf   = prior.match_score ?? 0;
-    const deltaPp     = Math.round((currentConf - priorConf) * 100);
+    const currentConf  = currentResult.pattern?.confidence ?? 0;
+    const priorConf    = prior.match_score ?? 0;
+    const deltaPp      = Math.round((currentConf - priorConf) * 100);
     const currentScore = currentResult.oracle_score ?? null;
     const priorScore   = prior.oracle_score ?? null;
     const deltaScore   = (currentScore !== null && priorScore !== null)
                          ? Math.round(currentScore - priorScore) : null;
+
+    // Compute Oracle Score velocity across all snapshots (pts/analysis)
+    let velocityLabel = '';
+    const scoreHistory = history
+      .map(s => s.oracle_score)
+      .filter(v => typeof v === 'number');
+    if (scoreHistory.length >= 2 && currentScore !== null) {
+      const allScores = [currentScore, ...scoreHistory];
+      const n = allScores.length;
+      const xMean = (n - 1) / 2;
+      const yMean = allScores.reduce((a, b) => a + b, 0) / n;
+      let num = 0, den = 0;
+      allScores.forEach((y, x) => { num += (x - xMean) * (y - yMean); den += (x - xMean) ** 2; });
+      const slope = den > 0 ? -(num / den) : 0; // negative because index 0 = newest
+      if (Math.abs(slope) >= 1) {
+        const dir = slope > 0 ? 'deteriorating' : 'recovering';
+        velocityLabel = ` · Oracle Score ${dir} ~${Math.abs(slope).toFixed(1)} pts/run`;
+      }
+    }
 
     const priorDate = new Date(prior.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
     let arrow, cls, text;
     if (Math.abs(deltaPp) < 2 && (deltaScore === null || Math.abs(deltaScore) < 2)) {
       arrow = '→'; cls = 'delta-flat';
-      text = `No significant change vs last analysis (${priorDate})`;
+      text = `No significant change vs last analysis (${priorDate})${velocityLabel}`;
     } else if (deltaPp > 0 || (deltaScore !== null && deltaScore < 0)) {
       arrow = '↑'; cls = 'delta-up';
       const parts = [];
       if (Math.abs(deltaPp) >= 2) parts.push(`match score +${deltaPp}pp`);
       if (deltaScore !== null && Math.abs(deltaScore) >= 2) parts.push(`Oracle Score ${deltaScore > 0 ? '+' : ''}${deltaScore}`);
-      text = `Risk increasing — ${parts.join(', ')} vs last analysis`;
+      text = `Risk increasing — ${parts.join(', ')} vs last analysis${velocityLabel}`;
     } else {
       arrow = '↓'; cls = 'delta-down';
       const parts = [];
       if (Math.abs(deltaPp) >= 2) parts.push(`match score ${deltaPp}pp`);
       if (deltaScore !== null && Math.abs(deltaScore) >= 2) parts.push(`Oracle Score ${deltaScore > 0 ? '+' : ''}${deltaScore}`);
-      text = `Risk decreasing — ${parts.join(', ')} vs last analysis`;
+      text = `Risk decreasing — ${parts.join(', ')} vs last analysis${velocityLabel}`;
     }
 
     badge.className = `trend-delta-badge ${cls}`;
@@ -2929,9 +3074,25 @@ function renderCascade(cascade) {
     intPanel.classList.add('hidden');
   }
 
-  // Calibration note (self-improving via Change Streams)
+  // Calibration note + Bayesian update summary
   const calibEl = document.getElementById('casc-calibration');
-  if (calibEl) calibEl.textContent = cascade.cascade_calibration || '';
+  if (calibEl) {
+    const steps = cascade.cascade_steps || [];
+    const updatedSteps = steps.filter(s =>
+      s.observed_count > 0 &&
+      Math.abs((s.initial_probability || s.transition_probability) - s.transition_probability) >= 0.01
+    );
+    let bayesNote = '';
+    if (updatedSteps.length > 0) {
+      const parts = updatedSteps.map(s => {
+        const init = Math.round((s.initial_probability || s.transition_probability) * 100);
+        const curr = Math.round(s.transition_probability * 100);
+        return `${s.pattern_name}: ${init}%→${curr}% (${s.observed_count} cases)`;
+      });
+      bayesNote = ` · Bayesian updates: ${parts.join(', ')}`;
+    }
+    calibEl.textContent = (cascade.cascade_calibration || '') + bayesNote;
+  }
 
   panel.classList.remove('hidden');
 }
@@ -3052,8 +3213,15 @@ function buildCascadeFlowSvg(cascade) {
       }
 
       if (step && step.observed_count > 0) {
-        p.push(`<rect x="${x+W-90}" y="${ay1+8}" width="82" height="17" rx="8" class="casc-obs-pill"/>`);
-        p.push(`<text x="${x+W-49}" y="${ay1+20}" text-anchor="middle" fill="${trigFill}" font-size="9">${step.observed_count} observed</text>`);
+        const initPct = Math.round((step.initial_probability || step.transition_probability) * 100);
+        const currPct = Math.round(step.transition_probability * 100);
+        const updated = initPct !== currPct;
+        const obsLabel = updated
+          ? `${initPct}%→${currPct}% (${step.observed_count} cases)`
+          : `${step.observed_count} observed`;
+        const pillW = Math.min(obsLabel.length * 6.5 + 16, 140);
+        p.push(`<rect x="${x+W-pillW-4}" y="${ay1+8}" width="${pillW}" height="17" rx="8" class="casc-obs-pill"/>`);
+        p.push(`<text x="${x+W-pillW/2-4}" y="${ay1+20}" text-anchor="middle" fill="${trigFill}" font-size="9">${obsLabel}</text>`);
       }
     }
   }

@@ -75,6 +75,78 @@ def compute_oracle_score(metrics: MetricsInput, match_confidence: float = 0.0) -
     return int(score), band
 
 
+def compute_trigger_breakdown(metrics: MetricsInput, pattern: dict) -> list[dict]:
+    """
+    For each trigger condition in the pattern, compute whether the startup's
+    current metrics meet it and by how much. Returns a list of rows for the UI.
+    """
+    tc = pattern.get("trigger_conditions") or {}
+    ltv_cac = _ltv_cac_ratio(metrics)
+    burn_mult = _burn_multiple(metrics)
+    rows = []
+
+    mapping = [
+        ("churn_rate_min",        "Churn Rate",      f"{metrics.churn_rate*100:.1f}%",    metrics.churn_rate,       lambda t: (f"≥ {t*100:.0f}%", metrics.churn_rate >= t)),
+        ("burn_multiple_min",     "Burn Multiple",   f"{burn_mult:.1f}x",                  burn_mult,                lambda t: (f"≥ {t:.1f}x", burn_mult >= t)),
+        ("nps_max",               "NPS",             str(metrics.nps),                     metrics.nps,              lambda t: (f"≤ {t}", metrics.nps <= t)),
+        ("ltv_cac_ratio_max",     "LTV:CAC",         f"{ltv_cac:.1f}x",                   ltv_cac,                  lambda t: (f"≤ {t:.1f}x", ltv_cac <= t)),
+        ("runway_months_max",     "Runway",          f"{metrics.runway_months}mo",         metrics.runway_months,    lambda t: (f"≤ {t}mo", metrics.runway_months <= t)),
+        ("mrr_growth_rate_min",   "MRR Growth",      f"{metrics.mrr_growth_rate*100:.0f}%",metrics.mrr_growth_rate,  lambda t: (f"≥ {t*100:.0f}%", metrics.mrr_growth_rate >= t)),
+    ]
+
+    for key, label, current_val, _, threshold_fn in mapping:
+        if tc.get(key) is not None:
+            threshold_str, met = threshold_fn(tc[key])
+            rows.append({
+                "metric": label,
+                "threshold": threshold_str,
+                "current": current_val,
+                "met": met,
+            })
+
+    return rows
+
+
+def compute_oracle_score_breakdown(metrics: MetricsInput, match_confidence: float = 0.0) -> dict:
+    """
+    Same logic as compute_oracle_score but returns a breakdown dict showing
+    each penalty/bonus with the actual numbers plugged in.
+    Used by the frontend audit view so judges can see the exact formula.
+    """
+    churn_pct = metrics.churn_rate * 100
+    ltv_cac   = (metrics.ltv / metrics.cac) if metrics.cac > 0 else 0
+    bm        = _burn_multiple(metrics)
+
+    pattern_penalty = round(match_confidence * 60, 1)
+    churn_penalty   = round(min((churn_pct - 5) * 2, 30), 1) if churn_pct > 5 else 0
+    ltv_penalty     = round(min((3 - ltv_cac) * 5, 15), 1)   if ltv_cac < 3  else 0
+    runway_penalty  = round(min((12 - metrics.runway_months) * 1.5, 15), 1) if metrics.runway_months < 12 else 0
+    bm_penalty      = round(min((bm - 2) * 2, 10), 1) if bm > 2 else 0
+    nps_bonus       = round(min((metrics.nps - 30) / 7, 10), 1) if metrics.nps > 30 else 0
+    growth_bonus    = round(min((metrics.mrr_growth_rate - 0.10) * 50, 5), 1) if metrics.mrr_growth_rate > 0.10 else 0
+
+    rows = [
+        {"label": "Base score",      "value": 100,             "detail": "Starting point"},
+        {"label": "Pattern match",   "value": -pattern_penalty,
+         "detail": f"{int(match_confidence*100)}% match × 60pp max = −{pattern_penalty}pp"},
+        {"label": "Churn",           "value": -churn_penalty,
+         "detail": f"{churn_pct:.1f}% churn — " + (f"({churn_pct:.1f}−5)×2 = −{churn_penalty}pp" if churn_pct > 5 else "within 5% safe zone")},
+        {"label": "LTV:CAC",         "value": -ltv_penalty,
+         "detail": f"{ltv_cac:.1f}x ratio — " + (f"(3−{ltv_cac:.1f})×5 = −{ltv_penalty}pp" if ltv_cac < 3 else "above 3x target")},
+        {"label": "Runway",          "value": -runway_penalty,
+         "detail": f"{metrics.runway_months}mo — " + (f"(12−{metrics.runway_months})×1.5 = −{runway_penalty}pp" if metrics.runway_months < 12 else "above 12mo floor")},
+        {"label": "Burn multiple",   "value": -bm_penalty,
+         "detail": f"{bm:.1f}x — " + (f"({bm:.1f}−2)×2 = −{bm_penalty}pp" if bm > 2 else "below 2x safe range")},
+        {"label": "NPS bonus",       "value": +nps_bonus,
+         "detail": f"NPS {metrics.nps} — " + (f"({metrics.nps}−30)/7 = +{nps_bonus}pp" if metrics.nps > 30 else "below 30 bonus threshold")},
+        {"label": "Growth bonus",    "value": +growth_bonus,
+         "detail": f"{metrics.mrr_growth_rate*100:.0f}% MoM — " + (f"({metrics.mrr_growth_rate*100:.0f}−10)×0.5 = +{growth_bonus}pp" if metrics.mrr_growth_rate > 0.10 else "below 10%/mo threshold")},
+    ]
+
+    final_score, band = compute_oracle_score(metrics, match_confidence)
+    return {"rows": rows, "final": final_score, "band": band}
+
+
 def build_recovery_scenario(metrics: MetricsInput, current_match_confidence: float) -> dict:
     """
     Project the Oracle Score under healthier counterfactual metrics.
@@ -693,6 +765,12 @@ async def match_patterns(metrics: MetricsInput) -> PatternMatch | None:
 
     # Only return a match if confidence is meaningful
     if best_score < 0.60 or best_match is None:
+        if best_match is not None and best_score < 0.40:
+            import logging as _log
+            _log.getLogger(__name__).info(
+                "UNCHARTED: best match %d%% (%s) — below 40%% floor",
+                int(best_score * 100), best_match.get("name", "?"),
+            )
         return None
 
     signals = [
@@ -749,4 +827,5 @@ async def match_patterns(metrics: MetricsInput) -> PatternMatch | None:
         days_to_crisis=best_scoring.get("days_to_crisis", 90),
         match_reasoning=best_scoring.get("match_reasoning"),
         trigger_conditions=best_match.get("trigger_conditions"),
+        trigger_breakdown=compute_trigger_breakdown(metrics, best_match),
     )

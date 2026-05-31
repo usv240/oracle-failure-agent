@@ -67,6 +67,7 @@ class PatternMatch(BaseModel):
     days_to_crisis: int
     match_reasoning: Optional[str] = None
     trigger_conditions: Optional[dict] = None
+    trigger_breakdown: Optional[list] = None  # [{metric, threshold, current, met}] for UI
     output_file: Optional[str] = None
 
 
@@ -124,6 +125,7 @@ class AlertResponse(BaseModel):
     recovery_scenario: Optional[RecoveryScenario] = None
     escape_plan: Optional[EscapePlan] = None
     cascade: Optional[dict] = None  # Failure cascade graph ($graphLookup result)
+    uncharted: Optional[dict] = None  # Set when best match < 60%: {is_uncharted, best_confidence, closest_pattern}
     message: str = ""
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 

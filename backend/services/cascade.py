@@ -392,6 +392,7 @@ async def get_cascade_chain(pattern_id: str) -> dict | None:
                 "trigger_direction": t.get("trigger_direction", ""),
                 "mechanism": t.get("mechanism", ""),
                 "observed_count": t.get("observed_count", 0),
+                "initial_probability": round(float(t.get("initial_probability", prob)), 3),
             })
 
             next_transitions = node.get("transitions", [])
