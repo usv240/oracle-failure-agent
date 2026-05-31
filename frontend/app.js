@@ -3116,7 +3116,8 @@ function buildCascadeFlowSvg(cascade) {
   const totalH  = allNodes.length * NODE_H + (allNodes.length - 1) * EDGE_H + MY * 2 +
                   ((cascade.cascade_steps || []).length > 3 ? 22 : 0);
 
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  // SVG cascade is always rendered on a dark background panel
+  const isDark = true;
 
   // Node class + inline text fill for guaranteed contrast in both themes
   const nc = (prob, isRoot) => isRoot ? 'cnr' : prob >= 60 ? 'cnd' : prob >= 35 ? 'cnw' : 'cnl';

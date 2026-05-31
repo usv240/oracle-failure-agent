@@ -10,13 +10,18 @@ outputs/
 plan/
 ORACLE_TODO.md
 DEVPOST_SUBMISSION.md
+PRODUCT_STRATEGY.md
+SUPER_DEPTH_STRATEGY.md
 gcloud
+Main Rules
+MongoDB Rules
 # One-off dev scripts
 frontend/educate.py
 frontend/update.py
 frontend/ux_overhaul.py
 tests/test_oracle.py
 tests/reports/
+tests/e2e/
 # Dev/exploratory scripts
 agent/
 # IDE
@@ -29,3 +34,6 @@ node_modules/
 playwright-report/
 test-results/
 test-output*.txt
+package.json
+package-lock.json
+playwright.config.ts

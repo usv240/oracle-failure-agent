@@ -6091,7 +6091,8 @@ body {
    FAILURE CASCADE GRAPH PANEL — $graphLookup timeline
 ═══════════════════════════════════════════════════════════════════ */
 .cascade-panel {
-  background: var(--card-bg, #1a1d24);
+  background: #101216 !important;
+  color: #f8fafc !important;
   border: 1px solid rgba(139, 92, 246, 0.35);
   border-left: 3px solid #8b5cf6;
   border-radius: 12px;
@@ -6122,15 +6123,15 @@ body {
   margin: 0 0 0.15rem;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--text);
+  color: #f8fafc !important;
 }
 .casc-subtitle {
   margin: 0;
   font-size: 0.78rem;
-  color: var(--muted);
+  color: #94a3b8 !important;
 }
 .casc-subtitle code {
-  background: rgba(139,92,246,0.12);
+  background: rgba(139,92,246,0.18);
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 0.75rem;
@@ -6278,8 +6279,8 @@ body {
   margin-bottom: 0.7rem;
 }
 .casc-int-icon { font-size: 1rem; }
-.casc-int-title { font-size: 0.9rem; font-weight: 700; color: var(--text); }
-.casc-int-subtitle { font-size: 0.75rem; color: var(--muted); }
+.casc-int-title { font-size: 0.9rem; font-weight: 700; color: #f8fafc !important; }
+.casc-int-subtitle { font-size: 0.75rem; color: #94a3b8 !important; }
 .casc-int-list { display: flex; flex-direction: column; gap: 0.6rem; }
 .casc-int-item {
   border-radius: 8px;
@@ -6314,13 +6315,13 @@ body {
   background: rgba(245,158,11,0.15);
   color: #f59e0b;
 }
-.casc-int-target { font-size: 0.8rem; color: var(--text); }
-.casc-int-days-hint { font-size: 0.73rem; color: var(--muted); margin-left: auto; }
-.casc-int-message { margin: 0; font-size: 0.81rem; color: var(--text); line-height: 1.6; }
+.casc-int-target { font-size: 0.8rem; color: #f1f5f9 !important; }
+.casc-int-days-hint { font-size: 0.73rem; color: #94a3b8 !important; margin-left: auto; }
+.casc-int-message { margin: 0; font-size: 0.81rem; color: #e2e8f0 !important; line-height: 1.6; }
 .casc-calibration {
   margin: 0.8rem 0 0;
   font-size: 0.75rem;
-  color: var(--muted);
+  color: #94a3b8 !important;
   font-style: italic;
   text-align: right;
 }
@@ -7228,113 +7229,76 @@ input[type="number"]:focus, input[type="text"]:focus, textarea:focus, select:foc
   padding: 2px 7px !important;
   border-radius: 5px !important;
 }
-[data-theme="dark"] .casc-int-urgency-badge {
+.casc-int-urgency-badge {
   background: #ef4444 !important;
   color: #fff !important;
 }
-[data-theme="dark"] .casc-int-warning .casc-int-urgency-badge {
+.casc-int-warning .casc-int-urgency-badge {
   background: #f59e0b !important;
   color: #000 !important;
 }
-[data-theme="light"] .casc-int-urgency-badge {
-  background: rgba(239,68,68,0.15) !important;
-  color: #dc2626 !important;
-  border: 1px solid rgba(239,68,68,0.3);
-}
-[data-theme="light"] .casc-int-warning .casc-int-urgency-badge {
-  background: rgba(245,158,11,0.15) !important;
-  color: #b45309 !important;
-  border: 1px solid rgba(245,158,11,0.3);
-}
 
 /* ── Message text — force readability ── */
-[data-theme="dark"] .casc-int-message {
+.casc-int-message {
   color: #e2e8f0 !important;
   line-height: 1.65 !important;
 }
-[data-theme="dark"] .casc-int-target {
+.casc-int-target {
   color: #f1f5f9 !important;
   font-weight: 600;
 }
-[data-theme="dark"] .casc-int-days-hint {
+.casc-int-days-hint {
   color: #94a3b8 !important;
-}
-[data-theme="light"] .casc-int-message {
-  color: #374151 !important;
-}
-[data-theme="light"] .casc-int-target {
-  color: #111827 !important;
-  font-weight: 600;
-}
-[data-theme="light"] .casc-int-critical {
-  background: rgba(239,68,68,0.05) !important;
-}
-[data-theme="light"] .casc-int-warning {
-  background: rgba(245,158,11,0.05) !important;
 }
 
 /* ── "→ prevents cascade to PatternName" link ── */
-[data-theme="dark"] .casc-int-target a,
-[data-theme="dark"] .casc-int-target .casc-link {
+.casc-int-target a,
+.casc-int-target .casc-link {
   color: #f87171 !important;
   font-weight: 700;
   text-decoration: none;
 }
-[data-theme="dark"] .casc-int-target a:hover { text-decoration: underline; }
+  font-weight: 700;
+  text-decoration: none;
+}
+.casc-int-target a:hover { text-decoration: underline; }
 
 /* ── Days hint (Act within Xd) ── */
-[data-theme="dark"] .casc-int-days-hint { color: #64748b !important; }
+.casc-int-days-hint { color: #94a3b8 !important; }
 
-/* ── SVG node text — boost contrast in dark mode ── */
-[data-theme="dark"] .cnr-name,
-[data-theme="dark"] .cnd-name,
-[data-theme="dark"] .cnw-name,
-[data-theme="dark"] .cnl-name {
+/* ── SVG node text — boost contrast on dark background panel ── */
+.cnr-name,
+.cnd-name,
+.cnw-name,
+.cnl-name {
   fill: #f8fafc !important;
   font-weight: 700;
 }
-[data-theme="dark"] .casc-sd { fill: #fca5a5 !important; }
-[data-theme="dark"] .casc-sw { fill: #fde68a !important; }
-[data-theme="dark"] .casc-ss { fill: #6ee7b7 !important; }
-[data-theme="dark"] .casc-pid { fill: #e2e8f0 !important; }
-[data-theme="dark"] .cnr-daytxt { fill: #ddd6fe !important; }
-[data-theme="dark"] .cnd-daytxt { fill: #fca5a5 !important; }
-[data-theme="dark"] .cnw-daytxt { fill: #fde68a !important; }
-[data-theme="dark"] .cnl-daytxt { fill: #cbd5e1 !important; }
-[data-theme="dark"] .casc-trig-txt { fill: #cbd5e1 !important; font-size: 9.5px; }
-[data-theme="dark"] .casc-trig-bg { fill: rgba(15,23,42,0.7) !important; stroke: rgba(148,163,184,0.3) !important; }
-[data-theme="dark"] .casc-edge { stroke: rgba(148,163,184,0.5) !important; }
-[data-theme="dark"] .casc-arr { fill: rgba(148,163,184,0.6) !important; }
-[data-theme="dark"] .casc-more { fill: #94a3b8 !important; }
+.casc-sd { fill: #fca5a5 !important; }
+.casc-sw { fill: #fde68a !important; }
+.casc-ss { fill: #6ee7b7 !important; }
+.casc-pid { fill: #e2e8f0 !important; }
+.cnr-daytxt { fill: #ddd6fe !important; }
+.cnd-daytxt { fill: #fca5a5 !important; }
+.cnw-daytxt { fill: #fde68a !important; }
+.cnl-daytxt { fill: #cbd5e1 !important; }
+.casc-trig-txt { fill: #cbd5e1 !important; font-size: 9.5px; }
+.casc-trig-bg { fill: rgba(15,23,42,0.7) !important; stroke: rgba(148,163,184,0.3) !important; }
+.casc-edge { stroke: rgba(148,163,184,0.5) !important; }
+.casc-arr { fill: rgba(148,163,184,0.6) !important; }
+.casc-more { fill: #94a3b8 !important; }
 
-/* ── SVG nodes — light mode: darker text for contrast ── */
-[data-theme="light"] .cnr-name,
-[data-theme="light"] .cnd-name,
-[data-theme="light"] .cnw-name,
-[data-theme="light"] .cnl-name {
-  fill: #1e293b !important;
-  font-weight: 700;
-}
-[data-theme="light"] .casc-pid { fill: #334155 !important; }
-[data-theme="light"] .casc-sd { fill: #dc2626 !important; }
-[data-theme="light"] .casc-ss { fill: #059669 !important; }
-[data-theme="light"] .casc-trig-txt { fill: #475569 !important; }
-[data-theme="light"] .casc-trig-bg { fill: rgba(255,255,255,0.8) !important; stroke: rgba(71,85,105,0.3) !important; }
-[data-theme="light"] .casc-edge { stroke: rgba(71,85,105,0.4) !important; }
-[data-theme="light"] .casc-arr { fill: rgba(71,85,105,0.5) !important; }
-
-/* ── SVG node rects — more opaque in dark for contrast ── */
-[data-theme="dark"] .cnr-rect { fill: rgba(109,40,217,0.2) !important; stroke: #8b5cf6 !important; }
-[data-theme="dark"] .cnd-rect { fill: rgba(185,28,28,0.25) !important; stroke: #ef4444 !important; }
-[data-theme="dark"] .cnw-rect { fill: rgba(180,83,9,0.2) !important; stroke: #f59e0b !important; }
-[data-theme="dark"] .cnl-rect { fill: rgba(51,65,85,0.4) !important; stroke: rgba(100,116,139,0.5) !important; }
-[data-theme="dark"] .cnr-pill { fill: rgba(109,40,217,0.35) !important; }
-[data-theme="dark"] .cnd-pill { fill: rgba(185,28,28,0.35) !important; }
-[data-theme="dark"] .cnw-pill { fill: rgba(180,83,9,0.35) !important; }
+/* ── SVG node rects — more opaque for contrast ── */
+.cnr-rect { fill: rgba(109,40,217,0.2) !important; stroke: #8b5cf6 !important; }
+.cnd-rect { fill: rgba(185,28,28,0.25) !important; stroke: #ef4444 !important; }
+.cnw-rect { fill: rgba(180,83,9,0.2) !important; stroke: #f59e0b !important; }
+.cnl-rect { fill: rgba(51,65,85,0.4) !important; stroke: rgba(100,116,139,0.5) !important; }
+.cnr-pill { fill: rgba(109,40,217,0.35) !important; }
+.cnd-pill { fill: rgba(185,28,28,0.35) !important; }
+.cnw-pill { fill: rgba(180,83,9,0.35) !important; }
 
 /* ── Calibration note ── */
-[data-theme="dark"] .casc-calibration { color: #64748b !important; }
-[data-theme="light"] .casc-calibration { color: #94a3b8 !important; }
+.casc-calibration { color: #94a3b8 !important; }
 
 
 /* ── Instant Demo system ── */
