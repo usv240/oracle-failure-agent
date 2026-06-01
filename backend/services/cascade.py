@@ -453,6 +453,10 @@ async def compute_full_cascade(
     db = get_db()
 
     for step in cascade["cascade_steps"]:
+        # Skip if cascade step loops back to the root pattern (circular reference)
+        if step["pattern_id"] == pattern_id:
+            continue
+
         # Fetch the source pattern to get the full transition object
         # (the step only has subset of transition data from graphLookup projection)
         if step["depth"] == 1:
@@ -480,7 +484,14 @@ async def compute_full_cascade(
                 intervention["breaks_cascade_to"] = step["pattern_id"]
                 intervention["cascade_pattern_name"] = step["pattern_name"]
                 intervention["days_until_cascade"] = step["days_from_now"]
-                interventions.append(intervention)
+                # Deduplicate: skip if same action + same trigger metric already present
+                already = any(
+                    iv.get("action") == intervention.get("action") and
+                    iv.get("trigger_metric") == intervention.get("trigger_metric")
+                    for iv in interventions
+                )
+                if not already:
+                    interventions.append(intervention)
 
     # ACID Transaction: atomically write intervention plan + telemetry + update counter
     client = db.client

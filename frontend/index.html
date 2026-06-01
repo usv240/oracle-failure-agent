@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.9" />
+  <link rel="stylesheet" href="style.css?v=3.0" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script>
     // Apply saved theme before render to avoid flash
@@ -166,19 +166,19 @@
       <div class="live-stats-bar hidden" id="live-stats-bar">
         <div class="ls-card">
           <div class="ls-card-glow"></div>
-          <div class="ls-card-icon">📊</div>
+          <div class="ls-card-icon ls-icon-text"></div>
           <div class="ls-card-content">
             <span class="ls-value" id="ls-analyses">0</span>
             <span class="ls-label">analyses run</span>
           </div>
           <div class="ls-tooltip">
-            <div class="lst-title">Vertex AI Gemini 2.5 Flash</div>
+            <div class="lst-title">Gemini Flash</div>
             <div class="lst-desc">Primary scorer — runs 5 pattern candidates in parallel with thinking_budget=0. Also powers ADK Investigator, Challenger, and Reporter agents.</div>
           </div>
         </div>
         <div class="ls-card">
           <div class="ls-card-glow"></div>
-          <div class="ls-card-icon">👁</div>
+          <div class="ls-card-icon ls-icon-text"></div>
           <div class="ls-card-content">
             <span class="ls-value" id="ls-monitored">0</span>
             <span class="ls-label">watched startups</span>
@@ -190,7 +190,7 @@
         </div>
         <div class="ls-card">
           <div class="ls-card-glow"></div>
-          <div class="ls-card-icon">🚨</div>
+          <div class="ls-card-icon ls-icon-text"></div>
           <div class="ls-card-content">
             <span class="ls-value" id="ls-alerts">0</span>
             <span class="ls-label">alerts today</span>
@@ -202,7 +202,7 @@
         </div>
         <div class="ls-card">
           <div class="ls-card-glow"></div>
-          <div class="ls-card-icon">📚</div>
+          <div class="ls-card-icon ls-icon-text"></div>
           <div class="ls-card-content">
             <span class="ls-value" id="ls-patterns">0</span>
             <span class="ls-label">failure patterns</span>
@@ -214,7 +214,7 @@
         </div>
         <div class="ls-card ls-card-integration">
           <div class="ls-card-glow"></div>
-          <div class="ls-card-icon">🔌</div>
+          <div class="ls-card-icon ls-icon-text"></div>
           <div class="ls-card-content">
             <span class="ls-value" id="ls-mcp-calls">0</span>
             <span class="ls-label">MongoDB MCP calls · 24h</span>
@@ -226,7 +226,7 @@
         </div>
         <div class="ls-card ls-card-integration">
           <div class="ls-card-glow"></div>
-          <div class="ls-card-icon">🧭</div>
+          <div class="ls-card-icon ls-icon-text"></div>
           <div class="ls-card-content">
             <span class="ls-value" id="ls-vector-searches">0</span>
             <span class="ls-label">Vector searches · 24h</span>
@@ -238,7 +238,7 @@
         </div>
         <div class="ls-card ls-card-integration">
           <div class="ls-card-glow"></div>
-          <div class="ls-card-icon">✨</div>
+          <div class="ls-card-icon ls-icon-text"></div>
           <div class="ls-card-content">
             <span class="ls-value" id="ls-gemini-calls">0</span>
             <span class="ls-label">Gemini + embedding calls · 24h</span>
@@ -250,7 +250,7 @@
         </div>
         <div class="ls-card ls-card-integration">
           <div class="ls-card-glow"></div>
-          <div class="ls-card-icon">🍃</div>
+          <div class="ls-card-icon ls-icon-text"></div>
           <div class="ls-card-content">
             <span class="ls-value">18</span>
             <span class="ls-label">MongoDB features active</span>
@@ -262,7 +262,7 @@
         </div>
         <div class="ls-card ls-card-integration ls-card-moat">
           <div class="ls-card-glow"></div>
-          <div class="ls-card-icon">🔄</div>
+          <div class="ls-card-icon ls-icon-text"></div>
           <div class="ls-card-content">
             <span class="ls-value ls-moat-label">Self-Improving</span>
             <span class="ls-label">data flywheel via Change Streams</span>
@@ -448,16 +448,16 @@
           <div class="hiw-step">
             <div class="step-num">3</div>
             <div class="step-body">
-              <h4>Vertex AI Gemini 2.5 Flash scores each candidate in parallel</h4>
-              <p>Up to 5 candidate patterns are scored simultaneously by <strong>Vertex AI Gemini 2.5 Flash</strong> (<code>thinking_budget=0</code> for speed). For each pattern, it evaluates metric-trigger alignment and returns a <strong>pattern similarity score</strong> (0–100%), detected warning signals, and estimated days to crisis. Parallel execution via <code>asyncio.gather</code> keeps total response time to 3–5 seconds.</p>
-              <div class="tech-tag">Vertex AI Gemini 2.5 Flash</div>
+              <h4>Gemini Flash scores each candidate in parallel</h4>
+              <p>Up to 5 candidate patterns are scored simultaneously by <strong>Gemini Flash</strong> (<code>thinking_budget=0</code> for speed). For each pattern, it evaluates metric-trigger alignment and returns a <strong>pattern similarity score</strong> (0–100%), detected warning signals, and estimated days to crisis. Parallel execution via <code>asyncio.gather</code> keeps total response time to 3–5 seconds.</p>
+              <div class="tech-tag">Gemini Flash</div>
               <div class="tech-tag">Parallel async scoring</div>
             </div>
           </div>
           <div class="hiw-step hiw-step-highlight">
             <div class="step-num">4</div>
             <div class="step-body">
-              <h4>⚖️ Challenger Agent independently verifies — adversarial AI</h4>
+              <h4>Challenger Agent independently verifies — adversarial AI</h4>
               <p>A <em>second</em> Gemini 3 instance is invoked with a deliberately skeptical prompt. Its job is to <strong>look for reasons the pattern does NOT apply</strong> — which healthy metrics contradict the match? It returns an independent pattern similarity score. If the two agents disagree by more than 10 percentage points, the result is flagged as <strong>DISPUTED</strong> and you see both scores side by side. This is dual-agent adversarial verification — not a single model's opinion.</p>
               <div class="tech-tag">Challenger Agent</div>
               <div class="tech-tag">Adversarial verification</div>
@@ -536,7 +536,7 @@
             <div class="arch-arrow">→</div>
             <div class="arch-box">MongoDB Atlas<br><small>Voyage AI + Vector + BM25</small></div>
             <div class="arch-arrow">→</div>
-            <div class="arch-box">Vertex AI<br><small>Gemini 2.5 Flash scorer</small></div>
+            <div class="arch-box">Vertex AI<br><small>Gemini Flash scorer</small></div>
             <div class="arch-arrow">→</div>
             <div class="arch-box">Gemini 3 Flash<br><small>ADK agents ×3</small></div>
             <div class="arch-arrow">→</div>
@@ -549,7 +549,7 @@
           <div class="stack-grid">
             <div class="stack-item">
               <div class="stack-icon"></div>
-              <strong>Vertex AI — Gemini 2.5 Flash (Scorer)</strong>
+              <strong>Vertex AI — Gemini Flash (Scorer)</strong>
               <small>Primary pattern scorer — parallel scoring of all candidates with <code>thinking_budget=0</code> for maximum speed. Also handles decision auditing with <code>thinking_budget=1024</code> for deeper reasoning. Why Vertex AI? Consistent latency SLA + enterprise billing.</small>
             </div>
             <div class="stack-item">
@@ -708,11 +708,11 @@
           <div class="wb-arrow">→</div>
           <div class="wb-step">
             <div class="wb-num">2</div>
-            <div class="wb-text"><strong>Investigator Agent finds the match</strong><br>Voyage AI embedding → Atlas Vector Search + BM25 RRF → Vertex AI Gemini 2.5 Flash parallel scoring → top pattern selected</div>
+            <div class="wb-text"><strong>Investigator Agent finds the match</strong><br>Voyage AI embedding → Atlas Vector Search + BM25 RRF → Gemini Flash parallel scoring → top pattern selected</div>
           </div>
           <div class="wb-arrow">→</div>
           <div class="wb-step wb-step-highlight">
-            <div class="wb-num">⚖️</div>
+            <div class="wb-num">3</div>
             <div class="wb-text"><strong>Challenger Agent disputes or confirms</strong><br>Second independent Gemini 3 Flash instance — actively seeks counter-evidence. &gt;10pp divergence triggers DISPUTE and catches false positives.</div>
           </div>
           <div class="wb-arrow">→</div>
@@ -723,6 +723,34 @@
         </div>
         <div class="wb-tip"><strong>First time?</strong> Click the <strong>Quibi</strong> card below — watch the Oracle catch a $1.75B failure live. The Challenger verdict and Δpp confidence gap appear in the Agent Log. Want to see a DISPUTE? Try <strong>HighVelocity AI</strong> in the demos.</div>
       </section>
+      <!-- ── MongoDB Atlas Feature Strip ─────────────────────────── -->
+      <div class="mongo-tech-strip">
+        <span class="mts-eyebrow">MongoDB Atlas — active in every analysis:</span>
+        <div class="mts-chips">
+          <span class="mts-chip" title="1024-dim Voyage AI embeddings · cosine similarity across 100 patterns · sub-50ms retrieval">
+            <span class="mts-dot mts-vector"></span>Atlas Vector Search
+          </span>
+          <span class="mts-chip" title="BM25 full-text search on pattern narratives · merged with vector results via Reciprocal Rank Fusion">
+            <span class="mts-dot mts-search"></span>Atlas Search · BM25 + RRF
+          </span>
+          <span class="mts-chip" title="28 native MCP tools · persistent stdio connection · tool-based reads for all pattern lookups">
+            <span class="mts-dot mts-mcp"></span>MongoDB MCP · 28 tools
+          </span>
+          <span class="mts-chip" title="Traverse failure state machine 3 hops deep · each node is a failure mode that triggers the next">
+            <span class="mts-dot mts-graph"></span>$graphLookup Cascade
+          </span>
+          <span class="mts-chip" title="Watches startup_analyses writes · auto-updates Bayesian probabilities · p = 0.3×prior + 0.7×empirical">
+            <span class="mts-dot mts-streams"></span>Change Streams · Self-Improving
+          </span>
+          <span class="mts-chip" title="Score distribution histogram · survivor intelligence · industry-filtered percentile ranking in one query">
+            <span class="mts-dot mts-facet"></span>$bucket · $facet · $setWindowFields
+          </span>
+          <span class="mts-chip" title="Cascade graph + interventions + telemetry written atomically · no partial failures">
+            <span class="mts-dot mts-acid"></span>ACID Transactions
+          </span>
+        </div>
+      </div>
+
       <div class="metrics-layout">
       <!-- ── Metrics Input ────────────────────────────────────────── -->
       <section class="card" id="input-section">
@@ -738,10 +766,10 @@
       <!-- Transcript extraction -->
       <div class="transcript-panel">
         <button class="transcript-toggle" onclick="toggleTranscript()" id="transcript-toggle-btn">
-          ✦ Extract metrics from text (pitch deck, investor update, YC app...)
+          + Extract metrics from text (pitch deck, investor update, YC app...)
         </button>
         <div class="transcript-body hidden" id="transcript-body">
-          <textarea id="transcript-input" placeholder="Paste any startup text — pitch deck, investor update, YC application, board memo... Oracle will extract all 11 metrics automatically using Vertex AI Gemini 2.5 Flash." rows="5"></textarea>
+          <textarea id="transcript-input" placeholder="Paste any startup text — pitch deck, investor update, YC application, board memo... Oracle will extract all 11 metrics automatically using Gemini Flash." rows="5"></textarea>
           <div style="display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem">
             <button type="button" class="transcript-btn" id="transcript-btn" onclick="extractFromTranscript()">Extract Metrics</button>
             <span class="transcript-note hidden" id="transcript-note"></span>
@@ -864,7 +892,7 @@
       </form>
 
       <!-- Demo presets with context -->
-      <div class="demo-section">
+      <div class="demo-section" id="demo-section">
         <div class="demo-section-header">
           <span class="demo-label">Load a real scenario — see exactly what the Oracle would have said:</span>
         </div>
@@ -901,7 +929,7 @@
       </div>
 
       <!-- ── Backtest Showcase ──────────────────────────────────────── -->
-      <div class="backtest-section">
+      <div class="backtest-section" id="backtest-section">
         <div class="backtest-header">
           <div class="bt-header-left">
             <span class="bt-badge">LIVE VERIFIED</span>
@@ -910,7 +938,7 @@
           <p class="bt-subtitle">These are actual Oracle outputs — we ran the system against each company's documented pre-failure metrics. Click any card to reproduce the result yourself.</p>
         </div>
         <!-- Instant Demo Badge (shown briefly after instant replay) -->
-        <div id="instant-demo-badge" class="instant-demo-badge hidden">⚡ Instant demo — cached from last live run</div>
+        <div id="instant-demo-badge" class="instant-demo-badge hidden">Instant demo — cached from last live run</div>
 
         <div class="backtest-cards">
 
@@ -939,7 +967,7 @@
               </div>
             </button>
             <div class="bt-action-row">
-              <button class="bt-instant-btn" onclick="playInstantDemo('wework')">⚡ Instant Demo</button>
+              <button class="bt-instant-btn" onclick="playInstantDemo('wework')">Instant Demo</button>
               <button class="bt-live-btn" onclick="fillDemo('wework');runAnalysis()">▶ Run Live (~40s)</button>
             </div>
           </div>
@@ -969,7 +997,7 @@
               </div>
             </button>
             <div class="bt-action-row">
-              <button class="bt-instant-btn" onclick="playInstantDemo('quibi')">⚡ Instant Demo</button>
+              <button class="bt-instant-btn" onclick="playInstantDemo('quibi')">Instant Demo</button>
               <button class="bt-live-btn" onclick="fillDemo('quibi');runAnalysis()">▶ Run Live (~40s)</button>
             </div>
           </div>
@@ -999,7 +1027,7 @@
               </div>
             </button>
             <div class="bt-action-row">
-              <button class="bt-instant-btn" onclick="playInstantDemo('theranos')">⚡ Instant Demo</button>
+              <button class="bt-instant-btn" onclick="playInstantDemo('theranos')">Instant Demo</button>
               <button class="bt-live-btn" onclick="fillDemo('theranos');runAnalysis()">▶ Run Live (~40s)</button>
             </div>
           </div>
@@ -1009,6 +1037,12 @@
       </div>
 
       <!-- Agent Terminal -->
+      <!-- Restore bar — shown when examples are collapsed during analysis -->
+      <div id="examples-restore-bar" class="examples-restore-bar hidden" onclick="expandExamples()">
+        <span class="erb-icon">▸</span>
+        <span>Show preset scenarios &amp; real-world demos</span>
+      </div>
+
       <div id="agent-terminal" class="agent-terminal hidden" style="margin-top:1.5rem">
         <div class="terminal-header">
           <span class="terminal-title">Agent Execution Log</span>
@@ -1031,8 +1065,19 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
           <h2 style="margin-bottom:0;color:var(--text);font-size:1.1rem">Live Health Pulse</h2>
         </div>
-        <p class="section-desc" style="font-size:0.85rem;margin-bottom:0">See how the Oracle interprets your numbers in real-time.</p>
-        
+        <p class="section-desc" style="font-size:0.85rem;margin-bottom:0.75rem">See how the Oracle interprets your numbers in real-time.</p>
+
+        <div class="lm-composite">
+          <div class="lm-composite-header">
+            <span class="lm-composite-label">Overall Health Score</span>
+            <span class="lm-composite-value" id="live-composite">--</span>
+          </div>
+          <div class="lm-composite-bar-wrap">
+            <div class="lm-composite-bar" id="live-composite-bar" style="width:0%"></div>
+          </div>
+          <div class="lm-composite-desc" id="live-composite-desc">Enter your metrics to see your health score</div>
+        </div>
+
         <div class="live-metric">
           <div class="lm-top">
             <span class="lm-label">Net Burn Multiple</span>
@@ -1058,6 +1103,15 @@
           </div>
           <div class="lm-bar-wrap"><div class="lm-bar-fill" id="live-runway-bar" style="width:0%"></div></div>
           <div class="lm-desc">How long until you run out of cash. <br><strong>Healthy:</strong> &gt;18 months</div>
+        </div>
+
+        <div class="live-metric">
+          <div class="lm-top">
+            <span class="lm-label">NPS Score</span>
+            <span class="lm-value" id="live-nps-val">--</span>
+          </div>
+          <div class="lm-bar-wrap"><div class="lm-bar-fill" id="live-nps-bar" style="width:0%"></div></div>
+          <div class="lm-desc">Customer satisfaction (−100 to +100). <br><strong>Healthy:</strong> &gt;50</div>
         </div>
       </aside>
     </div>
@@ -1172,6 +1226,15 @@
 
       <section class="card alert-card hidden" id="alert-section">
 
+      <!-- Back to form pill -->
+      <div class="back-to-form-bar">
+        <button class="btf-btn" onclick="expandExamples();document.getElementById('input-section')?.scrollIntoView({behavior:'smooth',block:'start'})">
+          ← Modify Inputs
+        </button>
+        <span class="btf-sep">·</span>
+        <span class="btf-label" id="btf-startup-name"></span>
+      </div>
+
       <!-- Risk level banner — populated by renderResult() -->
       <div id="risk-banner" class="risk-banner risk-banner-high hidden">
         <span class="risk-banner-icon" id="risk-banner-icon"></span>
@@ -1220,11 +1283,27 @@
         </div>
       </div>
 
-      <div class="result-tabs-nav">
+      <!-- Report actions -->
+      <div class="report-actions" id="report-actions-top" style="margin-bottom:0.75rem">
+        <button class="action-btn print-btn" onclick="window.print()" style="background:var(--accent);color:#fff;border:none;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.3rem;vertical-align:-2px"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          Print Brief</button>
+        <button class="action-btn download-btn" onclick="downloadReport()">Download Report</button>
+        <button class="action-btn share-btn" onclick="shareAnalysis()">Share Analysis</button>
+        <button class="action-btn public-share-btn" id="public-share-btn" onclick="createPublicShare()" title="Generate a public link anyone can view">Public Link</button>
+        <button class="action-btn slides-btn" id="slides-btn" onclick="exportSlides()" title="Download board-ready HTML deck powered by Gemini Flash">Export Board Deck</button>
+        <button class="action-btn slack-share-btn" id="slack-share-btn" onclick="shareToSlack()" title="Post this alert to your Slack channel">Share to Slack</button>
+        <span class="share-confirm hidden" id="share-confirm">Link copied!</span>
+        <span class="share-confirm hidden" id="slack-confirm">Posted to Slack!</span>
+        <span class="share-confirm hidden" id="public-share-confirm">Public link copied!</span>
+      </div>
+
+      <div class="result-tabs-nav" id="result-tabs-nav">
         <button class="result-tab-btn active" onclick="switchResultTab('result-tab-overview')">Overview</button>
         <button class="result-tab-btn" onclick="switchResultTab('result-tab-metrics')">Metrics & Timeline</button>
         <button class="result-tab-btn" onclick="switchResultTab('result-tab-signals')">Warning Signals</button>
-        <button class="result-tab-btn" onclick="switchResultTab('result-tab-playbook')">Action Plan</button>
+        <button class="result-tab-btn" id="tab-btn-escape" onclick="switchResultTab('result-tab-escape')">Escape Plan & Cascade</button>
+        <button class="result-tab-btn" onclick="switchResultTab('result-tab-playbook')">Survival Playbook</button>
         <button class="result-tab-btn" onclick="switchResultTab('result-tab-cases')">Case Studies</button>
       </div>
 
@@ -1240,7 +1319,7 @@
 
         <!-- Gemini reasoning block -->
         <div class="reasoning-block hidden" id="reasoning-block">
-          <div class="reasoning-label">Vertex AI Gemini 2.5 Flash analysis</div>
+          <div class="reasoning-label">Gemini Flash analysis</div>
           <p id="reasoning-text"></p>
         </div>
 
@@ -1415,7 +1494,7 @@
 
         <!-- Continuous monitoring -->
         <div class="monitor-panel" id="monitor-panel">
-          <div class="mp-icon">👁</div>
+          
           <div class="mp-body">
             <div class="mp-title">Enable Continuous Monitoring</div>
             <div class="mp-desc">The Oracle will re-analyse your metrics every 6 hours and alert you if the pattern worsens. Results stored in MongoDB.</div>
@@ -1440,7 +1519,7 @@
       <div class="cocktail-panel hidden" id="cocktail-panel">
         <div class="ctail-header">
           <div class="ctail-header-left">
-            <span class="ctail-icon">🍸</span>
+            
             <div>
               <h3 class="ctail-title">Cocktail Alert — <span id="ctail-count">2</span> Co-occurring Failure Patterns</h3>
               <p class="ctail-subtitle">Two or more failure patterns active simultaneously. Risk compounds non-linearly — each additional pattern roughly halves the survival probability. Triggered when ≥2 patterns exceed 60% confidence.</p>
@@ -1469,8 +1548,8 @@
           <span class="prov-dot prov-mongo"></span>Atlas Vector Search + BM25 RRF
         </span>
         <span class="prov-sep">·</span>
-        <span class="prov-item" title="Step 3 — Vertex AI Gemini 2.5 Flash scores all candidates in parallel (thinking_budget=0 for speed). Then: ADK SequentialAgent runs Investigator → Challenger → Reporter, all three on Gemini 3 Flash via paid Gemini API (Gemini 3 not yet on Vertex AI).">
-          <span class="prov-dot prov-google"></span>Vertex AI 2.5 Flash scorer · Gemini 3 Flash ADK ×3
+        <span class="prov-item" title="Step 3 — Gemini Flash scores all candidates in parallel (thinking_budget=0 for speed). Then: ADK SequentialAgent runs Investigator → Challenger → Reporter, all three on Gemini 3 Flash via paid Gemini API (Gemini 3 not yet on Vertex AI).">
+          <span class="prov-dot prov-google"></span>Gemini 3 Flash scorer · Gemini 3 Flash ADK ×3
         </span>
         <span class="prov-sep">·</span>
         <span class="prov-item" title="Step 4 — Analysis result, cascade graph, and transition probabilities stored atomically in MongoDB Atlas via ACID transaction. Bayesian probability updates written via Change Streams as real-world transitions are observed.">
@@ -1478,10 +1557,12 @@
         </span>
       </div>
 
-      <!-- Counterfactual Recovery Scenario — populated from backend response -->
-      <div class="recovery-card hidden" id="recovery-card">
+      <!-- Escape Plan + Cascade Tab (combined) -->
+      <div id="result-tab-escape" class="result-tab-content hidden">
+
+      <!-- Counterfactual Recovery Scenario -->
+      <div class="recovery-card" id="recovery-card">
         <div class="rec-header">
-          <span class="rec-icon">↗</span>
           <span class="rec-title">Recovery Path</span>
           <span class="rec-delta" id="rec-delta"></span>
         </div>
@@ -1489,11 +1570,10 @@
         <div class="rec-sub" id="rec-sub"></div>
       </div>
 
-      <!-- Escape Plan — ranked interventions to escape the pattern -->
-      <div class="escape-plan-panel hidden" id="escape-plan-panel">
+      <div class="escape-plan-panel" id="escape-plan-panel">
         <div class="ep-header">
           <div class="ep-header-left">
-            <span class="ep-icon">🔓</span>
+            
             <div>
               <h3 class="ep-title">Your Escape Plan</h3>
               <p class="ep-subtitle">Minimum metric changes to drop your pattern match below <strong>60%</strong> (the alert threshold). Each intervention is exact: "reduce churn from X% to Y%." Ranked by confidence impact. <strong>Pure algebra on the pattern's trigger conditions</strong> — no AI, reproducible every time.</p>
@@ -1513,12 +1593,11 @@
         <div class="ep-list" id="ep-list"></div>
         <p class="ep-disclaimer">Estimates based on pattern trigger thresholds. Difficulty ratings: easy (&lt;20% metric change needed), medium (20–45%), hard (&gt;45%).</p>
       </div>
-
-      <!-- Failure Cascade Graph — $graphLookup collapse timeline -->
-      <div class="cascade-panel hidden" id="cascade-panel">
+      <!-- Failure Cascade Graph — $graphLookup collapse timeline (same tab as Escape Plan) -->
+      <div class="cascade-panel" id="cascade-panel">
         <div class="casc-header">
           <div class="casc-header-left">
-            <span class="casc-icon">🔗</span>
+            
             <div>
               <h3 class="casc-title">Failure Cascade Graph</h3>
               <p class="casc-subtitle">Failure isn't a single event — it's a chain. Each node is a failure mode that triggers the next. Transition probabilities start as research estimates and self-improve via <strong>Bayesian blending</strong> as real-world cases are observed (p = 0.3×initial + 0.7×empirical). Graph traversal via MongoDB <code>$graphLookup</code> · written atomically in an <code>ACID transaction</code> · probabilities updated live via <code>Change Streams</code>.</p>
@@ -1534,7 +1613,7 @@
         </div>
         <div class="casc-interventions hidden" id="casc-interventions">
           <div class="casc-int-header">
-            <span class="casc-int-icon">🛡️</span>
+            
             <span class="casc-int-title">Cascade Intervention Optimizer</span>
             <span class="casc-int-subtitle">— for each cascade link, the exact minimum metric change needed to break that link before the failure propagates. Deterministic algebra on trigger thresholds — not AI-generated advice.</span>
           </div>
@@ -1543,36 +1622,29 @@
         <p class="casc-calibration" id="casc-calibration"></p>
       </div>
 
-      <div class="report-actions">
-        <button class="action-btn print-btn" onclick="window.print()" style="background:var(--accent);color:#fff;border:none;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.3rem;vertical-align:-2px"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-          Print Forensic Brief
-        </button>
-        <button class="action-btn download-btn" onclick="downloadReport()">Download Report</button>
-        <button class="action-btn share-btn" onclick="shareAnalysis()">Share Analysis</button>
-        <button class="action-btn public-share-btn" id="public-share-btn" onclick="createPublicShare()" title="Generate a public link anyone can view">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.3rem;vertical-align:-2px"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          Public Link
-        </button>
-        <button class="action-btn slides-btn" id="slides-btn" onclick="exportSlides()" title="Download board-ready HTML deck powered by Vertex AI Gemini 2.5 Flash">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:0.3rem;vertical-align:-2px"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          Export Board Deck
-        </button>
-        <button class="action-btn slack-share-btn" id="slack-share-btn" onclick="shareToSlack()" title="Post this alert to your Slack channel">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="margin-right:0.3rem;vertical-align:-2px"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg>
-          Share to Slack
-        </button>
-        <span class="share-confirm hidden" id="share-confirm">Link copied!</span>
-        <span class="share-confirm hidden" id="slack-confirm">Posted to Slack!</span>
-        <span class="share-confirm hidden" id="public-share-confirm">Public link copied!</span>
+      </div><!-- /result-tab-escape (contains recovery + escape plan + cascade) -->
+
+      <!-- Oracle Pre-Mortem Simulation CTA -->
+      <div class="premortem-cta hidden" id="premortem-cta">
+        <div class="pmc-left">
+          
+          <div>
+            <div class="pmc-title">Oracle Pre-Mortem Simulation</div>
+            <div class="pmc-desc">Project these metrics 6 months forward — see if this pattern escalates, plateaus, or resolves. Month-by-month Oracle Score trajectory with Gemini reasoning on each horizon.</div>
+          </div>
+        </div>
+        <button class="pmc-btn" onclick="switchTab('tab-auditor');setTimeout(()=>document.getElementById('premortem-card')?.scrollIntoView({behavior:'smooth'}),300)">Run 6-Month Simulation →</button>
       </div>
+
     </section>
       <section class="card safe-card hidden" id="safe-section">
-      <div class="safe-icon"></div>
-      <h2>No Dangerous Patterns Detected</h2>
-      <p>Your current metrics don't match any of the 100 documented high-risk failure patterns. Your trajectory looks healthy for this stage.</p>
-      <p class="safe-tip"><strong>Run this monthly.</strong> Failure patterns don't appear overnight — they build over 3–6 months. Early detection is the difference between a pivot and a shutdown. This is the institutional knowledge that Sequoia partners use — now available to every founder.</p>
-    </section>
+        
+        <div class="safe-body">
+          <h2>No Dangerous Patterns Detected</h2>
+          <p>Your current metrics don't match any of the 100 documented high-risk failure patterns. Your trajectory looks healthy for this stage.</p>
+          <p class="safe-tip"><strong>Run this monthly.</strong> Failure patterns build over 3–6 months. Early detection is the difference between a pivot and a shutdown.</p>
+        </div>
+      </section>
       <div id="history-panel" class="hidden"></div>
       <div id="trend-chart-section" class="card trend-chart-section hidden">
       <h2>Metric Trend</h2>
@@ -1642,8 +1714,11 @@
     <!-- ── Tab 3: VC Portfolio ── -->
     <div id="tab-portfolio" class="tab-content hidden">
       <section class="card" id="portfolio-section">
-      <h2>VC Portfolio Mode</h2>
-      <p class="section-desc">Analyze multiple startups at once. Paste your portfolio companies — the Oracle will run parallel analysis and return a risk-ranked dashboard.</p>
+      <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.25rem">
+        <h2 style="margin:0">VC Portfolio Mode</h2>
+        <span class="portfolio-parallel-badge">Parallel Analysis · Up to 20 Startups</span>
+      </div>
+      <p class="section-desc">Paste your portfolio companies — the Oracle runs <strong>concurrent async analysis</strong> on all startups simultaneously and returns a risk-ranked heat-map. Uses MongoDB <code>$facet</code> for live cohort benchmarking per company.</p>
       <div class="pf-example-bar">
         <span class="pf-ex-label">Load example portfolio:</span>
         <button type="button" class="pf-ex-btn" onclick="loadExamplePortfolio()">YC W24 Cohort Sim (3 companies)</button>
@@ -1661,6 +1736,14 @@
       <div id="portfolio-result" class="hidden">
         <div class="pf-summary" id="pf-summary"></div>
         <div class="pf-grid" id="pf-grid"></div>
+        <div class="portfolio-monitor-cta" id="portfolio-monitor-cta">
+          
+          <div class="pmc2-body">
+            <div class="pmc2-title">Enable 24/7 Background Monitoring for Flagged Startups</div>
+            <div class="pmc2-desc">Oracle re-analyses every 6 hours via Google Cloud Scheduler. Slack alerts fire instantly via MongoDB Change Streams when risk worsens. No manual checking required.</div>
+          </div>
+          <button class="pmc2-btn" onclick="switchTab('tab-dashboard');setTimeout(()=>document.getElementById('monitor-panel')?.scrollIntoView({behavior:'smooth'}),300)">Set Up Monitoring →</button>
+        </div>
       </div>
     </section>
     </div>
@@ -1672,15 +1755,15 @@
       <p class="section-desc">MongoDB <code>$bucket</code> + <code>$facet</code> — see how your startup ranks against similar companies at the same stage. Where do you sit in the distribution of 302 startups the Oracle has analyzed?</p>
       <div class="cohort-explainer">
         <div class="cohort-ex-item">
-          <span class="cohort-ex-icon">📊</span>
+          
           <div><strong>Percentile rank</strong><br><small>Where your Oracle Score sits in the distribution of all analyzed startups in your industry and stage</small></div>
         </div>
         <div class="cohort-ex-item">
-          <span class="cohort-ex-icon">🪣</span>
+          
           <div><strong>MongoDB $bucket</strong><br><small>Scores grouped into 10-point bands — see the full distribution shape, not just your rank</small></div>
         </div>
         <div class="cohort-ex-item">
-          <span class="cohort-ex-icon">🏆</span>
+          
           <div><strong>Survivor patterns</strong><br><small>What the top-quartile startups in your cohort did differently — their avg churn, burn multiple, and NPS</small></div>
         </div>
       </div>
@@ -1731,7 +1814,7 @@
         <div class="cohort-patterns-row" id="cohort-patterns-row"></div>
         <div class="cohort-survivor-card hidden" id="cohort-survivor-card">
           <div class="cohort-survivor-header">
-            <span class="cohort-survivor-icon">🏆</span>
+            
             <span class="cohort-survivor-title">What Survivors Did Differently</span>
           </div>
           <div class="cohort-survivor-stats" id="cohort-survivor-stats"></div>
@@ -1752,7 +1835,7 @@
       </div>
       
       <div class="lib-featured">
-        <div class="lib-feat-title">⚡ Most Dangerous Patterns <span class="lib-feat-sub">— lowest survival rates across 100 documented cases</span></div>
+        <div class="lib-feat-title">Most Dangerous Patterns <span class="lib-feat-sub">— lowest survival rates across 100 documented cases</span></div>
         <div class="lib-feat-grid">
           <div class="lib-feat-card" onclick="document.getElementById('toggle-patterns-btn').click();setTimeout(()=>document.querySelector('[data-pattern-id=F-017]')?.scrollIntoView({behavior:'smooth'}),400)">
             <div class="lib-feat-id">F-017</div>
@@ -1781,14 +1864,17 @@
       
       <div id="patterns-container" class="hidden">
         <div class="patterns-filter" id="patterns-filter">
-          <button class="pf-btn active" onclick="filterPatterns('')">All</button>
-          <button class="pf-btn" onclick="filterPatterns('premature_scaling')">Premature Scaling</button>
-          <button class="pf-btn" onclick="filterPatterns('product_market_fit')">PMF</button>
-          <button class="pf-btn" onclick="filterPatterns('unit_economics')">Unit Economics</button>
-          <button class="pf-btn" onclick="filterPatterns('fundraising')">Fundraising</button>
-          <button class="pf-btn" onclick="filterPatterns('team')">Team</button>
-          <button class="pf-btn" onclick="filterPatterns('go_to_market')">Go-To-Market</button>
-          <button class="pf-btn" onclick="filterPatterns('competition')">Competition</button>
+          <div class="pf-filter-left">
+            <button class="pf-btn active" onclick="filterPatterns('')">All</button>
+            <button class="pf-btn" onclick="filterPatterns('premature_scaling')">Premature Scaling</button>
+            <button class="pf-btn" onclick="filterPatterns('product_market_fit')">PMF</button>
+            <button class="pf-btn" onclick="filterPatterns('unit_economics')">Unit Economics</button>
+            <button class="pf-btn" onclick="filterPatterns('fundraising')">Fundraising</button>
+            <button class="pf-btn" onclick="filterPatterns('team')">Team</button>
+            <button class="pf-btn" onclick="filterPatterns('go_to_market')">Go-To-Market</button>
+            <button class="pf-btn" onclick="filterPatterns('competition')">Competition</button>
+          </div>
+          <button id="pattern-view-toggle" class="pf-view-toggle" onclick="togglePatternView()">Heatmap View</button>
         </div>
         <div class="patterns-grid" id="patterns-grid">
           <div class="patterns-loading">Loading pattern library…</div>
@@ -1873,13 +1959,18 @@
 
   <footer>
     <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.5rem;margin-bottom:0.75rem">
-      <span class="tech-badge">Google ADK</span>
-      <span class="tech-badge">Vertex AI Gemini 2.5 Flash</span>
+      <span class="tech-badge">Google ADK · SequentialAgent</span>
+      <span class="tech-badge">Gemini 3 Flash</span>
       <span class="tech-badge">MongoDB Voyage AI</span>
       <span class="tech-badge">Atlas Vector Search</span>
-      <span class="tech-badge">Atlas Search</span>
-      <span class="tech-badge">MongoDB MCP</span>
+      <span class="tech-badge">Atlas Search · BM25</span>
+      <span class="tech-badge">MongoDB MCP · 28 tools</span>
+      <span class="tech-badge">$graphLookup</span>
+      <span class="tech-badge">Change Streams</span>
+      <span class="tech-badge">$bucket · $facet</span>
+      <span class="tech-badge">ACID Transactions</span>
       <span class="tech-badge">Cloud Run</span>
+      <span class="tech-badge">Cloud Scheduler</span>
     </div>
     <p style="color:var(--muted);font-size:0.8rem">
       <button class="footer-link" onclick="openHowItWorks()">How it works</button>
@@ -1917,7 +2008,7 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2026060101"></script>
   <script>
     // Initialize monthly tracking on page load
     window.addEventListener('load', () => { renderHistory(); });
@@ -1950,5 +2041,15 @@
 
   <!-- Nav info tooltip popup -->
   <div id="nav-info-tooltip" class="nav-info-tooltip hidden"></div>
+
+  <!-- Sticky result tabs — appears when original tabs scroll off screen -->
+  <div id="sticky-result-tabs" class="sticky-result-tabs hidden" role="navigation" aria-label="Result sections">
+    <button class="srt-btn active" data-tab="result-tab-overview" onclick="switchResultTabSticky('result-tab-overview')">Overview</button>
+    <button class="srt-btn" data-tab="result-tab-metrics" onclick="switchResultTabSticky('result-tab-metrics')">Metrics & Timeline</button>
+    <button class="srt-btn" data-tab="result-tab-signals" onclick="switchResultTabSticky('result-tab-signals')">Warning Signals</button>
+    <button class="srt-btn" id="srt-btn-escape" data-tab="result-tab-escape" onclick="switchResultTabSticky('result-tab-escape')">Escape Plan & Cascade</button>
+    <button class="srt-btn" data-tab="result-tab-playbook" onclick="switchResultTabSticky('result-tab-playbook')">Survival Playbook</button>
+    <button class="srt-btn" data-tab="result-tab-cases" onclick="switchResultTabSticky('result-tab-cases')">Case Studies</button>
+  </div>
 </body>
 </html>

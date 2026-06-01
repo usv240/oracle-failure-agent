@@ -224,6 +224,7 @@ async def _check_all_watched() -> None:
                 "pattern_name": match.pattern_name if match else None,
                 "confidence": match.confidence if match else 0.0,
                 "days_to_crisis": match.days_to_crisis if match else None,
+                "survival_rate": match.survival_rate if match else 0.0,
             }
 
             # Save to startup_analyses — MCP primary, Motor fallback

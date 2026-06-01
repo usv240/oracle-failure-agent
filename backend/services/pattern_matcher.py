@@ -534,7 +534,8 @@ TASK: Return JSON with exactly these fields:
 }}
 
 IMPORTANT RULES:
-- Only return confidence >0.75 if the metrics clearly match multiple trigger conditions.
+- HARD RULE: If ZERO trigger conditions listed above are numerically met by the current metrics, you MUST return confidence < 0.55. Semantic similarity or narrative resemblance does NOT override a complete trigger miss. Do not let prior analysis history inflate confidence past this ceiling.
+- HARD RULE: Only return confidence > 0.75 if the metrics clearly match MULTIPLE trigger conditions simultaneously.
 - For every signal in the "Known warning signals" list, evaluate whether the current metrics show evidence of it. A single snapshot IS enough to detect structural signals (e.g. high churn, low NPS, negative LTV:CAC). Do NOT require trend data — evaluate against the current values.
 - If confidence >= 0.75, you MUST mark at least 2 signals as DETECTED or EMERGING. A high confidence match with zero detected signals is a contradiction.
 - Use DETECTED when the current metric value clearly meets the signal condition. Use EMERGING when partially met. Use NOT_YET only when no metric evidence exists at all.
@@ -716,6 +717,10 @@ async def match_patterns_top3(metrics: MetricsInput) -> CocktailMatch | None:
         if isinstance(scoring, Exception):
             continue
         confidence = float(scoring.get("confidence", 0.0))
+        # Same deterministic guardrail as match_patterns
+        trigger_rows = compute_trigger_breakdown(metrics, pattern)
+        if trigger_rows and not any(r["met"] for r in trigger_rows):
+            confidence = min(confidence, 0.55)
         if confidence >= 0.60:
             total = pattern["failure_count"] + pattern["survival_count"]
             survival_rate = pattern["survival_count"] / total if total > 0 else 0.0
@@ -846,7 +851,14 @@ async def match_patterns(metrics: MetricsInput) -> PatternMatch | None:
     for pattern, scoring in zip(candidates, scorings):
         if isinstance(scoring, Exception):
             continue
-        confidence = scoring.get("confidence", 0.0)
+        confidence = float(scoring.get("confidence", 0.0))
+
+        # Deterministic guardrail: if zero trigger conditions are numerically met,
+        # cap Gemini's confidence at 0.55 regardless of semantic reasoning.
+        trigger_rows = compute_trigger_breakdown(metrics, pattern)
+        if trigger_rows and not any(r["met"] for r in trigger_rows):
+            confidence = min(confidence, 0.55)
+
         if confidence > best_score:
             best_score = confidence
             best_match = pattern
@@ -888,6 +900,7 @@ async def match_patterns(metrics: MetricsInput) -> PatternMatch | None:
             "confidence": round(best_score, 2),
             "oracle_score": compute_oracle_score(metrics, best_score)[0],
             "days_to_crisis": best_scoring.get("days_to_crisis", 90),
+            "survival_rate": round(survival_rate, 3),
             "metrics_snapshot": metrics.model_dump(),
         }
         _saved = False

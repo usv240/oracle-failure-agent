@@ -6,7 +6,7 @@ Architecture (google-adk v2.0 SequentialAgent):
   Agent 2 — Challenger    : adversarial verifier, second Gemini instance, stress-tests the match
   Agent 3 — Reporter      : fetches MongoDB category benchmarks → saves structured Markdown report
 
-Each sub-agent is a real LlmAgent (Agent) with its own Vertex AI Gemini 2.5 Flash call and dedicated tool set.
+Each sub-agent is a real LlmAgent (Agent) with its own Gemini Flash call and dedicated tool set.
 ADK SequentialAgent orchestrates the three-agent handoff; output_key writes each agent's
 verdict into shared session state for downstream agents to read.
 
@@ -32,7 +32,7 @@ from backend.db.schemas import MetricsInput, PatternMatch, WarningSig
 logger = logging.getLogger(__name__)
 
 # ADK agents use Gemini 3 Flash — required by hackathon rules (set via ADK_MODEL env var)
-# Scoring uses Vertex AI Gemini 2.5 Flash (separate client in pattern_matcher.py)
+# Scoring uses Gemini Flash (separate client in pattern_matcher.py)
 from backend.config import settings as _settings
 _MODEL = _settings.ADK_MODEL
 
@@ -54,7 +54,7 @@ def _configure_adk_auth() -> None:
 
     Gemini 3 Flash (gemini-3-flash-preview) is not yet available on Vertex AI —
     it must be accessed via the Gemini API key. Pattern scoring uses Vertex AI
-    Gemini 2.5 Flash separately via its own explicit client in gemini.py.
+    Gemini Flash separately via its own explicit client in gemini.py.
 
     google-genai SDK routing: GOOGLE_GENAI_USE_VERTEXAI=1 → Vertex AI;
     absent + GOOGLE_API_KEY set → Gemini API. We clear the Vertex AI flag so
@@ -126,7 +126,7 @@ async def _analyze_startup_metrics(
     )
     await _emit("step", icon="🤖", message=(
         f"Investigator Agent initializing — {embed_model} → "
-        "Atlas Vector Search + BM25 RRF → MongoDB MCP → Vertex AI Gemini 2.5 Flash scoring"
+        "Atlas Vector Search + BM25 RRF → MongoDB MCP → Gemini Flash scoring"
     ))
     await _emit("step", icon="🔢", message=f"Generating 1024-dim embedding via {embed_model}...")
 
@@ -242,7 +242,7 @@ async def _analyze_startup_metrics(
 
     # ── Step 4: Parallel Vertex AI scoring ───────────────────────────
     _gemini.last_fallback_reason = None
-    await _emit("step", icon="🤖", message=f"Vertex AI Gemini 2.5 Flash scoring {len(candidates)} candidates in parallel (thinking_budget=0)...")
+    await _emit("step", icon="🤖", message=f"Gemini Flash scoring {len(candidates)} candidates in parallel (thinking_budget=0)...")
     for i, p in enumerate(candidates):
         await _emit("step", icon="⚡", message=f"Evaluating [{i+1}/{len(candidates)}] {p['name']}...")
 
@@ -292,7 +292,7 @@ async def _analyze_startup_metrics(
 
             if backup_candidates:
                 await _emit("step", icon="🤖", message=(
-                    f"Re-scoring {len(backup_candidates)} backup patterns via Vertex AI Gemini 2.5 Flash..."
+                    f"Re-scoring {len(backup_candidates)} backup patterns via Gemini Flash..."
                 ))
                 backup_scorings = await _asyncio.gather(
                     *[_score_with_gemini(metrics, p) for p in backup_candidates],
@@ -431,6 +431,7 @@ async def _analyze_startup_metrics(
             "confidence": round(best_score, 2),
             "oracle_score": _cos(metrics, best_score)[0],
             "days_to_crisis": best_scoring.get("days_to_crisis", 90),
+            "survival_rate": round(survival_rate, 3),
             "metrics_snapshot": metrics.model_dump(),
         })
     except Exception:
@@ -728,7 +729,7 @@ def _get_runner() -> tuple[Runner, InMemorySessionService]:
         description=(
             "Embeds startup metrics with Voyage AI voyage-4-large (1024-dim), "
             "runs MongoDB Atlas Vector Search + BM25 Reciprocal Rank Fusion, "
-            "scores top candidates with Vertex AI Gemini 2.5 Flash (separate client)."
+            "scores top candidates with Gemini Flash (separate client)."
         ),
         instruction=_INVESTIGATOR_INSTRUCTION,
         tools=[FunctionTool(_analyze_startup_metrics)],
@@ -892,7 +893,7 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
             await _emit("step", icon="🔢", message=(
                 f"Step 1 — Investigator: {_embed_model} embedding → "
                 "MongoDB Atlas Vector Search + BM25 RRF → "
-                "MCP category context → Vertex AI Gemini 2.5 Flash scoring"
+                "MCP category context → Gemini Flash scoring"
             ))
             # Run ADK pipeline + multi-pattern cocktail matching in parallel
             raw_result, cocktail = await _asyncio.gather(

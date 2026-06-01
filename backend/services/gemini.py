@@ -191,7 +191,7 @@ async def generate_json_fast(prompt: str) -> str:
         response_mime_type="application/json",
         thinking_config=types.ThinkingConfig(thinking_budget=0),
     )
-    # Primary: Vertex AI 2.5 Flash (consistent with DEVPOST — "Parallel Gemini 2.5 Flash Scoring")
+    # Primary: Vertex AI 2.5 Flash (consistent with DEVPOST — "Parallel Gemini Flash Scoring")
     try:
         client = _get_vertex_client()
         response = client.models.generate_content(

@@ -262,20 +262,27 @@ function fillDemo(type) {
   const d = DEMOS[type];
   Object.keys(d).forEach((key) => {
     const el = document.getElementById(key);
-    if (el) el.value = d[key];
+    if (!el) return;
+    el.value = d[key];
+    el.dispatchEvent(new Event('input'));
   });
   updateLiveMetrics();
 }
 
 async function playInstantDemo(demoKey) {
   const cached = _loadDemoResult(demoKey);
+  _suppressFillDemoAutoRun = true;
   fillDemo(demoKey);
+  _suppressFillDemoAutoRun = false;
+
+  collapseExamples();
 
   // Hide old results
-  ['alert-section','safe-section','challenger-panel','cascade-panel','cocktail-panel',
-   'escape-plan-panel','oracle-score-card','recovery-card','risk-banner'].forEach(id => {
+  ['alert-section','safe-section','challenger-panel','cocktail-panel',
+   'oracle-score-card','risk-banner','premortem-cta'].forEach(id => {
     const el = document.getElementById(id); if (el) el.classList.add('hidden');
   });
+  document.getElementById('tab-btn-escape')?.classList.remove('has-data');
 
   // Show terminal with instant replay
   const terminal = document.getElementById('agent-terminal');
@@ -296,17 +303,17 @@ async function playInstantDemo(demoKey) {
   };
 
   const terminalLines = [
-    ['>', 'Starting Oracle pipeline — MongoDB Voyage AI (embed) → Atlas Vector Search + BM25 RRF → MongoDB MCP → Vertex AI Gemini 2.5 Flash scoring...'],
-    ['🤖', 'Oracle Pipeline starting — ADK SequentialAgent: Investigator → Challenger → Reporter'],
-    ['🔢', 'Step 1 — Investigator: MongoDB Voyage AI voyage-4-large (1024-dim) embedding → MongoDB Atlas Vector Search + BM25 RRF → MCP category context → Vertex AI Gemini 2.5 Flash scoring'],
-    ['🔍', 'Hybrid retrieval: MongoDB Atlas Vector Search (cosine similarity) + Atlas Search (BM25) → Reciprocal Rank Fusion...'],
-    ['✅', 'Vector Search: 10 vector results merged → top 5 candidates'],
-    ['🤖', 'Vertex AI Gemini 2.5 Flash scoring 5 candidates in parallel (thinking_budget=0)...'],
+    ['>', 'Starting Oracle pipeline — MongoDB Voyage AI (embed) → Atlas Vector Search + BM25 RRF → MongoDB MCP → Gemini Flash scoring...'],
+    ['[agent]', 'Oracle Pipeline starting — ADK SequentialAgent: Investigator → Challenger → Reporter'],
+    ['[step]', 'Step 1 — Investigator: MongoDB Voyage AI voyage-4-large (1024-dim) embedding → MongoDB Atlas Vector Search + BM25 RRF → MCP category context → Gemini Flash scoring'],
+    ['[search]', 'Hybrid retrieval: MongoDB Atlas Vector Search (cosine similarity) + Atlas Search (BM25) → Reciprocal Rank Fusion...'],
+    ['[ok]', 'Vector Search: 10 vector results merged → top 5 candidates'],
+    ['[agent]', 'Gemini Flash scoring 5 candidates in parallel (thinking_budget=0)...'],
   ];
 
   if (!cached) {
     // No cache — run real analysis
-    addLine('⚡', 'Running live analysis... (first run takes ~40s, subsequent runs are instant)', 'terminal-warn');
+    addLine('[run]', 'Running live analysis... (first run takes ~40s, subsequent runs are instant)', 'terminal-warn');
     await runAnalysis();
     return;
   }
@@ -321,21 +328,24 @@ async function playInstantDemo(demoKey) {
   const challengerData = cached.challengerEvt;
 
   if (finalData?.alert) {
-    addLine('⚠️', `Pattern confirmed: ${finalData.pattern?.pattern_name} at ${Math.round((finalData.pattern?.confidence||0)*100)}% — Challenger adversarial verification complete`, 'terminal-alert');
+    addLine('[warn]', `Pattern confirmed: ${finalData.pattern?.pattern_name} at ${Math.round((finalData.pattern?.confidence||0)*100)}% — Challenger adversarial verification complete`, 'terminal-alert');
   } else {
-    addLine('✅', 'No dangerous failure patterns detected. Metrics look healthy.', 'terminal-safe');
+    addLine('[ok]', 'No dangerous failure patterns detected. Metrics look healthy.', 'terminal-safe');
   }
 
   await new Promise(r => setTimeout(r, 300));
 
-  // Collapse terminal and render
-  const termPill = document.getElementById('terminal-pill');
-  if (termPill) {
-    termPill.textContent = finalData?.alert
-      ? `⚡ ${finalData.pattern?.pattern_name} — ${Math.round((finalData.pattern?.confidence||0)*100)}% match`
-      : '✅ No dangerous patterns detected';
-    termPill.classList.remove('hidden');
+  // Collapse terminal properly (update tp-label, not textContent which destroys child spans)
+  collapseTerminal();
+  const tpLabel = document.getElementById('tp-label');
+  if (tpLabel) {
+    tpLabel.textContent = finalData?.alert
+      ? `${finalData.pattern?.pattern_name} — ${Math.round((finalData.pattern?.confidence||0)*100)}% match`
+      : 'No dangerous patterns detected';
   }
+
+  // Set _lastPayload from demo preset so back-to-form bar and monitoring work
+  _lastPayload = DEMOS[demoKey] || null;
 
   _lastResult = finalData;
   renderResult(finalData);
@@ -409,11 +419,33 @@ document.getElementById('metrics-form').addEventListener('submit', async (e) => 
 let _lastResult = null;
 let _lastPayload = null;
 
+function collapseExamples() {
+  ['demo-section','backtest-section'].forEach(id => {
+    const el = document.getElementById(id) || document.querySelector('.' + id);
+    if (el) el.classList.add('examples-collapsed');
+  });
+  const bar = document.getElementById('examples-restore-bar');
+  if (bar) bar.classList.remove('hidden');
+}
+
+function expandExamples() {
+  ['demo-section','backtest-section'].forEach(id => {
+    const el = document.getElementById(id) || document.querySelector('.' + id);
+    if (el) el.classList.remove('examples-collapsed');
+  });
+  const bar = document.getElementById('examples-restore-bar');
+  if (bar) bar.classList.add('hidden');
+  document.querySelector('.demo-section')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 async function runAnalysis() {
   const btnText    = document.getElementById('btn-text');
   const btnSpinner = document.getElementById('btn-spinner');
   btnText.classList.add('hidden');
   btnSpinner.classList.remove('hidden');
+
+  collapseExamples();
+  teardownStickyResultTabs();
 
   hide('alert-section');
   hide('safe-section');
@@ -454,17 +486,27 @@ async function runAnalysis() {
   if (pill) pill.classList.add('hidden');
   termBody.innerHTML = '';
 
+  const _stripEmoji = (s) => (s || '').replace(
+    /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FEFF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F1FF}\u{1F200}-\u{1F2FF}\u{1F900}-\u{1F9FF}\u{2300}-\u{23FF}\u{2B50}\u{2B55}\u{2934}\u{2935}\u{25AA}-\u{25FE}\u{00A9}\u{00AE}]/gu, ''
+  ).trim();
+
   function addTermLine(icon, msg, cls = '') {
     const p = document.createElement('div');
     p.className = 'terminal-line' + (cls ? ' ' + cls : '');
     const highlight = (s) => s.replace(/(MongoDB[^,.<\s]*|Gemini[^,.<\s]*|MCP|Vector Search|ADK)/g,
       '<span class="highlight">$1</span>');
-    p.innerHTML = `${icon} ${highlight(msg)}`;
+    // Map emoji icons to clean text prefixes
+    const iconMap = { '[agent]':'[agent]','[step]':'[step]','[ok]':'[ok]','[search]':'[search]','[db]':'[db]',
+      '[run]':'[run]','[score]':'[score]','[retry]':'[retry]','[verify]':'[verify]','[warn]':'[warn]',
+      '💾':'[save]','🌐':'[net]','>>':'>>' };
+    const cleanIcon = iconMap[icon] || _stripEmoji(icon) || '>';
+    const cleanMsg  = _stripEmoji(msg);
+    p.innerHTML = `<span class="term-icon">${cleanIcon}</span> ${highlight(cleanMsg)}`;
     termBody.appendChild(p);
     termBody.scrollTop = termBody.scrollHeight;
   }
 
-  addTermLine('>', 'Starting Oracle pipeline — MongoDB Voyage AI (embed) → Atlas Vector Search + BM25 RRF → MongoDB MCP → Vertex AI Gemini 2.5 Flash scoring...');
+  addTermLine('>', 'Starting Oracle pipeline — MongoDB Voyage AI (embed) → Atlas Vector Search + BM25 RRF → MongoDB MCP → Gemini Flash scoring...');
 
   try {
     const response = await fetch(`${API}/api/metrics/analyze/stream`, {
@@ -578,8 +620,8 @@ function collapseTerminal() {
   const lineCount = body ? body.children.length : 0;
   if (terminal) terminal.classList.add('hidden');
   if (pill) {
-    document.getElementById('tp-label').textContent =
-      `View agent execution log (${lineCount} steps)`;
+    const lbl = document.getElementById('tp-label');
+    if (lbl) lbl.textContent = `Agent execution log — ${lineCount} steps`;
     pill.classList.remove('hidden');
   }
 }
@@ -612,7 +654,7 @@ function renderChallenger(c) {
 
   panel.className = `challenger-panel ${isConfirm ? 'chp-confirm' : 'chp-dispute'}`;
 
-  document.getElementById('chp-icon').textContent  = isConfirm ? '✅' : '⚡';
+  document.getElementById('chp-icon').textContent  = isConfirm ? '[ok]' : '[run]';
   document.getElementById('chp-title').textContent = isConfirm
     ? 'Both agents confirm this pattern'
     : 'Agents disagree — review carefully';
@@ -699,6 +741,36 @@ function renderOracleScore(score, band, breakdown) {
     warning:  'WARNING · Course correct now',
     critical: 'CRITICAL · Take action this week',
   }[band] || band.toUpperCase();
+
+  const ringColor = { strong: '#10b981', watch: '#f59e0b', warning: '#f97316', critical: '#ef4444' }[band] || '#6366f1';
+  const radius = 44, circ = 2 * Math.PI * radius;
+  const offset = circ * (1 - score / 100);
+
+  // Inject animated ring gauge into the left column
+  const oscLeft = card.querySelector('.osc-left');
+  if (oscLeft) {
+    let ringWrap = oscLeft.querySelector('.osc-ring-wrap');
+    if (!ringWrap) {
+      ringWrap = document.createElement('div');
+      ringWrap.className = 'osc-ring-wrap';
+      oscLeft.prepend(ringWrap);
+    }
+    ringWrap.innerHTML = `
+      <svg class="osc-ring-svg" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="${radius}" fill="none" stroke="var(--border)" stroke-width="7"/>
+        <circle cx="50" cy="50" r="${radius}" fill="none" stroke="${ringColor}" stroke-width="7"
+          stroke-linecap="round" transform="rotate(-90 50 50)"
+          stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${circ.toFixed(1)}"
+          class="osc-ring-arc" data-target="${offset.toFixed(1)}"/>
+        <text x="50" y="46" text-anchor="middle" fill="${ringColor}" class="osc-ring-num">${score}</text>
+        <text x="50" y="62" text-anchor="middle" fill="var(--muted)" class="osc-ring-label">${band.toUpperCase()}</text>
+      </svg>`;
+    // Animate after paint
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const arc = ringWrap.querySelector('.osc-ring-arc');
+      if (arc) arc.style.strokeDashoffset = offset.toFixed(1);
+    }));
+  }
 
   if (valEl)  { valEl.textContent = score; valEl.dataset.band = band; }
   if (bandEl) { bandEl.textContent = bandText; bandEl.dataset.band = band; }
@@ -793,7 +865,10 @@ function renderResult(data) {
         safeSection.classList.remove('uncharted-card');
       }
     }
+    collapseTerminal();
+    teardownStickyResultTabs();
     show('safe-section');
+    setTimeout(() => document.getElementById('safe-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
     return;
   }
 
@@ -804,7 +879,7 @@ function renderResult(data) {
 
   // Escape Plan — ranked interventions to drop below danger threshold
   if (data.escape_plan) renderEscapePlan(data.escape_plan);
-  else hide('escape-plan-panel');
+  else { document.getElementById('tab-btn-escape')?.classList.remove('has-data'); }
 
   // Cocktail Detection — co-occurring failure patterns
   if (data.cocktail) renderCocktail(data.cocktail);
@@ -812,7 +887,14 @@ function renderResult(data) {
 
   // Failure Cascade Graph — $graphLookup collapse timeline
   if (data.cascade) renderCascade(data.cascade);
-  else hide('cascade-panel');
+
+  // Pre-Mortem CTA — show whenever we have an alert
+  const pmCta = document.getElementById('premortem-cta');
+  if (pmCta) pmCta.classList.remove('hidden');
+
+  // Back-to-form bar — stamp startup name
+  const btfName = document.getElementById('btf-startup-name');
+  if (btfName && _lastPayload?.startup_name) btfName.textContent = _lastPayload.startup_name;
 
   const p = data.pattern;
   const pct = Math.round(p.confidence * 100);
@@ -1105,8 +1187,15 @@ function renderResult(data) {
   const monBtn = document.getElementById('monitor-btn');
   if (monBtn) { monBtn.textContent = 'Watch My Startup'; monBtn.disabled = false; }
 
+  if (document.getElementById('agent-terminal')?.classList.contains('hidden') === false) {
+    collapseTerminal();
+  }
   show('alert-section');
-  document.getElementById('alert-section').scrollIntoView({ behavior: 'smooth' });
+  // Small delay so layout settles after terminal collapse before scrolling
+  setTimeout(() => {
+    document.getElementById('alert-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setupStickyResultTabs();
+  }, 80);
 }
 
 // ── Pattern Research Sources ─────────────────────────────────────
@@ -1224,63 +1313,94 @@ function downloadReport() {
     .map(f => `| ${f.company} | ${f.outcome} | ${f.detail} |`)
     .join('\n');
 
-  const md = `#FAILURE PATTERN ALERT
+  const oracleScore = _lastResult.oracle_score != null ? _lastResult.oracle_score : '—';
+  const scoreBand   = _lastResult.score_band  || '';
+  const challenger  = _lastResult.challenger;
+  const escapePlan  = _lastResult.escape_plan;
+
+  const escapeSection = escapePlan?.interventions?.length
+    ? `## Escape Plan — Minimum Metric Changes to Exit Danger\n` +
+      `Pattern match can drop from **${Math.round(p.confidence * 100)}% → ${Math.round((p.confidence - escapePlan.combined_drop) * 100)}%** if all actions below are taken.\n\n` +
+      `| # | Metric | Current | Target | Difficulty | Risk Reduction |\n` +
+      `|---|--------|---------|--------|------------|----------------|\n` +
+      escapePlan.interventions.slice(0, 5).map((item, i) =>
+        `| ${i+1} | ${item.metric} | ${item.current_value} | ${item.target_value} | ${item.difficulty} | −${item.estimated_confidence_drop}pp |`
+      ).join('\n') + '\n\n---\n'
+    : '';
+
+  const challengerSection = challenger
+    ? `## Challenger Agent Verdict\n**${challenger.verdict || 'CONFIRMED'}** — Confidence gap: ${challenger.confidence_gap != null ? challenger.confidence_gap + 'pp' : '—'}\n\n${challenger.reasoning || ''}\n\n---\n`
+    : '';
+
+  const md = `# The Failure Oracle — Risk Report
+
 **Pattern:** ${p.pattern_name} (${p.pattern_id})
-**Pattern Match Score:** ${Math.round(p.confidence * 100)}%
+**Match Score:** ${Math.round(p.confidence * 100)}%
+**Oracle Score:** ${oracleScore}/100 ${scoreBand ? `(${scoreBand.toUpperCase()})` : ''}
 **Startup:** ${pl.startup_name} | Month ${pl.current_month}
+**Industry:** ${pl.industry || 'N/A'}
 **Generated:** ${new Date().toLocaleString()}
 
 ---
 
 ## What This Pattern Means
+
 ${p.narrative}
 
 ---
 
-## Warning Signals
+## Your Metrics
+
+| Metric | Value |
+|--------|-------|
+| MRR | $${pl.mrr.toLocaleString()} |
+| Monthly Growth | ${(pl.mrr_growth_rate * 100).toFixed(1)}% |
+| Churn Rate | ${(pl.churn_rate * 100).toFixed(1)}% |
+| Burn Rate | $${pl.burn_rate.toLocaleString()}/mo |
+| Runway | ${pl.runway_months} months |
+| NPS | ${pl.nps} |
+| Headcount | ${pl.headcount || 'N/A'} |
+| LTV:CAC | ${pl.cac > 0 ? (pl.ltv / pl.cac).toFixed(1) + 'x' : 'N/A'} |
+
+---
+
+## Warning Signals Detected
+
 | Signal | Status | First Detectable |
 |--------|--------|-----------------|
 ${signals || '| No signals detected | — | — |'}
 
 ---
 
-## Your Metrics
-| Metric | Value |
-|--------|-------|
-| MRR | $${pl.mrr.toLocaleString()} |
-| Monthly Growth | ${(pl.mrr_growth_rate*100).toFixed(1)}% |
-| Churn Rate | ${(pl.churn_rate*100).toFixed(1)}% |
-| Burn Rate | $${pl.burn_rate.toLocaleString()}/mo |
-| Runway | ${pl.runway_months} months |
-| NPS | ${pl.nps} |
-| LTV:CAC | ${pl.cac > 0 ? (pl.ltv/pl.cac).toFixed(1) : 'N/A'}x |
-
----
-
 ## Historical Outcomes (${total.toLocaleString()} cases)
+
 - **${failPct}% failed** within ${p.days_to_crisis} days
 - **${survPct}% survived** (${p.survival_count} companies)
 
 ---
 
-## Survival Playbook
-${playbook}
+${challengerSection}${escapeSection}## Survival Playbook
+
+${playbook || '_No playbook available for this pattern._'}
 
 ---
 
 ## Companies That Matched This Pattern
+
 | Company | Outcome | Detail |
 |---------|---------|--------|
-${failures}
+${failures || '| — | — | — |'}
 
 ---
-*Generated by The Failure Oracle*
+
+_Generated by The Failure Oracle · ${new Date().toLocaleDateString()}_
 `;
 
   const blob = new Blob([md], { type: 'text/markdown' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `oracle-report-${pl.startup_name.replace(/\s+/g,'-').toLowerCase()}.md`;
+  const safeName = pl.startup_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  a.download = `oracle-report-${safeName}.md`;
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -1509,10 +1629,35 @@ function renderAudit(data) {
     ? _allPatterns.find(p => p.pattern_id === data.related_pattern)
     : null;
 
+  // Render *text* as bold (Gemini sometimes uses markdown asterisks)
+  const renderMarkdown = (text) => (text || '')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*\n]+?)\*/g, '<strong>$1</strong>');
+
+  // Make F-XXX pattern IDs clickable chips in any text string
+  const linkPatternRefs = (text) => renderMarkdown(text || '').replace(/\b(F-\d{3})\b/g, (id) => {
+    const p = _allPatterns.find(x => x.pattern_id === id);
+    return `<span class="pattern-chip-inline" onclick="jumpToPattern('${id}')" title="${p ? p.name : id}">${id}</span>`;
+  });
+
+  // Convert a rationale paragraph into a bullet list (split on sentence boundaries)
+  const rationaleToList = (text) => {
+    if (!text) return '';
+    const sentences = text
+      .split(/(?<=[.!?])\s+(?=[A-Z"'(])/)
+      .map(s => s.trim())
+      .filter(s => s.length > 15);
+    if (sentences.length <= 1) return `<p class="audit-rationale">${linkPatternRefs(text)}</p>`;
+    return `<ul class="audit-bullets">${sentences.map(s =>
+      `<li>${linkPatternRefs(s)}</li>`
+    ).join('')}</ul>`;
+  };
+
   let patternCard = '';
   if (linked) {
     const totalCases = (linked.survival_count || 0) + (linked.failure_count || 0);
-    const computedSurvRate = linked.survival_rate != null ? linked.survival_rate : (totalCases > 0 ? (linked.survival_count / totalCases) : 0);
+    const computedSurvRate = linked.survival_rate != null ? linked.survival_rate
+      : (totalCases > 0 ? (linked.survival_count / totalCases) : 0);
     const survRatePct = Math.round(computedSurvRate * 100);
     const survClass = survRatePct < 25 ? 'apc-surv-low' : 'apc-surv-ok';
     const catLabel = CAT_LABELS[linked.category] || (linked.category || '').replace(/_/g, ' ');
@@ -1521,12 +1666,10 @@ function renderAudit(data) {
       <div class="audit-pattern-card" onclick="jumpToPattern('${linked.pattern_id}')" style="cursor:pointer" title="Click to view details in library">
         <div class="apc-label">Closest matching failure pattern ↗</div>
         <div class="apc-name">${linked.name}</div>
+        <div class="apc-surv-hero ${survClass}">${survRatePct}%<span class="apc-surv-hero-label">survived</span></div>
         <div class="apc-meta">
           <span class="apc-id">${linked.pattern_id}</span>
           <span class="apc-cat">${catLabel}</span>
-          <span class="apc-surv ${survClass}">
-            ${survRatePct}% survival rate
-          </span>
         </div>
         ${linked.famous_failures && linked.famous_failures.length > 0
           ? `<div class="apc-example">"${linked.famous_failures[0].company} — ${linked.famous_failures[0].detail}"</div>`
@@ -1535,25 +1678,53 @@ function renderAudit(data) {
     `;
   }
 
+  // Risk banner colors
+  const bannerColors = {
+    CRITICAL: 'var(--danger)',
+    HIGH: '#f97316',
+    MEDIUM: 'var(--warning)',
+    LOW: 'var(--safe)',
+  };
+  const bannerColor = bannerColors[data.risk_level] || 'var(--muted)';
+
   el.innerHTML = `
-    <div class="audit-risk ${cls}">
-      ${riskIcon(data.risk_level)} <strong>${data.risk_level} RISK</strong>
+    <div class="audit-risk-banner" style="border-color:${bannerColor};background:${bannerColor}18">
+      <span class="audit-risk-level" style="color:${bannerColor}">${data.risk_level} RISK</span>
+      <span class="audit-risk-sub">Evaluated against ${(_allPatterns && _allPatterns.length) || '100'} documented failure patterns</span>
     </div>
-    ${patternCard}
-    <div class="audit-section">
-      <div class="audit-section-label">Key differentiator</div>
-      <p class="audit-differentiator">${data.key_differentiator}</p>
+
+    <div class="audit-body">
+      <div class="audit-left-col">
+        ${patternCard}
+        ${data.key_differentiator ? `
+        <div class="audit-section audit-section-diff">
+          <div class="audit-section-label">What survivors did differently</div>
+          <p class="audit-differentiator">${linkPatternRefs(data.key_differentiator)}</p>
+        </div>` : ''}
+      </div>
+
+      <div class="audit-right-col">
+        <div class="audit-recommendation-box" style="border-color:${bannerColor};background:${bannerColor}10">
+          <div class="audit-rec-label">Recommendation</div>
+          <div class="audit-rec-text">${linkPatternRefs(data.recommendation)}</div>
+        </div>
+
+        ${data.rationale ? `
+        <div class="audit-section">
+          <div class="audit-section-label">Why this decision is risky</div>
+          ${rationaleToList(data.rationale)}
+        </div>` : ''}
+
+        <div class="audit-premortem-cta">
+          <span class="audit-premortem-cta-text">Want to see what happens if you proceed anyway?</span>
+          <button class="audit-premortem-cta-btn" onclick="
+            const pmEl = document.getElementById('pm-decision-text');
+            if (pmEl) pmEl.value = document.getElementById('decision-text').value || '';
+            setTimeout(() => { if(pmEl) pmEl.scrollIntoView({behavior:'smooth', block:'center'}); }, 100);
+          ">Run Pre-Mortem →</button>
+        </div>
+      </div>
     </div>
-    <div class="audit-section">
-      <div class="audit-section-label">Recommendation</div>
-      <p class="audit-recommendation">${data.recommendation}</p>
-    </div>
-    ${data.rationale ? `
-    <div class="audit-section">
-      <div class="audit-section-label">Analysis</div>
-      <p class="audit-rationale">${data.rationale}</p>
-    </div>` : ''}
-    <p class="audit-footer">Evaluated against ${(_allPatterns && _allPatterns.length) || (data.total_cases ? '' : '100')} documented failure patterns${linked ? ' · grounded in the named pattern above' : ''}</p>
   `;
   el.classList.remove('hidden');
   el.scrollIntoView({ behavior: 'smooth' });
@@ -1578,7 +1749,53 @@ async function loadPatternLibrary() {
   }
 }
 
+let _patternViewMode = 'list'; // 'list' | 'heatmap'
+
+function togglePatternView() {
+  _patternViewMode = _patternViewMode === 'list' ? 'heatmap' : 'list';
+  const btn = document.getElementById('pattern-view-toggle');
+  if (btn) btn.textContent = _patternViewMode === 'list' ? 'Heatmap View' : 'List View';
+  const filtered = _currentPatternCategory
+    ? _allPatterns.filter(p => p.category === _currentPatternCategory)
+    : _allPatterns;
+  renderPatternGrid(filtered);
+}
+
+let _currentPatternCategory = '';
+
+function renderPatternHeatmap(patterns) {
+  const grid = document.getElementById('patterns-grid');
+  const cats = [...new Set(patterns.map(p => p.category))].sort();
+  const catColors = {
+    premature_scaling: '#f97316', product_market_fit: '#ef4444', unit_economics: '#dc2626',
+    fundraising: '#f59e0b', team: '#8b5cf6', go_to_market: '#3b82f6',
+    competition: '#06b6d4', platform_risk: '#14b8a6', regulatory: '#84cc16',
+    technical_debt: '#6366f1', pivot: '#ec4899', product: '#a855f7',
+  };
+
+  let html = '<div class="heatmap-legend"><span>Lower survival rate</span><div class="heatmap-legend-bar"></div><span>Higher survival rate</span></div>';
+  html += '<div class="heatmap-grid">';
+
+  patterns.forEach(p => {
+    const total = (p.failure_count || 0) + (p.survival_count || 0);
+    const surv = total > 0 ? Math.round((p.survival_count / total) * 100) : 0;
+    const r = Math.round(239 - (surv / 100) * (239 - 16));
+    const g = Math.round(68 + (surv / 100) * (185 - 68));
+    const b = Math.round(68 + (surv / 100) * (129 - 68));
+    const bg = `rgb(${r},${g},${b})`;
+    html += `
+      <div class="heatmap-cell" style="background:${bg}" title="${p.pattern_id}: ${p.name} — ${surv}% survived"
+        onclick="jumpToPattern('${p.pattern_id}')">
+        <span class="heatmap-cell-id">${p.pattern_id}</span>
+        <span class="heatmap-cell-surv">${surv}%</span>
+      </div>`;
+  });
+  html += '</div>';
+  grid.innerHTML = html;
+}
+
 function filterPatterns(category) {
+  _currentPatternCategory = category || '';
   document.querySelectorAll('.pf-btn').forEach(b => b.classList.remove('active'));
   
   if (typeof event !== 'undefined' && event && event.target && event.target.classList.contains('pf-btn')) {
@@ -1605,6 +1822,7 @@ function renderPatternGrid(patterns) {
     grid.innerHTML = '<p style="color:var(--muted);padding:1rem">No patterns in this category.</p>';
     return;
   }
+  if (_patternViewMode === 'heatmap') { renderPatternHeatmap(patterns); return; }
   grid.innerHTML = patterns.map(p => {
     const total = (p.failure_count || 0) + (p.survival_count || 0);
     const survRate = total > 0 ? Math.round((p.survival_count / total) * 100) : 0;
@@ -1673,6 +1891,13 @@ function jumpToPattern(patternId) {
     const countEl = document.getElementById('patterns-count');
     const count = countEl ? countEl.textContent : '';
     if (btn) btn.innerHTML = `Hide Pattern Library (<span id="patterns-count">${count}</span>)`;
+  }
+
+  // Switch to list view so .pattern-card elements exist
+  if (_patternViewMode === 'heatmap') {
+    _patternViewMode = 'list';
+    const vBtn = document.getElementById('pattern-view-toggle');
+    if (vBtn) vBtn.textContent = 'Heatmap View';
   }
 
   // 2. Clear any active category filter so the card is visible
@@ -1815,22 +2040,78 @@ function switchResultTab(tabId) {
   const targetTab = document.getElementById(tabId);
   if (targetTab) targetTab.classList.remove('hidden');
 
-  document.querySelectorAll('.result-tab-btn').forEach(btn => {
-    if (btn.getAttribute('onclick')?.includes(tabId)) {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
+  // Sync active state in both the inline nav and the sticky nav
+  ['.result-tab-btn', '.srt-btn'].forEach(selector => {
+    document.querySelectorAll(selector).forEach(btn => {
+      const matches = btn.getAttribute('onclick')?.includes(tabId)
+                   || btn.dataset.tab === tabId;
+      btn.classList.toggle('active', !!matches);
+    });
   });
+
+  // Mirror has-data dot to sticky escape tab btn
+  const srtEscape = document.getElementById('srt-btn-escape');
+  const origEscape = document.getElementById('tab-btn-escape');
+  if (srtEscape && origEscape) {
+    srtEscape.classList.toggle('has-data', origEscape.classList.contains('has-data'));
+  }
+}
+
+// Called by sticky nav buttons — switch tab AND scroll to top of section
+function switchResultTabSticky(tabId) {
+  switchResultTab(tabId);
+
+  // Immediately hide sticky + disconnect observer so scroll animation
+  // doesn't re-trigger the observer and cause flicker
+  const sticky = document.getElementById('sticky-result-tabs');
+  if (sticky) sticky.classList.add('hidden');
+  if (_stickyTabsObserver) _stickyTabsObserver.disconnect();
+  _stickyTabsObserver = null;
+
+  const anchor = document.getElementById('result-tabs-nav');
+  if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Reconnect observer after smooth scroll finishes (~600ms)
+  setTimeout(() => setupStickyResultTabs(), 650);
+}
+
+// ── Sticky Result Tabs (IntersectionObserver) ─────────────────────
+let _stickyTabsObserver = null;
+
+function setupStickyResultTabs() {
+  const anchor = document.getElementById('result-tabs-nav');
+  const sticky = document.getElementById('sticky-result-tabs');
+  if (!anchor || !sticky) return;
+
+  if (_stickyTabsObserver) _stickyTabsObserver.disconnect();
+
+  const contentArea = document.querySelector('.content-area') || document.documentElement;
+
+  _stickyTabsObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      // Show sticky when original tabs have scrolled above viewport
+      const above = !entry.isIntersecting && entry.boundingClientRect.top < 0;
+      sticky.classList.toggle('hidden', !above);
+    });
+  }, { root: contentArea, threshold: 0 });
+
+  _stickyTabsObserver.observe(anchor);
+}
+
+function teardownStickyResultTabs() {
+  if (_stickyTabsObserver) { _stickyTabsObserver.disconnect(); _stickyTabsObserver = null; }
+  document.getElementById('sticky-result-tabs')?.classList.add('hidden');
 }
 
 // ── Escape Plan ──────────────────────────────────────────────────
 function renderEscapePlan(plan) {
-  const panel = document.getElementById('escape-plan-panel');
+  const panel  = document.getElementById('escape-plan-panel');
+  const tabBtn = document.getElementById('tab-btn-escape');
   if (!panel || !plan || !plan.interventions?.length) {
-    if (panel) panel.classList.add('hidden');
+    if (tabBtn) tabBtn.classList.remove('has-data');
     return;
   }
+  if (tabBtn) tabBtn.classList.add('has-data');
 
   const afterConf = plan.current_confidence - plan.combined_drop;
   const escapeEl   = document.getElementById('ep-after-conf');
@@ -1851,7 +2132,7 @@ function renderEscapePlan(plan) {
     }
   }
 
-  const diffIcon = { easy: '🟢', medium: '🟡', hard: '🔴' };
+  const diffIcon = { easy: '', medium: '', hard: '' };
 
   if (listEl) {
     listEl.innerHTML = plan.interventions.slice(0, 5).map((item, i) => `
@@ -1870,7 +2151,7 @@ function renderEscapePlan(plan) {
     `).join('');
   }
 
-  panel.classList.remove('hidden');
+  // Panel is now always visible inside its tab; just ensure tab is accessible
 }
 
 // ── Confidence Trajectory Forecast ──────────────────────────────
@@ -2158,20 +2439,31 @@ function renderHistory() {
   if (!snapshots.length) { el.classList.add('hidden'); return; }
   el.classList.remove('hidden');
 
+  const totalSnaps = snapshots.length;
   const rows = snapshots.slice(0, 6).map((s, i) => {
     const d = new Date(s.date);
     const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const scoreStr = s.alert ? `<span class="hs-score hs-danger">${Math.round(s.match_score * 100)}% — ${s.pattern_name || 'Risk detected'}</span>`
-                             : `<span class="hs-score hs-safe">No pattern</span>`;
+    const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const runNum = totalSnaps - i;
+    const riskCls = s.alert ? 'danger' : 'safe';
+    const patternLabel = s.alert
+      ? `${Math.round(s.match_score * 100)}% — ${(s.pattern_name || 'Risk detected').length > 30 ? (s.pattern_name || 'Risk detected').slice(0, 30) + '…' : (s.pattern_name || 'Risk detected')}`
+      : 'No pattern detected';
     const trend = i < snapshots.length - 1
       ? (s.match_score > snapshots[i + 1].match_score ? '↑' : s.match_score < snapshots[i + 1].match_score ? '↓' : '→')
-      : '';
-    const trendCls = trend === '↑' ? 'hs-up' : trend === '↓' ? 'hs-down' : 'hs-flat';
-    return `<div class="hs-row">
-      <span class="hs-date">${dateStr}</span>
+      : '—';
+    const trendCls = trend === '↑' ? 'up' : trend === '↓' ? 'down' : 'flat';
+    return `<div class="hs-row hs-row-${riskCls}" style="--row-index:${i}">
+      <div class="hs-row-left">
+        <span class="hs-run-badge">#${runNum}</span>
+        <div class="hs-time-stack">
+          <span class="hs-date">${dateStr}</span>
+          <span class="hs-time">${timeStr}</span>
+        </div>
+      </div>
       <span class="hs-name">${s.startup_name}</span>
-      ${scoreStr}
-      <span class="hs-trend ${trendCls}">${trend}</span>
+      <span class="hs-score-pill ${riskCls}">${patternLabel}</span>
+      <span class="hs-trend-icon ${trendCls}">${trend}</span>
     </div>`;
   }).join('');
 
@@ -2214,7 +2506,7 @@ function renderTrendChart() {
   }
   section.classList.remove('hidden');
 
-  const labels  = snapshots.map(s => new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+  const labels  = snapshots.map((_, i) => `Run #${i + 1}`);
   const growth  = snapshots.map(s => +(((s.mrr_growth || 0) * 100).toFixed(1)));
   const churn   = snapshots.map(s => +(((s.churn || 0) * 100).toFixed(1)));
   const alerts  = snapshots.map(s => s.alert ? s.match_score * 100 : null);
@@ -2277,6 +2569,13 @@ function renderTrendChart() {
         },
         tooltip: {
           callbacks: {
+            title: ctx => {
+              const idx = ctx[0]?.dataIndex ?? 0;
+              const d = new Date(snapshots[idx].date);
+              const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+              return `Run #${idx + 1} · ${dateStr} at ${timeStr}  —  ${snapshots[idx].startup_name}`;
+            },
             label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) + '%' : '—'}`,
           },
         },
@@ -2517,6 +2816,7 @@ async function runPortfolio() {
     alert('Add at least one company with a name.');
     return;
   }
+  _portfolioLastMetrics = startups;
 
   btnText.classList.add('hidden');
   spinner.classList.remove('hidden');
@@ -2548,31 +2848,80 @@ function renderPortfolio(data) {
   const gridEl    = document.getElementById('pf-grid');
 
   const riskColors = { CRITICAL: '#ef4444', HIGH: '#f97316', MODERATE: '#f59e0b', SAFE: '#10b981' };
+  const riskBg     = { CRITICAL: 'rgba(239,68,68,0.06)', HIGH: 'rgba(249,115,22,0.06)', MODERATE: 'rgba(245,158,11,0.06)', SAFE: 'rgba(16,185,129,0.06)' };
+
+  const atRisk = data.critical + data.high_risk;
+  const portfolioHealth = data.safe === data.total ? 'All Clear' :
+    data.critical > 0 ? 'Portfolio Alert' : 'Monitor Required';
+  const healthColor = data.critical > 0 ? '#ef4444' : data.high_risk > 0 ? '#f97316' : '#10b981';
 
   summaryEl.innerHTML = `
-    <div class="pf-sum-stat"><div class="pf-sum-num">${data.total}</div><div class="pf-sum-label">Total</div></div>
-    <div class="pf-sum-stat"><div class="pf-sum-num pf-critical">${data.critical}</div><div class="pf-sum-label">Critical</div></div>
-    <div class="pf-sum-stat"><div class="pf-sum-num pf-high">${data.high_risk}</div><div class="pf-sum-label">High Risk</div></div>
-    <div class="pf-sum-stat"><div class="pf-sum-num pf-moderate">${data.moderate}</div><div class="pf-sum-label">Moderate</div></div>
-    <div class="pf-sum-stat"><div class="pf-sum-num pf-safe">${data.safe}</div><div class="pf-sum-label">Safe</div></div>
+    <div class="pf-danger-board">
+      <div class="pf-danger-headline" style="color:${healthColor}">${portfolioHealth}</div>
+      <div class="pf-danger-sub">${atRisk} of ${data.total} companies need immediate attention</div>
+    </div>
+    <div class="pf-sum-chips">
+      <div class="pf-sum-chip pf-sum-critical"><span>${data.critical}</span> Critical</div>
+      <div class="pf-sum-chip pf-sum-high"><span>${data.high_risk}</span> High Risk</div>
+      <div class="pf-sum-chip pf-sum-moderate"><span>${data.moderate}</span> Moderate</div>
+      <div class="pf-sum-chip pf-sum-safe"><span>${data.safe}</span> Safe</div>
+    </div>
   `;
 
   gridEl.innerHTML = data.companies.map((c, i) => {
-    const pct      = Math.round(c.confidence * 100);
-    const chipCls  = `pf-chip-${c.risk_level.toLowerCase()}`;
-    const days     = c.days_to_crisis ? `~${c.days_to_crisis}d to crisis` : '';
-    const pattern  = c.pattern_name ? `<span class="pf-pattern">${c.pattern_name}</span>` : '';
-    const reason   = c.match_reasoning ? `<div class="pf-reasoning">${c.match_reasoning}</div>` : '';
+    const pct   = Math.round(c.confidence * 100);
+    const color = riskColors[c.risk_level] || '#6366f1';
+    const bg    = riskBg[c.risk_level] || 'transparent';
+    const survPct = c.survival_rate != null ? Math.round(c.survival_rate * 100) : null;
+    const days  = c.days_to_crisis ? `~${c.days_to_crisis}d` : '';
+
+    const metricsForDive = _portfolioLastMetrics?.[i];
+    const diveBtn = metricsForDive ? `
+      <button class="pf-dive-btn" onclick='loadPortfolioCompany(${JSON.stringify(metricsForDive)})'>
+        Deep Dive →
+      </button>` : '';
+
     return `
-      <div class="pf-company-row">
-        <span class="pf-rank">#${i + 1}</span>
-        <span class="pf-name">${c.startup_name}</span>
-        ${pattern}
-        <span class="pf-risk-chip ${chipCls}">${c.risk_level} ${pct > 0 ? pct + '%' : ''}</span>
-        <span class="pf-days">${days}</span>
-        ${reason}
+      <div class="pf-company-card" style="border-left-color:${color};background:${bg}">
+        <div class="pf-card-top">
+          <div class="pf-card-rank">#${i + 1}</div>
+          <div class="pf-card-name">${c.startup_name}</div>
+          <div class="pf-card-badge" style="background:${color}20;color:${color};border-color:${color}40">${c.risk_level}</div>
+        </div>
+
+        ${c.pattern_name ? `
+        <div class="pf-card-pattern">
+          <span class="pf-card-pattern-name">${c.pattern_name}</span>
+          <div class="pf-conf-track">
+            <div class="pf-conf-fill" style="width:${pct}%;background:${color}"></div>
+          </div>
+          <span class="pf-conf-pct" style="color:${color}">${pct}%</span>
+        </div>` : '<div class="pf-card-pattern pf-safe-tag">No dangerous pattern detected</div>'}
+
+        <div class="pf-card-stats">
+          ${survPct != null ? `<div class="pf-card-stat"><span class="pf-stat-big" style="color:${survPct < 20 ? '#ef4444' : '#10b981'}">${survPct}%</span><span class="pf-stat-tiny">survived</span></div>` : ''}
+          ${days ? `<div class="pf-card-stat"><span class="pf-stat-big">${days}</span><span class="pf-stat-tiny">to crisis</span></div>` : ''}
+        </div>
+
+        ${c.match_reasoning ? `<div class="pf-card-reasoning">${c.match_reasoning}</div>` : ''}
+
+        ${diveBtn}
       </div>`;
   }).join('');
+}
+
+// Store last portfolio metrics for "Deep Dive" buttons
+let _portfolioLastMetrics = null;
+
+function loadPortfolioCompany(metrics) {
+  // Pre-fill the main form and switch to dashboard
+  Object.entries(metrics).forEach(([k, v]) => {
+    const el = document.getElementById(k);
+    if (el) { el.value = v; el.dispatchEvent(new Event('input')); }
+  });
+  switchTab('tab-dashboard');
+  updateLiveMetrics();
+  setTimeout(() => document.getElementById('run-btn')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
 }
 
 // ── Pattern Submission ────────────────────────────────────────────
@@ -2640,6 +2989,8 @@ function updateLiveMetrics() {
   const ltv = parseFloat(document.getElementById('ltv').value) || 0;
   const cac = parseFloat(document.getElementById('cac').value) || 0;
   const runway = parseFloat(document.getElementById('runway_months').value) || 0;
+  const npsRaw = document.getElementById('nps').value;
+  const nps = npsRaw !== '' ? parseFloat(npsRaw) : null;
 
   const netNewMrr = mrr * growth;
   const burnMultiple = netNewMrr > 0 ? (burn / netNewMrr) : 99;
@@ -2683,7 +3034,7 @@ function updateLiveMetrics() {
     runwayEl.textContent = runway + ' mo';
     runwayEl.className = 'lm-value ' + (runway >= 18 ? 'healthy' : (runway >= 9 ? 'warning' : 'danger'));
     if (runwayBar) {
-      const pct = Math.max(0, Math.min(100, (runway / 24.0) * 100)); // higher is better
+      const pct = Math.max(0, Math.min(100, (runway / 24.0) * 100));
       runwayBar.style.width = `${pct}%`;
       runwayBar.className = 'lm-bar-fill ' + (runway >= 18 ? 'healthy' : (runway >= 9 ? 'warning' : 'danger'));
     }
@@ -2692,20 +3043,56 @@ function updateLiveMetrics() {
     runwayEl.className = 'lm-value';
     if (runwayBar) runwayBar.style.width = '0%';
   }
+
+  // NPS metric
+  const npsEl = document.getElementById('live-nps-val');
+  const npsBar = document.getElementById('live-nps-bar');
+  if (nps !== null) {
+    npsEl.textContent = (nps > 0 ? '+' : '') + nps;
+    const npsSt = nps >= 50 ? 'healthy' : nps >= 20 ? 'warning' : 'danger';
+    npsEl.className = 'lm-value ' + npsSt;
+    if (npsBar) {
+      npsBar.style.width = `${Math.max(0, Math.min(100, ((nps + 100) / 200) * 100))}%`;
+      npsBar.className = 'lm-bar-fill ' + npsSt;
+    }
+  } else {
+    if (npsEl) { npsEl.textContent = '--'; npsEl.className = 'lm-value'; }
+    if (npsBar) npsBar.style.width = '0%';
+  }
+
+  // Composite health score (0–100)
+  const compEl = document.getElementById('live-composite');
+  const compBar = document.getElementById('live-composite-bar');
+  const compDesc = document.getElementById('live-composite-desc');
+  const netNewMrrComp = mrr * growth;
+  const burnMulComp = netNewMrrComp > 0 ? (burn / netNewMrrComp) : 99;
+  const ltvcacComp = cac > 0 ? (ltv / cac) : 0;
+  const hasAnyData = (burn > 0 && mrr > 0 && growth > 0) || (ltv > 0 && cac > 0) || runway > 0;
+  if (hasAnyData && compEl) {
+    const burnPts  = (burn > 0 && netNewMrrComp > 0) ? (burnMulComp <= 1.5 ? 33 : burnMulComp <= 3 ? 18 : 0) : 0;
+    const ltvcacPts = (ltv > 0 && cac > 0) ? (ltvcacComp >= 3 ? 33 : ltvcacComp >= 1.5 ? 18 : 5) : 0;
+    const runwayPts = runway > 0 ? (runway >= 18 ? 34 : runway >= 9 ? 20 : 5) : 0;
+    const score = burnPts + ltvcacPts + runwayPts;
+    compEl.textContent = score + '/100';
+    const compSt = score >= 60 ? 'healthy' : score >= 35 ? 'warning' : 'danger';
+    compEl.className = 'lm-composite-value ' + compSt;
+    if (compBar) { compBar.style.width = `${score}%`; compBar.className = 'lm-composite-bar ' + compSt; }
+    if (compDesc) compDesc.textContent = score >= 60 ? 'Metrics look healthy — low failure risk'
+      : score >= 35 ? 'Warning signals present — monitor closely'
+      : 'Critical risk indicators — intervention needed';
+  }
 }
 
 // Hook into fillDemo
+let _suppressFillDemoAutoRun = false;
 const originalFillDemo = fillDemo;
 fillDemo = function(preset) {
   originalFillDemo(preset);
   updateLiveMetrics();
-  
-  // Automatically trigger the pattern analysis to run immediately
+  if (_suppressFillDemoAutoRun) return;
   setTimeout(() => {
     const analyzeBtn = document.getElementById('analyze-btn');
-    if (analyzeBtn) {
-      analyzeBtn.click();
-    }
+    if (analyzeBtn) analyzeBtn.click();
   }, 50);
 };
 
@@ -3110,11 +3497,12 @@ function renderCocktail(cocktail) {
 
 // ── Failure Cascade Graph ($graphLookup) ──────────────────────────
 function renderCascade(cascade) {
-  const panel = document.getElementById('cascade-panel');
+  const panel  = document.getElementById('cascade-panel');
+  const tabBtn = document.getElementById('tab-btn-escape');
   if (!panel || !cascade || !cascade.has_cascade) {
-    if (panel) panel.classList.add('hidden');
     return;
   }
+  if (tabBtn) tabBtn.classList.add('has-data');
 
   // Header badges
   const depthBadge = document.getElementById('casc-depth-badge');
@@ -3168,8 +3556,7 @@ function renderCascade(cascade) {
     }
     calibEl.textContent = (cascade.cascade_calibration || '') + bayesNote;
   }
-
-  panel.classList.remove('hidden');
+  // Panel always visible inside its tab
 }
 
 // ── SVG Cascade Flow Diagram — $graphLookup visualised as a node-edge graph

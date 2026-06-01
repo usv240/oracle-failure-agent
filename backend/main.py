@@ -197,7 +197,7 @@ async def stats():
 @app.get("/api/health")
 async def health():
     from backend.db.connection import get_db
-    from backend.services.adk_runner import _runner
+    import backend.services.adk_runner as _adk_mod
     from backend.services.gemini import active_gemini3_model, _GEMINI3_CHAIN
     db = get_db()
     try:
@@ -210,7 +210,7 @@ async def health():
         "mongodb": "connected",
         "mcp": "ready" if mcp.available else "unavailable (motor fallback active)",
         "mcp_tools": len(mcp.tool_names),
-        "adk_agent": "initialized" if _runner is not None else "pending",
+        "adk_agent": "initialized" if _adk_mod._runner is not None else "pending",
         "pattern_count": pattern_count,
         "gemini_active": active_gemini3_model,
         "gemini3_chain": _GEMINI3_CHAIN,
