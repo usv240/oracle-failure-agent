@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3.0" />
+  <link rel="stylesheet" href="style.css?v=3.4" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script>
     // Apply saved theme before render to avoid flash
@@ -17,13 +17,199 @@
     })();
   </script>
 </head>
-<body>
+<body class="landing-active">
 
   <!-- Offline banner — shown when backend is unreachable -->
   <div id="offline-banner" class="offline-banner hidden">
     <span>⚠ Oracle backend is unreachable. Check your connection or try refreshing.</span>
     <button onclick="document.getElementById('offline-banner').classList.add('hidden')" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1rem;margin-left:0.5rem">✕</button>
   </div>
+
+  <!-- ══ Landing Hero (Option A entry screen) — dismissed via enterApp() ══ -->
+  <div id="landing-hero" class="landing-hero">
+
+    <button class="lh-theme-toggle" id="theme-btn-landing" onclick="toggleTheme()" title="Toggle light / dark" aria-label="Toggle light or dark theme"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></button>
+
+    <!-- First screen -->
+    <section class="lh-screen">
+      <div class="lh-inner">
+        <svg class="lh-logo" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="72" height="72" rx="18" fill="#1a0533"/>
+          <rect width="72" height="72" rx="18" fill="url(#bg_lh)" opacity="0.6"/>
+          <path d="M10 38 L20 38 L26 22 L32 52 L38 32 L44 42 L50 38 L62 38" stroke="#93c5fd" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="62" cy="38" r="4" fill="#ef4444"/>
+          <defs>
+            <linearGradient id="bg_lh" x1="0" y1="0" x2="72" y2="72" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#2563eb"/>
+              <stop offset="100%" stop-color="#1e3a8a"/>
+            </linearGradient>
+          </defs>
+        </svg>
+
+        <span class="lh-eyebrow"><span class="lh-dot"></span>Google ADK · Gemini 3 Flash · MongoDB Atlas</span>
+
+        <h1 class="lh-title">Catch startup failure <span class="lh-grad">3–6 months early</span>.</h1>
+
+        <p class="lh-sub">Enter your 11 startup metrics. A 3-agent AI pipeline matches them against 100 documented failure patterns — then shows you the warning signs, a deterministic escape plan, and exactly what the companies that survived did.</p>
+
+        <div class="lh-cta-row">
+          <button class="lh-btn-primary" onclick="enterApp('tab-dashboard')">Analyze my startup →</button>
+          <button class="lh-btn-ghost" onclick="openHowItWorks()">See how it works</button>
+        </div>
+
+        <div class="lh-stats">
+          <div class="lh-stat"><div class="lh-stat-num lh-countup" data-count="100">100</div><div class="lh-stat-lbl">documented failure patterns</div></div>
+          <div class="lh-stat"><div class="lh-stat-num lh-countup" data-count="90" data-suffix="%">90%</div><div class="lh-stat-lbl">fail for known, preventable reasons</div></div>
+          <div class="lh-stat"><div class="lh-stat-num">3-agent</div><div class="lh-stat-lbl">adversarial AI pipeline</div></div>
+          <div class="lh-stat"><div class="lh-stat-num">0–100</div><div class="lh-stat-lbl">transparent Oracle Score</div></div>
+        </div>
+
+        <nav class="lh-nav" aria-label="Jump to a tool">
+          <button class="lh-nav-chip" onclick="enterApp('tab-dashboard')">Diagnostic Dashboard</button>
+          <button class="lh-nav-chip" onclick="enterApp('tab-auditor')">Decision Auditor</button>
+          <button class="lh-nav-chip" onclick="enterApp('tab-portfolio')">VC Portfolio</button>
+          <button class="lh-nav-chip" onclick="enterApp('tab-cohort')">Cohort Intel</button>
+          <button class="lh-nav-chip" onclick="enterApp('tab-library')">Pattern Library</button>
+          <button class="lh-nav-chip" onclick="enterApp('tab-submit')">Submit Pattern</button>
+        </nav>
+
+        <button class="lh-scroll-cue" onclick="document.getElementById('lh-more').scrollIntoView({behavior:'smooth'})" aria-label="Learn more" title="Learn more">↓</button>
+      </div>
+    </section>
+
+    <!-- Detail sections -->
+    <div class="lh-detail" id="lh-more">
+
+      <!-- Signature: animated Oracle Score gauge -->
+      <section class="lh-section lh-demo-section" style="border-top:none">
+        <h2 class="lh-h2">Watch it call a collapse</h2>
+        <p class="lh-lead">We ran WeWork's Q4 2019 numbers through the Oracle — three months before the IPO imploded. Here's the verdict.</p>
+        <div class="lh-demo">
+          <div class="lh-gauge">
+            <svg viewBox="0 0 140 140">
+              <circle class="lh-gauge-track" cx="70" cy="70" r="60"/>
+              <circle class="lh-gauge-prog" id="lh-gauge-prog" cx="70" cy="70" r="60"/>
+            </svg>
+            <div class="lh-gauge-center">
+              <span class="lh-gauge-num" id="lh-gauge-num">100</span>
+              <span class="lh-gauge-cap">Oracle Score</span>
+            </div>
+          </div>
+          <div class="lh-demo-readout">
+            <div class="lh-demo-company">WeWork · Q4 2019</div>
+            <div class="lh-demo-verdict" id="lh-gauge-verdict" style="color:var(--muted)">Analyzing…</div>
+            <ul class="lh-demo-list">
+              <li>Burn multiple <strong>54×</strong> — threshold 4×</li>
+              <li>Runway <strong>7 months</strong> — floor 12</li>
+              <li>LTV:CAC <strong>0.5×</strong> — needs 3×</li>
+            </ul>
+            <div class="lh-demo-foot">Outcome 3 months later: $47B → $2.9B, IPO withdrawn.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section class="lh-section">
+        <h2 class="lh-h2">From metrics to forecast in seconds</h2>
+        <p class="lh-lead">Three AI agents run in sequence — and every step streams live to your screen as it happens.</p>
+        <div class="lh-steps">
+          <div class="lh-step">
+            <div class="lh-step-num">1</div>
+            <h3>Investigator</h3>
+            <p>Embeds your metrics with Voyage AI and searches all 100 patterns using MongoDB Vector Search + BM25, fused with Reciprocal Rank Fusion.</p>
+          </div>
+          <div class="lh-step">
+            <div class="lh-step-num">2</div>
+            <h3>Challenger</h3>
+            <p>A second, independent Gemini agent actively tries to prove the match wrong — catching false positives a single AI would miss.</p>
+          </div>
+          <div class="lh-step">
+            <div class="lh-step-num">3</div>
+            <h3>Reporter</h3>
+            <p>Assembles your Oracle Score, a deterministic escape plan, and the failure cascade showing exactly what breaks next.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- What you get -->
+      <section class="lh-section">
+        <h2 class="lh-h2">What every analysis gives you</h2>
+        <div class="lh-features">
+          <div class="lh-feature">
+            <div class="lh-feature-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></div>
+            <h3>Oracle Score</h3><p>A transparent 0–100 health score — click to audit every penalty and bonus with your numbers.</p>
+          </div>
+          <div class="lh-feature">
+            <div class="lh-feature-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+            <h3>Pattern Match</h3><p>Which of 100 documented failure patterns your metrics resemble, with a confidence score.</p>
+          </div>
+          <div class="lh-feature">
+            <div class="lh-feature-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></div>
+            <h3>Escape Plan</h3><p>The exact metric changes to drop below the danger threshold. Pure algebra, not AI advice.</p>
+          </div>
+          <div class="lh-feature">
+            <div class="lh-feature-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
+            <h3>Failure Cascade</h3><p>What fails next, in how many days, at what probability — traversed with MongoDB <code>$graphLookup</code>.</p>
+          </div>
+          <div class="lh-feature">
+            <div class="lh-feature-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+            <h3>Warning Signals</h3><p>Early indicators already in your data, with how many days ago each first became detectable.</p>
+          </div>
+          <div class="lh-feature">
+            <div class="lh-feature-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+            <h3>Survival Playbook</h3><p>The numbered steps used by the companies that actually survived this exact pattern.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Proven on -->
+      <section class="lh-section lh-section-center">
+        <h2 class="lh-h2">Proven on failures everyone knows</h2>
+        <p class="lh-lead">Run the famous collapses and watch the Oracle call them — with the same numbers the headlines missed.</p>
+        <div class="lh-companies">
+          <span class="lh-company">WeWork</span>
+          <span class="lh-company">Quibi</span>
+          <span class="lh-company">Theranos</span>
+          <span class="lh-company">Homejoy</span>
+          <span class="lh-company">Jawbone</span>
+          <span class="lh-company">Vine</span>
+        </div>
+      </section>
+
+      <!-- Built on -->
+      <section class="lh-section lh-section-center">
+        <h2 class="lh-h2">Built on the full MongoDB Atlas + Google stack</h2>
+        <p class="lh-lead">Not a demo integration — every feature runs in the actual pipeline.</p>
+        <div class="lh-tech">
+          <span>Google ADK</span><span>Gemini 3 Flash</span><span>Atlas Vector Search</span>
+          <span>Atlas Search · BM25 + RRF</span><span>MongoDB MCP</span><span>$graphLookup</span>
+          <span>$bucket · $facet</span><span>Change Streams</span><span>ACID Transactions</span>
+          <span>Voyage AI Embeddings</span><span>Google Cloud Run</span>
+        </div>
+      </section>
+
+      <!-- Final CTA + footer -->
+      <section class="lh-section lh-section-center">
+        <button class="lh-btn-primary" onclick="enterApp('tab-dashboard')">Analyze my startup →</button>
+        <div class="lh-footer">
+          The Failure Oracle &nbsp;·&nbsp; <a href="https://github.com/usv240/oracle-failure-agent" target="_blank" rel="noopener">View source on GitHub →</a>
+        </div>
+      </section>
+
+    </div>
+  </div>
+  <script>
+    // Deep-link: if the URL already points at a tab, skip the landing before first paint
+    (function(){
+      var h = (location.hash || '').replace('#','');
+      var tabs = ['tab-dashboard','tab-auditor','tab-portfolio','tab-cohort','tab-library','tab-submit'];
+      if (tabs.indexOf(h) !== -1) {
+        document.body.classList.remove('landing-active');
+        var hero = document.getElementById('landing-hero');
+        if (hero) hero.classList.add('hidden');
+      }
+    })();
+  </script>
 
   <div class="app-layout">
     <!-- Desktop Sidebar -->
@@ -136,7 +322,7 @@
     <div class="content-area">
       <!-- App Top Brand Header -->
       <header class="app-top-header">
-        <div class="top-brand">
+        <div class="top-brand" onclick="showLanding()" title="Back to home" style="cursor:pointer">
           <svg class="top-logo-svg" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="72" height="72" rx="18" fill="#1a0533"/>
             <rect width="72" height="72" rx="18" fill="url(#bg_t)" opacity="0.6"/>
@@ -283,7 +469,7 @@
           position: fixed !important;
           inset: 0 !important;
           background: rgba(0,0,0,0.65) !important;
-          z-index: 1000 !important;
+          z-index: 2000 !important; /* above landing hero (1500) */
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
@@ -688,9 +874,6 @@
           <h2>Diagnostic Dashboard</h2>
           <span class="dhi-agentic-pill">3-Agent Adversarial Pipeline</span>
         </div>
-        <p class="hero-tagline">
-          The first AI that treats startup failure as a <strong>state machine</strong> — predicting the exact collapse sequence before it happens and computing the minimum intervention to break each link. Every analysis self-calibrates the cascade graph via <strong>MongoDB Change Streams</strong>, so the Oracle gets smarter with every startup that uses it.
-        </p>
       </div>
       
       <section class="welcome-banner" id="welcome-banner">
@@ -2008,7 +2191,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=2026060101"></script>
+  <script src="app.js?v=2026060104"></script>
   <script>
     // Initialize monthly tracking on page load
     window.addEventListener('load', () => { renderHistory(); });

@@ -376,6 +376,9 @@ function updateThemeUI(theme) {
   
   const btnMobile = document.getElementById('theme-btn-mobile');
   if (btnMobile) btnMobile.innerHTML = iconHtml;
+
+  const btnLanding = document.getElementById('theme-btn-landing');
+  if (btnLanding) btnLanding.innerHTML = iconHtml;
 }
 
 function toggleTheme() {
@@ -392,6 +395,18 @@ window.addEventListener('DOMContentLoaded', () => {
   document.documentElement.setAttribute('data-theme', theme);
   updateThemeUI(theme);
 
+  // Restore the active tab from the URL hash on refresh
+  // (the inline pre-paint script already hid the landing for deep links)
+  const _hashTab = (location.hash || '').replace('#', '');
+  if (['tab-dashboard','tab-auditor','tab-portfolio','tab-cohort','tab-library','tab-submit'].includes(_hashTab)) {
+    switchTab(_hashTab);
+  }
+
+  // Landing motion & signature gauge
+  initReveals();
+  initCountUp();
+  initHeroGauge();
+
   // Pre-fill form from shared URL (e.g. ?startup_name=Quibi&mrr=420000&...)
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has('startup_name')) {
@@ -402,6 +417,8 @@ window.addEventListener('DOMContentLoaded', () => {
       const el = document.getElementById(key);
       if (el && urlParams.has(key)) el.value = urlParams.get(key);
     });
+    // Shared link → skip the landing and run the analysis immediately
+    enterApp('tab-dashboard');
     updateLiveMetrics();
     // Clean URL without losing the page, then auto-run
     window.history.replaceState({}, '', window.location.pathname);
@@ -2032,6 +2049,122 @@ function switchTab(tabId) {
 
   const contentArea = document.querySelector('.content-area');
   if (contentArea) contentArea.scrollTop = 0;
+
+  // Reflect the active tab in the URL so a refresh keeps you here
+  if (window.history && history.replaceState) {
+    history.replaceState(null, '', '#' + tabId);
+  }
+}
+
+// ── Landing hero (Option A entry screen) ─────────────────────────
+// Dismiss the landing overlay and reveal the tabbed app. Optionally
+// jump straight to a given tab (used by the landing nav chips).
+function enterApp(tabId) {
+  const hero = document.getElementById('landing-hero');
+  if (hero && !hero.classList.contains('hidden')) {
+    hero.classList.add('leaving');
+    setTimeout(() => hero.classList.add('hidden'), 450);
+  }
+  document.body.classList.remove('landing-active');
+  document.body.style.overflow = '';
+  if (tabId) switchTab(tabId);
+}
+
+// Bring the landing hero back (clicking the brand logo = "home").
+function showLanding() {
+  const hero = document.getElementById('landing-hero');
+  if (!hero) return;
+  hero.classList.remove('hidden');
+  void hero.offsetWidth;            // force reflow so the fade plays
+  hero.classList.remove('leaving');
+  document.body.classList.add('landing-active');
+  hero.scrollTop = 0;
+  const ca = document.querySelector('.content-area');
+  if (ca) ca.scrollTop = 0;
+  // Clear the route so this URL shows the landing on refresh
+  if (window.history && history.replaceState) {
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+}
+
+// ── Landing: scroll-reveal, count-up, signature gauge ────────────
+// Progressive enhancement — JS adds the .reveal class, so if any of this
+// fails the content stays fully visible.
+function initReveals() {
+  if (!('IntersectionObserver' in window)) return;
+  const targets = document.querySelectorAll(
+    '.lh-detail .lh-h2, .lh-detail .lh-lead, .lh-step, .lh-feature, .lh-company, .lh-tech span, .lh-demo, .lh-detail .lh-btn-primary, .lh-footer'
+  );
+  if (!targets.length) return;
+  targets.forEach(el => el.classList.add('reveal'));
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target;
+      const idx = el.parentElement ? Array.prototype.indexOf.call(el.parentElement.children, el) : 0;
+      el.style.transitionDelay = (Math.max(0, idx % 6) * 70) + 'ms';
+      el.classList.add('in-view');
+      obs.unobserve(el);
+    });
+  }, { threshold: 0.15 });
+  targets.forEach(el => obs.observe(el));
+}
+
+function initCountUp() {
+  document.querySelectorAll('.lh-countup').forEach(el => {
+    const target = parseFloat(el.dataset.count);
+    if (isNaN(target)) return;
+    const suffix = el.dataset.suffix || '';
+    const startT = performance.now(), dur = 1400;
+    (function step(now) {
+      const t = Math.min(1, (now - startT) / dur);
+      const eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = Math.round(target * eased) + suffix;
+      if (t < 1) requestAnimationFrame(step);
+      else el.textContent = target + suffix;
+    })(performance.now());
+  });
+}
+
+// The signature moment: animate WeWork's Oracle Score collapsing to 12/100
+function initHeroGauge() {
+  const sec = document.querySelector('.lh-demo-section');
+  const numEl = document.getElementById('lh-gauge-num');
+  const prog = document.getElementById('lh-gauge-prog');
+  const verdict = document.getElementById('lh-gauge-verdict');
+  if (!sec || !numEl || !prog || !verdict) return;
+  const CIRC = 376.99;          // 2π · r(60)
+  const target = 12;
+  const colorFor = (s) => s >= 75 ? 'var(--safe)' : s >= 50 ? 'var(--warning)' : s >= 25 ? '#fb923c' : 'var(--danger)';
+  let played = false;
+
+  function play() {
+    if (played) return;
+    played = true;
+    requestAnimationFrame(() => {
+      prog.style.strokeDashoffset = String(CIRC * (1 - target / 100));
+      prog.style.stroke = colorFor(target);
+      const startT = performance.now(), dur = 2200, from = 100;
+      (function step(now) {
+        const t = Math.min(1, (now - startT) / dur);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const val = Math.round(from + (target - from) * eased);
+        numEl.textContent = String(val);
+        numEl.style.color = colorFor(val);
+        if (t < 1) requestAnimationFrame(step);
+        else { verdict.textContent = 'Burn Multiple Death Spiral'; verdict.style.color = 'var(--danger)'; }
+      })(performance.now());
+    });
+  }
+
+  if ('IntersectionObserver' in window) {
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { play(); obs.disconnect(); } });
+    }, { threshold: 0.4 });
+    obs.observe(sec);
+  } else {
+    play();
+  }
 }
 
 // Result Sub-tab Switcher
