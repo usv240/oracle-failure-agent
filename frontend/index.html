@@ -46,7 +46,7 @@
           </defs>
         </svg>
 
-        <span class="lh-eyebrow"><span class="lh-dot"></span>Google ADK · Gemini 3 Flash · MongoDB Atlas</span>
+        <span class="lh-eyebrow"><span class="lh-dot"></span>Vertex AI Agent Builder · Gemini 3 · MongoDB Atlas</span>
 
         <h1 class="lh-title">Catch startup failure <span class="lh-grad">3–6 months early</span>.</h1>
 
@@ -178,13 +178,14 @@
 
       <!-- Built on -->
       <section class="lh-section lh-section-center">
-        <h2 class="lh-h2">Built on the full MongoDB Atlas + Google stack</h2>
-        <p class="lh-lead">Not a demo integration — every feature runs in the actual pipeline.</p>
+        <h2 class="lh-h2">Built on the full MongoDB Atlas + Google Cloud stack</h2>
+        <p class="lh-lead">Not a demo integration — every feature runs in the actual pipeline. The agents are built with Google's Agent Development Kit (the framework of Vertex AI Agent Builder); MongoDB is the partner, via its MCP server.</p>
         <div class="lh-tech">
-          <span>Google ADK</span><span>Gemini 3 Flash</span><span>Atlas Vector Search</span>
-          <span>Atlas Search · BM25 + RRF</span><span>MongoDB MCP</span><span>$graphLookup</span>
-          <span>$bucket · $facet</span><span>Change Streams</span><span>ACID Transactions</span>
-          <span>Voyage AI Embeddings</span><span>Google Cloud Run</span>
+          <span>Google ADK (Agent Builder)</span><span>Gemini 3 Flash</span><span>Vertex AI</span>
+          <span>Atlas Vector Search</span><span>Atlas Search · BM25 + RRF</span><span>MongoDB MCP</span>
+          <span>$graphLookup</span><span>$bucket · $facet</span><span>Change Streams</span>
+          <span>ACID Transactions</span><span>Voyage AI Embeddings</span><span>Google Cloud Run</span>
+          <span>Cloud Scheduler</span>
         </div>
       </section>
 
@@ -722,9 +723,9 @@
             <div class="arch-arrow">→</div>
             <div class="arch-box">MongoDB Atlas<br><small>Voyage AI + Vector + BM25</small></div>
             <div class="arch-arrow">→</div>
-            <div class="arch-box">Vertex AI<br><small>Gemini Flash scorer</small></div>
+            <div class="arch-box">Gemini 3 Flash<br><small>scorer + ADK agents ×3</small></div>
             <div class="arch-arrow">→</div>
-            <div class="arch-box">Gemini 3 Flash<br><small>ADK agents ×3</small></div>
+            <div class="arch-box">Vertex AI<br><small>Gemini 2.5 fallback</small></div>
             <div class="arch-arrow">→</div>
             <div class="arch-box">Alert + Cascade<br><small>$graphLookup</small></div>
           </div>
@@ -735,13 +736,13 @@
           <div class="stack-grid">
             <div class="stack-item">
               <div class="stack-icon"></div>
-              <strong>Vertex AI — Gemini Flash (Scorer)</strong>
-              <small>Primary pattern scorer — parallel scoring of all candidates with <code>thinking_budget=0</code> for maximum speed. Also handles decision auditing with <code>thinking_budget=1024</code> for deeper reasoning. Why Vertex AI? Consistent latency SLA + enterprise billing.</small>
+              <strong>Gemini 3 Flash — Scorer + ADK Agents</strong>
+              <small>Primary inference: all 5 candidate patterns scored in parallel with <code>thinking_budget=0</code> for speed, and the three ADK agents run on Gemini 3 Flash via the Gemini API. Decision auditing uses <code>thinking_budget=1024</code> for deeper reasoning.</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
-              <strong>Gemini 3 Flash (ADK Agents)</strong>
-              <small>All three ADK agents (Investigator, Challenger, Reporter) run on Gemini 3 Flash via paid Gemini API. Gemini 3 Flash is not yet available on Vertex AI, so agents route via the Gemini API key. This dual-model architecture is intentional: best model for each job.</small>
+              <strong>Vertex AI — Resilient Fallback (Google Cloud)</strong>
+              <small>When the Gemini 3 chain is exhausted, inference fails over to Gemini 2.5 Flash on Vertex AI — consistent latency SLA + enterprise billing; embeddings fall back to Vertex <code>text-embedding-004</code>. Gemini 3 Flash isn't on Vertex AI yet, so the primary path uses the Gemini API — an intentional dual-model design.</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
@@ -755,13 +756,13 @@
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
-              <strong>Google ADK — SequentialAgent Pipeline</strong>
-              <small>google-adk orchestrates 3 LlmAgents: Investigator (finds pattern) → Challenger (disputes it) → Reporter (synthesises + saves report). Each agent has dedicated <code>FunctionTools</code> and passes results via <code>output_key</code> through shared session state. Real-time events streamed via SSE + <code>asyncio.Queue</code>.</small>
+              <strong>Google ADK — Vertex AI Agent Builder</strong>
+              <small>Built with Google's Agent Development Kit — the code-first framework of Vertex AI Agent Builder. A <code>SequentialAgent</code> orchestrates 3 LlmAgents: Investigator (finds pattern) → Challenger (disputes it) → Reporter (synthesises + saves report). Each has dedicated <code>FunctionTools</code> and passes results via <code>output_key</code> through shared session state. Real-time events streamed via SSE + <code>asyncio.Queue</code>.</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
               <strong>MongoDB MCP</strong>
-              <small>mongodb-mcp-server@1.9.0 — 28 tools, persistent stdio connection, handles all pattern reads/writes/aggregations in the critical path</small>
+              <small>mongodb-mcp-server@1.9.0 — 24 tools, persistent stdio connection, handles all pattern reads/writes/aggregations in the critical path</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
@@ -770,8 +771,8 @@
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
-              <strong>MongoDB MCP</strong>
-              <small>Model Context Protocol server for direct agent database access</small>
+              <strong>Google Cloud Scheduler</strong>
+              <small>Triggers the 6-hour background monitoring loop for watched startups — re-analysis + Slack alerts when risk worsens</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
@@ -916,8 +917,8 @@
           <span class="mts-chip" title="BM25 full-text search on pattern narratives · merged with vector results via Reciprocal Rank Fusion">
             <span class="mts-dot mts-search"></span>Atlas Search · BM25 + RRF
           </span>
-          <span class="mts-chip" title="28 native MCP tools · persistent stdio connection · tool-based reads for all pattern lookups">
-            <span class="mts-dot mts-mcp"></span>MongoDB MCP · 28 tools
+          <span class="mts-chip" title="24 native MCP tools · persistent stdio connection · tool-based reads for all pattern lookups">
+            <span class="mts-dot mts-mcp"></span>MongoDB MCP · 24 tools
           </span>
           <span class="mts-chip" title="Traverse failure state machine 3 hops deep · each node is a failure mode that triggers the next">
             <span class="mts-dot mts-graph"></span>$graphLookup Cascade
@@ -2142,12 +2143,12 @@
 
   <footer>
     <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.5rem;margin-bottom:0.75rem">
-      <span class="tech-badge">Google ADK · SequentialAgent</span>
+      <span class="tech-badge">Google ADK · Vertex AI Agent Builder</span>
       <span class="tech-badge">Gemini 3 Flash</span>
       <span class="tech-badge">MongoDB Voyage AI</span>
       <span class="tech-badge">Atlas Vector Search</span>
       <span class="tech-badge">Atlas Search · BM25</span>
-      <span class="tech-badge">MongoDB MCP · 28 tools</span>
+      <span class="tech-badge">MongoDB MCP · 24 tools</span>
       <span class="tech-badge">$graphLookup</span>
       <span class="tech-badge">Change Streams</span>
       <span class="tech-badge">$bucket · $facet</span>
