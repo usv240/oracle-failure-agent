@@ -475,31 +475,6 @@ async def _score_with_gemini(metrics: MetricsInput, pattern: dict) -> dict:
     Ask Gemini to score the match confidence and extract detected signals.
     Returns JSON with: confidence, detected_signals, days_to_crisis, narrative_summary.
     """
-    # Inject previous analysis for session memory context
-    prev = await _get_previous_analysis(metrics.startup_name)
-    prev_context = ""
-    if prev:
-        prev_snap = prev.get("metrics_snapshot", {})
-        prev_churn = prev_snap.get("churn_rate", 0) * 100
-        prev_score = int((prev.get("confidence") or 0) * 100)
-        prev_pattern = prev.get("pattern_name") or "none"
-        from datetime import datetime, timezone
-        checked = prev.get("checked_at")
-        days_ago = ""
-        if checked:
-            if isinstance(checked, str):
-                checked = datetime.fromisoformat(checked.replace("Z", "+00:00"))
-            # Motor returns timezone-naive datetimes from MongoDB; make UTC-aware before subtracting
-            if checked.tzinfo is None:
-                checked = checked.replace(tzinfo=timezone.utc)
-            delta = (datetime.now(timezone.utc) - checked).days
-            days_ago = f" ({delta} days ago)"
-        prev_context = (
-            f"\nPREVIOUS ANALYSIS{days_ago}: pattern={prev_pattern}, "
-            f"similarity={prev_score}%, churn={prev_churn:.1f}%. "
-            f"Note trend changes vs current values in your match_reasoning."
-        )
-
     prompt = f"""
 You are a startup failure pattern analyst. Evaluate how closely this startup's
 current metrics match the given failure pattern.
@@ -521,7 +496,7 @@ FAILURE PATTERN: {pattern['name']}
 Category: {pattern['category']}
 Description: {pattern['narrative']}
 Trigger conditions: {json.dumps(pattern['trigger_conditions'])}
-Known warning signals: {json.dumps([s['signal'] for s in pattern['warning_signals']])}{prev_context}
+Known warning signals: {json.dumps([s['signal'] for s in pattern['warning_signals']])}
 
 TASK: Return JSON with exactly these fields:
 {{

@@ -952,11 +952,17 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
                 escape_raw = compute_escape_plan(metrics, pattern_data, match_conf)
 
                 # ── Cascade Graph ($graphLookup + ACID transaction write) ──────
+                # Use the Cocktail dominant pattern for the cascade when available —
+                # it's always the unit-economics anchor (F-017) which has the richest
+                # transition graph, regardless of which semantic pattern matched first.
                 cascade_dict = None
                 try:
                     from backend.services.cascade import compute_full_cascade
+                    _cascade_pid = pattern_data["pattern_id"]
+                    if cocktail and cocktail.patterns:
+                        _cascade_pid = cocktail.patterns[0].pattern_id
                     cascade_dict = await compute_full_cascade(
-                        metrics, pattern_data["pattern_id"], float(match_conf)
+                        metrics, _cascade_pid, float(match_conf)
                     )
                     if cascade_dict and cascade_dict.get("cascade_steps"):
                         n_steps = len(cascade_dict["cascade_steps"])
