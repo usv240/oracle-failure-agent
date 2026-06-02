@@ -3635,6 +3635,8 @@ function renderCascade(cascade) {
   if (!panel || !cascade || !cascade.has_cascade) {
     return;
   }
+  // The reset (runAnalysis) hides this panel; unhide it now that we have data.
+  panel.classList.remove('hidden');
   if (tabBtn) tabBtn.classList.add('has-data');
 
   // Header badges
