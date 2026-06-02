@@ -249,7 +249,7 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
             <span>Pattern Library</span>
           </button>
-          <button class="nav-info-btn" onclick="showNavInfo(event,'Browse all 100 documented failure patterns sourced from YC post-mortems, CB Insights, Sequoia, a16z, and public founder retrospectives. Each pattern includes: trigger metric thresholds, warning signals with timing (e.g. NPS drops 3–6 months before), survival playbook (exact steps the 10–30% who survived took), and famous failures (WeWork, Quibi, Theranos, etc.) with verified metric data.')">ⓘ</button>
+          <button class="nav-info-btn" onclick="showNavInfo(event,'Browse all 100 documented failure patterns sourced from YC post-mortems, CB Insights, Sequoia, a16z, and public founder retrospectives. Each pattern includes: trigger metric thresholds, warning signals with timing (e.g. NPS drops 3–6 months before), survival playbook (exact steps the 10–30% who survived took), and famous failures (WeWork, Quibi, Theranos, etc.) with representative metric profiles.')">ⓘ</button>
         </div>
         <div class="nav-item-wrap">
           <button class="nav-item" data-tab="tab-submit" onclick="switchTab('tab-submit')">
@@ -1119,7 +1119,7 @@
             <span class="bt-badge">LIVE VERIFIED</span>
             <h3 class="bt-title">Proven on Real Failures</h3>
           </div>
-          <p class="bt-subtitle">These are actual Oracle outputs — we ran the system against each company's documented pre-failure metrics. Click any card to reproduce the result yourself.</p>
+          <p class="bt-subtitle">These are actual Oracle outputs — we ran the system against each company's representative pre-collapse metric profile. Click any card to reproduce the result yourself.</p>
         </div>
         <!-- Instant Demo Badge (shown briefly after instant replay) -->
         <div id="instant-demo-badge" class="instant-demo-badge hidden">Instant demo — cached from last live run</div>
@@ -1217,7 +1217,7 @@
           </div>
 
         </div>
-        <p class="bt-disclaimer">Pattern similarity scores shown above are live Oracle outputs — run by us before submission against each company's documented pre-failure metrics. Click any card to reproduce them on the live system. The Quibi result uses the month-12 trajectory extrapolated from documented month-4 metrics. Pattern similarity reflects narrative match against the failure library, not a statistical probability of failure.</p>
+        <p class="bt-disclaimer">Pattern similarity scores shown above are live Oracle outputs — run by us before submission against each company's representative pre-collapse profile (illustrative figures chosen to capture the real failure pattern, not audited financials). Click any card to reproduce them on the live system. The Quibi result is projected from its early trajectory. Pattern similarity reflects narrative match against the failure library, not a statistical probability of failure.</p>
       </div>
 
       <!-- Agent Terminal -->
