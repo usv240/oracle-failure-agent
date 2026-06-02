@@ -952,18 +952,31 @@ async def run_analysis_via_adk_stream(metrics: MetricsInput):
                 escape_raw = compute_escape_plan(metrics, pattern_data, match_conf)
 
                 # ── Cascade Graph ($graphLookup + ACID transaction write) ──────
-                # Use the Cocktail dominant pattern for the cascade when available —
-                # it's always the unit-economics anchor (F-017) which has the richest
-                # transition graph, regardless of which semantic pattern matched first.
+                # Try the primary matched pattern first, then each co-occurring
+                # cocktail pattern, and use the first one that actually has a
+                # cascade chain. Not every pattern has transitions seeded (e.g.
+                # F-074 Long Payback Period Trap has none), so blindly pinning to
+                # the cocktail-dominant pattern silently drops the cascade.
                 cascade_dict = None
                 try:
                     from backend.services.cascade import compute_full_cascade
-                    _cascade_pid = pattern_data["pattern_id"]
+                    _candidate_pids = [pattern_data["pattern_id"]]
                     if cocktail and cocktail.patterns:
-                        _cascade_pid = cocktail.patterns[0].pattern_id
-                    cascade_dict = await compute_full_cascade(
-                        metrics, _cascade_pid, float(match_conf)
-                    )
+                        _candidate_pids = (
+                            [p.pattern_id for p in cocktail.patterns]
+                            + _candidate_pids
+                        )
+                    _seen_pids = set()
+                    for _cascade_pid in _candidate_pids:
+                        if _cascade_pid in _seen_pids:
+                            continue
+                        _seen_pids.add(_cascade_pid)
+                        _candidate = await compute_full_cascade(
+                            metrics, _cascade_pid, float(match_conf)
+                        )
+                        if _candidate and _candidate.get("cascade_steps"):
+                            cascade_dict = _candidate
+                            break
                     if cascade_dict and cascade_dict.get("cascade_steps"):
                         n_steps = len(cascade_dict["cascade_steps"])
                         worst_days = cascade_dict.get("worst_case_days", "?")
