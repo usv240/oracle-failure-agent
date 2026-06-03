@@ -40,7 +40,7 @@ We curated 100 documented failure patterns from YC post-mortems, CB Insights rep
    │  Voyage AI   │   │  Gemini 3    │   │      MongoDB  Atlas      │
    │  embeddings  │   │   Flash      │   │  Vector Search           │
    │  1024-dim    │   │  scoring +   │   │  Atlas Search (BM25+RRF) │
-   └──────────────┘   │  reasoning   │   │  MCP server (28 tools)   │
+   └──────────────┘   │  reasoning   │   │  MCP server (24 tools)   │
                       └──────────────┘   │  $graphLookup cascade    │
                                          │  $bucket + $facet        │
                                          │  Change Streams · ACID   │
@@ -213,7 +213,7 @@ Sources: YC post-mortems, CB Insights, Paul Graham essays, Sequoia/a16z/Bessemer
 | **Gemini 3 Flash** | All 3 ADK agents + parallel pattern scoring (`thinking_budget=0` for speed, `=1024` for decision auditing) |
 | **MongoDB Atlas Vector Search** | 1024-dim cosine similarity across 100 pattern narratives |
 | **MongoDB Atlas Search** | BM25 full-text retrieval, merged with vector results via Reciprocal Rank Fusion |
-| **MongoDB MCP Server** | Persistent stdio connection, 28 native tools — critical path for pattern reads |
+| **MongoDB MCP Server** | Persistent stdio connection, 24 native tools — critical path for pattern reads |
 | **MongoDB Voyage AI** | `voyage-4-large` embeddings, 1024-dim, asymmetric query/document encoding |
 | **MongoDB `$graphLookup`** | Failure cascade graph — 3-hop traversal of 47 directed edges across 17 patterns |
 | **MongoDB `$bucket` + `$facet`** | Cohort percentile intelligence — 5 sub-pipelines in one query |
