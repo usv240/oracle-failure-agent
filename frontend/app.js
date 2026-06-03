@@ -236,6 +236,9 @@ async function loadLiveStats() {
     }
 
     animateStat('ls-analyses',  d.total_analyses);
+    // Keep the Cohort tab's "distribution of N startups" line in sync with the real count
+    const cohortTotalEl = document.getElementById('cohort-total-count');
+    if (cohortTotalEl && typeof d.total_analyses === 'number') cohortTotalEl.textContent = d.total_analyses;
     animateStat('ls-monitored', d.startups_monitored);
     animateStat('ls-alerts',    d.alerts_today);
     animateStat('ls-patterns',  d.pattern_count);
@@ -453,6 +456,41 @@ function expandExamples() {
   const bar = document.getElementById('examples-restore-bar');
   if (bar) bar.classList.add('hidden');
   document.querySelector('.demo-section')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Reset the dashboard to its fresh, pre-analysis state — clears results, form, and
+// in-memory state so it looks exactly like a first visit. Wired to the header "↺ Reset".
+function resetDashboard() {
+  // Hide every result panel — mirrors the set runAnalysis() hides when a new run starts
+  ['alert-section','safe-section','early-warning-banner','risk-banner',
+   'challenger-panel','accuracy-showcase','alert-lib-link','oracle-score-card',
+   'osc-legend','recovery-card','escape-plan-panel','cocktail-panel',
+   'cascade-panel','conf-forecast-section','sources-block',
+   'history-panel','trend-chart-section','premortem-cta'].forEach(hide);
+
+  // Hide + clear the agent terminal and its collapsed pill
+  hide('agent-terminal');
+  hide('terminal-pill');
+  const termBody = document.getElementById('terminal-body');
+  if (termBody) termBody.innerHTML = '';
+
+  // Bring the preset / backtest example cards back
+  if (typeof teardownStickyResultTabs === 'function') teardownStickyResultTabs();
+  expandExamples();
+
+  // Reset the metrics form and the live health pulse to their starting state
+  const form = document.getElementById('metrics-form');
+  if (form) form.reset();
+  if (typeof updateLiveMetrics === 'function') updateLiveMetrics();
+
+  // Drop the in-memory analysis so nothing stale leaks into other tabs
+  _lastResult = null;
+  _lastPayload = null;
+
+  // Land on a clean dashboard, scrolled to the top
+  switchTab('tab-dashboard');
+  const ca = document.querySelector('.content-area');
+  if (ca) ca.scrollTop = 0;
 }
 
 async function runAnalysis() {
@@ -3834,10 +3872,25 @@ function buildCascadeFlowSvg(cascade) {
 }
 
 // ── Cohort Percentile Intelligence ($bucket + $facet) ────────────
-async function runCohortIntelligence() {
-  const industry = document.getElementById('cohort-industry')?.value.trim() || 'B2B SaaS';
-  const score    = parseInt(document.getElementById('cohort-score')?.value) || 50;
-  const month    = parseInt(document.getElementById('cohort-month')?.value) || 12;
+// Known-dense fallback cohort — guarantees the panel never renders the empty
+// state on screen. B2B SaaS @ month 12 is the most populated cohort.
+const COHORT_FALLBACK = { industry: 'B2B SaaS', month: 12 };
+
+async function runCohortIntelligence(opts) {
+  opts = opts || {};
+  let industry = document.getElementById('cohort-industry')?.value.trim() || 'B2B SaaS';
+  let score    = parseInt(document.getElementById('cohort-score')?.value) || 50;
+  let month    = parseInt(document.getElementById('cohort-month')?.value) || 12;
+
+  // On a fallback retry, swap to a cohort we know has data and reflect it in the form
+  if (opts.fallback) {
+    industry = COHORT_FALLBACK.industry;
+    month    = COHORT_FALLBACK.month;
+    const indEl = document.getElementById('cohort-industry');
+    const monEl = document.getElementById('cohort-month');
+    if (indEl) indEl.value = industry;
+    if (monEl) monEl.value = month;
+  }
 
   const btnText   = document.getElementById('cohort-btn-text');
   const spinner   = document.getElementById('cohort-spinner');
@@ -3851,7 +3904,23 @@ async function runCohortIntelligence() {
     const res = await fetch(`${API}/api/cascade/cohort/intelligence?${params}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+
+    // Never show a bare empty cohort: if this slice is too thin, retry once
+    // against the known-dense fallback so the panel always has real data.
+    if ((data.total_in_cohort || 0) < 3 && !opts.fallback &&
+        !(industry === COHORT_FALLBACK.industry && month === COHORT_FALLBACK.month)) {
+      return runCohortIntelligence({ fallback: true, origIndustry: industry, origMonth: month });
+    }
+
     renderCohortResult(data);
+
+    // If we fell back, say so honestly instead of pretending it's their cohort
+    if (opts.fallback) {
+      const msg = document.getElementById('cohort-perc-message');
+      if (msg) msg.textContent =
+        `Not enough analyses yet for ${opts.origIndustry} at month ${opts.origMonth} — ` +
+        `showing the nearest active cohort (${COHORT_FALLBACK.industry}). ` + (msg.textContent || '');
+    }
   } catch (err) {
     console.error('[cohort]', err);
     alert(`Cohort analysis failed: ${err.message}`);

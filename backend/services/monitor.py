@@ -225,6 +225,11 @@ async def _check_all_watched() -> None:
                 "confidence": match.confidence if match else 0.0,
                 "days_to_crisis": match.days_to_crisis if match else None,
                 "survival_rate": match.survival_rate if match else 0.0,
+                # Flat cohort fields so $bucket/$facet cohort intelligence can see this run
+                "industry": metrics.industry,
+                "current_month": metrics.current_month,
+                "churn_rate": metrics.churn_rate,
+                "runway_months": metrics.runway_months,
             }
 
             # Save to startup_analyses — MCP primary, Motor fallback

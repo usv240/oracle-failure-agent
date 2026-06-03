@@ -359,6 +359,11 @@ async def _analyze_startup_metrics(
                 "pattern_name": None,
                 "confidence": round(best_score, 2),
                 "oracle_score": _safe_score,
+                # Flat cohort fields so $bucket/$facet cohort intelligence can see this run
+                "industry": metrics.industry,
+                "current_month": metrics.current_month,
+                "churn_rate": metrics.churn_rate,
+                "runway_months": metrics.runway_months,
                 "metrics_snapshot": metrics.model_dump(),
             })
         except Exception:
@@ -432,6 +437,11 @@ async def _analyze_startup_metrics(
             "oracle_score": _cos(metrics, best_score)[0],
             "days_to_crisis": best_scoring.get("days_to_crisis", 90),
             "survival_rate": round(survival_rate, 3),
+            # Flat cohort fields so $bucket/$facet cohort intelligence can see this run
+            "industry": metrics.industry,
+            "current_month": metrics.current_month,
+            "churn_rate": metrics.churn_rate,
+            "runway_months": metrics.runway_months,
             "metrics_snapshot": metrics.model_dump(),
         })
     except Exception:

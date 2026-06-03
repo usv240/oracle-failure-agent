@@ -270,7 +270,7 @@
 
     <!-- Mobile Header -->
     <header class="mobile-header">
-      <div class="mobile-header-brand">
+      <div class="mobile-header-brand" onclick="showLanding()" title="Back to home" style="cursor:pointer">
         <div class="logo">
           <svg class="logo-svg" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:36px;height:36px;border-radius:9px;box-shadow:none">
             <rect width="72" height="72" rx="18" fill="#1a0533"/>
@@ -876,6 +876,8 @@
         <div class="dhi-headline-row">
           <h2>Diagnostic Dashboard</h2>
           <span class="dhi-agentic-pill">3-Agent Adversarial Pipeline</span>
+          <button type="button" onclick="resetDashboard()" title="Clear results and reset the dashboard to a fresh state"
+            style="margin-left:auto;display:inline-flex;align-items:center;gap:0.35rem;padding:0.4rem 0.85rem;font-size:0.82rem;font-weight:600;color:var(--muted);background:transparent;border:1px solid var(--border);border-radius:8px;cursor:pointer">↺ Reset</button>
         </div>
       </div>
       
@@ -1938,7 +1940,7 @@
     <div id="tab-cohort" class="tab-content hidden">
     <section class="card cohort-section" id="cohort-section">
       <h2>Cohort Intelligence</h2>
-      <p class="section-desc">MongoDB <code>$bucket</code> + <code>$facet</code> — see how your startup ranks against similar companies at the same stage. Where do you sit in the distribution of 302 startups the Oracle has analyzed?</p>
+      <p class="section-desc">MongoDB <code>$bucket</code> + <code>$facet</code> — see how your startup ranks against similar companies at the same stage. Where do you sit in the distribution of <span id="cohort-total-count">302</span> startups the Oracle has analyzed?</p>
       <div class="cohort-explainer">
         <div class="cohort-ex-item">
           
