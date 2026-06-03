@@ -727,7 +727,7 @@
             <div class="arch-arrow">→</div>
             <div class="arch-box">Gemini 3 Flash<br><small>scorer + ADK agents ×3</small></div>
             <div class="arch-arrow">→</div>
-            <div class="arch-box">Vertex AI<br><small>Gemini 2.5 fallback</small></div>
+            <div class="arch-box">Vertex AI<br><small>resilience fallback</small></div>
             <div class="arch-arrow">→</div>
             <div class="arch-box">Alert + Cascade<br><small>$graphLookup</small></div>
           </div>
@@ -744,7 +744,7 @@
             <div class="stack-item">
               <div class="stack-icon"></div>
               <strong>Vertex AI — Resilient Fallback (Google Cloud)</strong>
-              <small>When the Gemini 3 chain is exhausted, inference fails over to Gemini 2.5 Flash on Vertex AI — consistent latency SLA + enterprise billing; embeddings fall back to Vertex <code>text-embedding-004</code>. Gemini 3 Flash isn't on Vertex AI yet, so the primary path uses the Gemini API — an intentional dual-model design.</small>
+              <small>When the full Gemini 3 chain is exhausted, inference fails over to a Vertex AI fallback model — consistent latency SLA + enterprise billing. Embeddings fall back to Vertex <code>text-embedding-004</code>. Gemini 3 Flash runs via the Gemini API as primary on all paths.</small>
             </div>
             <div class="stack-item">
               <div class="stack-icon"></div>
