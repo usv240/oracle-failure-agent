@@ -1,20 +1,36 @@
 # ADR-0001: Adversarial Challenger Agent before every verdict
 
-**Status:** Accepted  
+**Status:** Accepted
 **Date:** 2026-06-01
 
 ---
 
-The first version of the pipeline had a single Investigator agent score each pattern and output a confidence number. It worked, but the scores were unreliable in a specific way: when the input metrics were ambiguous — high burn but reasonable runway, high churn but growing revenue — the model would anchor to whichever signal it encountered first in the prompt and build its reasoning around that. There was no mechanism to push back.
+## The problem
 
-The problem is that a single LLM doing both retrieval and scoring has no adversarial pressure. It finds a plausible match, builds a coherent narrative, and returns a number. Users had no way to know whether a 91% confidence score was a strong match or the model confidently wrong.
+The first version of the pipeline had one agent score each pattern and return a confidence number. It worked, but the scores were not trustworthy in a specific way.
 
-Three alternatives were considered. Running the same scoring call three times and averaging reduces variance slightly but all three calls see identical data in identical order — you are averaging over temperature noise, not over genuine disagreement. Adding a fact-check pass where a second model reviews the first model's output falls into the same trap: the second model anchors on the first model's framing before forming its own view. Neither approach produces an independent signal.
+When metrics were mixed (high burn but decent runway, high churn but growing revenue), the model anchored to whichever signal appeared first in the prompt and built its reasoning around that. There was nothing pushing back. A single agent doing retrieval and scoring has no pressure to doubt itself. It finds a plausible match, tells a coherent story, and returns a number. The founder had no way to know if 91% confidence was genuinely strong or just the model being confidently wrong.
 
-The adversarial Challenger does something different. After the Investigator produces a match and confidence score, the Challenger agent receives the same raw metrics and a brief that explicitly requires it to find reasons the match is wrong. It cannot see the Investigator's reasoning; it only sees the pattern definition and the metrics. It produces an independent confidence estimate, a CONFIRM or DISPUTE verdict, and specific objections.
+## What we tried first
 
-The practical result: the user sees both positions. When the Investigator scores 95% and the Challenger scores 60%, the DISPUTED badge at Δ35pp tells the founder this is a contested finding — credible enough to take seriously, not certain enough to treat as fact. When both agents agree within 10pp, the CONFIRMED badge carries genuine weight because it survived an adversarial challenge.
+We considered three alternatives before landing on the Challenger:
 
-The Challenger also catches retrieval errors. If the Investigator matched on one strong signal and ignored two contradictory signals, the Challenger — working from the same raw metrics — will surface those contradictions in its objections. The debate transcript is visible, so the founder can read both sides rather than accepting a bare number.
+1. **Run the same scoring call three times and average.** This reduces random variance slightly, but all three calls see identical data in the same order. You are averaging over noise, not over real disagreement.
 
-Two downsides worth acknowledging. This adds one full Gemini call per analysis, adding 8–15 seconds of latency. And because both agents are non-deterministic, the Δ between them varies on repeated runs. Neither is a dealbreaker for this use case: the latency is acceptable for a decision that could affect months of runway, and the variance is honest — it reflects genuine uncertainty rather than hiding it behind a false precision.
+2. **Add a fact-check pass.** A second model reviews the first model's output. The problem: the second model reads the first model's conclusion before forming its own view. It anchors on that framing and rarely produces a genuinely independent signal.
+
+Neither approach gives the founder any information about *how confident the system actually is*.
+
+## What we built instead
+
+After the Investigator produces a match, the Challenger agent gets the same raw metrics and a brief that requires it to find reasons the match is wrong. It cannot see the Investigator's reasoning. It only sees the pattern definition and the numbers. It produces its own confidence score, a CONFIRM or DISPUTE verdict, and specific objections.
+
+The founder sees both positions side by side. When the Investigator scores 95% and the Challenger scores 60%, the DISPUTED badge at a 35-point gap tells the founder this is a contested finding. When both agents land within 10 points, the CONFIRMED badge carries real weight because the finding survived an active challenge.
+
+The Challenger also catches errors the Investigator misses. If the Investigator focused on one strong signal and ignored two contradictory ones, the Challenger working from the same raw metrics will surface those contradictions.
+
+## The trade-offs
+
+This adds one full Gemini 3 call per analysis, adding roughly 8 to 15 seconds of latency. The scores are also non-deterministic, so the gap between the two agents will vary slightly across runs.
+
+Neither is a dealbreaker. For a decision that could affect months of runway, the extra latency is worth it. And the variance is honest: it reflects genuine uncertainty instead of hiding it behind a precise-looking number.

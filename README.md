@@ -1,8 +1,8 @@
-# The Failure Oracle
+﻿# The Failure Oracle
 
-> Most startups don't fail suddenly. The warning signs show up 3–6 months early — in the numbers. The problem is knowing which numbers matter and what they're telling you.
+> Most startups don't fail suddenly. The warning signs show up 3–6 months early - in the numbers. The problem is knowing which numbers matter and what they're telling you.
 
-**The Failure Oracle reads your startup metrics and tells you which documented failure pattern you're heading into — before the crisis hits.**
+**The Failure Oracle reads your startup metrics and tells you which documented failure pattern you're heading into - before the crisis hits.**
 
 **Live:** https://oracle-38381883054.us-central1.run.app
 
@@ -12,7 +12,7 @@
 
 When a YC partner sits across from a founder, they're doing something most founders can't: they recognize patterns. "I've seen this churn number. I know what happens at month 18." That pattern recognition took decades to build. The Failure Oracle makes it available to anyone with a spreadsheet of metrics.
 
-We curated 100 documented failure patterns from YC post-mortems, CB Insights reports, and public founder retrospectives. Each pattern has exact trigger conditions, warning signals with timing, a survival playbook, and real companies that matched it. Enter your 11 key metrics and a 3-agent AI pipeline matches them against this library — with the same specificity an experienced investor would use.
+We curated 100 documented failure patterns from YC post-mortems, CB Insights reports, and public founder retrospectives. Each pattern has exact trigger conditions, warning signals with timing, a survival playbook, and real companies that matched it. Enter your 11 key metrics and a 3-agent AI pipeline matches them against this library - with the same specificity an experienced investor would use.
 
 ---
 
@@ -53,7 +53,7 @@ flowchart TD
     CS -->|"prob update on new analysis"| AG
 ```
 
-**The flow in one breath:** you enter 11 metrics in the browser → FastAPI hands them to a 3-agent Google ADK pipeline → the **Investigator** embeds them (Voyage AI) and searches the 100-pattern library (Atlas Vector Search + BM25, fused) → the **Challenger** re-checks the match skeptically → the **Reporter** assembles the Oracle Score, Escape Plan, and Cascade. Every step streams back to the terminal live. MongoDB Atlas is the single source of truth throughout — retrieval, graph cascade, cohort stats, and self-calibration all run inside it.
+**The flow in one breath:** you enter 11 metrics in the browser → FastAPI hands them to a 3-agent Google ADK pipeline → the **Investigator** embeds them (Voyage AI) and searches the 100-pattern library (Atlas Vector Search + BM25, fused) → the **Challenger** re-checks the match skeptically → the **Reporter** assembles the Oracle Score, Escape Plan, and Cascade. Every step streams back to the terminal live. MongoDB Atlas is the single source of truth throughout - retrieval, graph cascade, cohort stats, and self-calibration all run inside it.
 
 > Full architecture walkthrough and design decisions: [docs/architecture.md](docs/architecture.md) · [docs/adr/](docs/adr/)
 
@@ -62,16 +62,16 @@ flowchart TD
 ## What you get from a single analysis
 
 **Pattern Match**
-Which of 100 documented failure patterns your metrics most closely resemble. Not a vague label — a specific pattern like "Premature Scaling with Hidden Churn" with a 0–100% confidence score and the exact trigger conditions that fired.
+Which of 100 documented failure patterns your metrics most closely resemble. Not a vague label - a specific pattern like "Premature Scaling with Hidden Churn" with a 0–100% confidence score and the exact trigger conditions that fired.
 
 **Oracle Score**
-A 0–100 composite health score (100 = healthy, 0 = crisis). Fully transparent — click "Audit formula" to see every penalty and bonus with your actual numbers plugged in. Churn penalty, burn multiple penalty, LTV:CAC penalty, runway penalty, pattern match penalty, plus NPS and growth bonuses. No black box.
+A 0–100 composite health score (100 = healthy, 0 = crisis). Fully transparent - click "Audit formula" to see every penalty and bonus with your actual numbers plugged in. Churn penalty, burn multiple penalty, LTV:CAC penalty, runway penalty, pattern match penalty, plus NPS and growth bonuses. No black box.
 
 **Escape Plan**
-The minimum metric changes to drop below the danger threshold. Not AI advice — pure algebra on the pattern's stored trigger conditions. "Reduce monthly churn from 8.2% to 5.5%." Reproducible every time.
+The minimum metric changes to drop below the danger threshold. Not AI advice - pure algebra on the pattern's stored trigger conditions. "Reduce monthly churn from 8.2% to 5.5%." Reproducible every time.
 
 **Failure Cascade Graph**
-Most tools show *what's failing*. The Oracle shows the full collapse sequence — which failure mode fires next, in how many days, at what probability. Up to 3 hops deep, traversed via MongoDB `$graphLookup`. The probabilities self-improve as real cases are observed via Change Streams.
+Most tools show *what's failing*. The Oracle shows the full collapse sequence - which failure mode fires next, in how many days, at what probability. Up to 3 hops deep, traversed via MongoDB `$graphLookup`. The probabilities self-improve as real cases are observed via Change Streams.
 
 **Cascade Intervention Optimizer**
 For each link in the failure chain: the exact minimum metric change to break it before it propagates. Deterministic algebra, not AI-generated advice.
@@ -80,16 +80,16 @@ For each link in the failure chain: the exact minimum metric change to break it 
 A second independent AI instance re-evaluates every match with deliberate skepticism. If it disagrees with the first agent by more than 10 percentage points, a DISPUTE is flagged. Two agents cross-checking catches false positives a single-agent system would miss.
 
 **Survival Playbook**
-Numbered steps used by every company that survived this specific pattern. Not generic advice — sourced from documented cases of the 10–30% who made it through.
+Numbered steps used by every company that survived this specific pattern. Not generic advice - sourced from documented cases of the 10–30% who made it through.
 
 **Warning Signals**
-Early indicators already visible in your data, with how many days ago they first became detectable. "Runway below 12 months with no improvement in burn multiple — detectable ~150 days ago."
+Early indicators already visible in your data, with how many days ago they first became detectable. "Runway below 12 months with no improvement in burn multiple - detectable ~150 days ago."
 
 **Historical Outcomes**
 Exactly how many companies have hit this pattern, what percentage failed, what percentage survived, and how long they typically had before the crisis.
 
 **Confidence Trajectory**
-Run the Oracle monthly on the same startup and it tracks your Oracle Score over time — showing whether risk is increasing, stable, or recovering. Projects your score 1–3 months forward.
+Run the Oracle monthly on the same startup and it tracks your Oracle Score over time - showing whether risk is increasing, stable, or recovering. Projects your score 1–3 months forward.
 
 **Uncharted Territory**
 If your metrics don't closely match any known pattern (best match below 40%), the Oracle says so honestly instead of forcing a weak result.
@@ -99,16 +99,16 @@ If your metrics don't closely match any known pattern (best match below 40%), th
 ## More features
 
 **Decision Auditor**
-Describe any decision before you make it — "Should I hire 5 engineers?" — and the Oracle evaluates it against 100 failure patterns. It shows how similar decisions played out historically and gives a structured risk assessment.
+Describe any decision before you make it - "Should I hire 5 engineers?" - and the Oracle evaluates it against 100 failure patterns. It shows how similar decisions played out historically and gives a structured risk assessment.
 
 **Oracle Pre-Mortem**
-Simulate a decision's impact over 6 months. Gemini projects your metric trajectory at months +1, +3, and +6 — with Oracle Score at each horizon and which failure pattern your month-6 metrics would trigger. Make decisions before they kill you.
+Simulate a decision's impact over 6 months. Gemini projects your metric trajectory at months +1, +3, and +6 - with Oracle Score at each horizon and which failure pattern your month-6 metrics would trigger. Make decisions before they kill you.
 
 **VC Portfolio Mode**
-Analyze up to 20 startups at once. The Oracle runs concurrent analysis and returns a risk-ranked dashboard — CRITICAL → HIGH → MODERATE → SAFE. Designed for investors who need a quick read across a portfolio.
+Analyze up to 20 startups at once. The Oracle runs concurrent analysis and returns a risk-ranked dashboard - CRITICAL → HIGH → MODERATE → SAFE. Designed for investors who need a quick read across a portfolio.
 
 **Cohort Intelligence**
-See where your Oracle Score sits relative to every similar startup in the database — filtered by industry and startup age. "You're in the 33rd percentile for B2B SaaS at Month 12." Powered by MongoDB `$bucket` + `$facet` aggregation.
+See where your Oracle Score sits relative to every similar startup in the database - filtered by industry and startup age. "You're in the 33rd percentile for B2B SaaS at Month 12." Powered by MongoDB `$bucket` + `$facet` aggregation.
 
 **Pattern Library**
 Browse all 100 documented failure patterns. Each has: full narrative, trigger thresholds, warning signals with timing, survival playbook, and the real companies that matched it. Filter by category, view as heatmap, click any pattern to expand.
@@ -117,10 +117,10 @@ Browse all 100 documented failure patterns. Each has: full narrative, trigger th
 Register your startup for background monitoring. The Oracle re-analyzes every 6 hours and sends a Slack alert if the pattern worsens or changes. Powered by Google Cloud Scheduler + MongoDB Change Streams.
 
 **Stripe Integration**
-Import your live MRR, growth rate, and churn directly from Stripe — no manual entry.
+Import your live MRR, growth rate, and churn directly from Stripe - no manual entry.
 
 **Text Extraction**
-Paste any startup text — pitch deck, investor update, YC application — and Gemini extracts all 11 metrics automatically.
+Paste any startup text - pitch deck, investor update, YC application - and Gemini extracts all 11 metrics automatically.
 
 **Export & Share**
 Download a Markdown forensic brief, generate a board-ready HTML slide deck (Gemini-powered), create a shareable public link, or post directly to Slack.
@@ -161,17 +161,17 @@ Click any of these in the UI to load pre-filled metrics and run instantly.
 
 | Scenario | What makes it interesting |
 |---|---|
-| **Quibi (2020)** | $8.5M/mo burn, LTV:CAC 0.25x — catches "Premature Scaling with Hidden Churn" at 95% |
-| **WeWork (Q4 2019)** | $22M burn, 16% churn, LTV:CAC 0.5x — triggers Burn Multiple Death Spiral at 95% |
-| **Theranos (2015)** | 45% churn, NPS −42, $5.8M burn on $18K MRR — 98% match, Oracle Score 0 |
-| **HighVelocity AI** | Mixed signals — designed specifically to trigger a Challenger **DISPUTE** |
-| **Healthy Startup** | Good metrics across the board — shows what a clean result looks like |
+| **Quibi (2020)** | $8.5M/mo burn, LTV:CAC 0.25x - catches "Premature Scaling with Hidden Churn" at 95% |
+| **WeWork (Q4 2019)** | $22M burn, 16% churn, LTV:CAC 0.5x - triggers Burn Multiple Death Spiral at 95% |
+| **Theranos (2015)** | 45% churn, NPS −42, $5.8M burn on $18K MRR - 98% match, Oracle Score 0 |
+| **HighVelocity AI** | Mixed signals - designed specifically to trigger a Challenger **DISPUTE** |
+| **Healthy Startup** | Good metrics across the board - shows what a clean result looks like |
 
 ---
 
 ## Oracle Score formula
 
-Transparent and deterministic — no ML, fully auditable:
+Transparent and deterministic - no ML, fully auditable:
 
 ```
 Base score: 100
@@ -219,10 +219,10 @@ Sources: YC post-mortems, CB Insights, Paul Graham essays, Sequoia/a16z/Bessemer
 | **Gemini 3 Flash** | All 3 ADK agents + parallel pattern scoring (`thinking_budget=0` for speed, `=1024` for decision auditing) |
 | **MongoDB Atlas Vector Search** | 1024-dim cosine similarity across 100 pattern narratives |
 | **MongoDB Atlas Search** | BM25 full-text retrieval, merged with vector results via Reciprocal Rank Fusion |
-| **MongoDB MCP Server** | Persistent stdio connection, 24 native tools — critical path for pattern reads |
+| **MongoDB MCP Server** | Persistent stdio connection, 24 native tools - critical path for pattern reads |
 | **MongoDB Voyage AI** | `voyage-4-large` embeddings, 1024-dim, asymmetric query/document encoding |
-| **MongoDB `$graphLookup`** | Failure cascade graph — 3-hop traversal of 47 directed edges across 17 patterns |
-| **MongoDB `$bucket` + `$facet`** | Cohort percentile intelligence — 5 sub-pipelines in one query |
+| **MongoDB `$graphLookup`** | Failure cascade graph - 3-hop traversal of 47 directed edges across 17 patterns |
+| **MongoDB `$bucket` + `$facet`** | Cohort percentile intelligence - 5 sub-pipelines in one query |
 | **MongoDB Change Streams** | Watches real A→B pattern transitions, updates Bayesian cascade probabilities live |
 | **MongoDB ACID Transactions** | Atomic writes across 3 collections per cascade analysis |
 | **FastAPI + Motor** | Async Python backend, parallel scoring via `asyncio.gather` |
@@ -237,9 +237,9 @@ Sources: YC post-mortems, CB Insights, Paul Graham essays, Sequoia/a16z/Bessemer
 **Prerequisites**
 - Python 3.11+
 - Node.js 20+ (for MongoDB MCP server)
-- MongoDB Atlas account — free M0 tier works
-- Gemini API key — [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-- Voyage AI API key — [voyageai.com](https://voyageai.com)
+- MongoDB Atlas account - free M0 tier works
+- Gemini API key - [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+- Voyage AI API key - [voyageai.com](https://voyageai.com)
 
 **Install**
 ```bash
@@ -283,7 +283,7 @@ Open `http://localhost:8080`. Click the **Quibi** preset to see the full pipelin
 
 | Method | Endpoint | What it does |
 |---|---|---|
-| `POST` | `/api/metrics/analyze` | Full analysis — returns pattern match, Oracle Score, Escape Plan, Cascade |
+| `POST` | `/api/metrics/analyze` | Full analysis - returns pattern match, Oracle Score, Escape Plan, Cascade |
 | `POST` | `/api/metrics/analyze/stream` | Same, with real-time SSE streaming |
 | `POST` | `/api/metrics/extract-metrics` | Extract metrics from free-form text (Gemini) |
 | `POST` | `/api/audit/evaluate` | Decision audit against 100 patterns |
@@ -295,7 +295,7 @@ Open `http://localhost:8080`. Click the **Quibi** preset to see the full pipelin
 | `GET` | `/api/patterns/` | All 100 patterns (MCP-backed) |
 | `POST` | `/api/metrics/watch` | Register for 6-hour background monitoring |
 | `POST` | `/api/export/slides` | Generate board-ready HTML slide deck |
-| `GET` | `/api/health` | System status — MCP, ADK, model config |
+| `GET` | `/api/health` | System status - MCP, ADK, model config |
 
 ---
 
@@ -303,11 +303,11 @@ Open `http://localhost:8080`. Click the **Quibi** preset to see the full pipelin
 
 - **Pattern match ≠ failure probability.** 95% match means the metric signature strongly resembles a documented failure. Survivors exist for every pattern.
 - **100 patterns is curated, not exhaustive.** Depth and citation traceability over breadth. The Uncharted Territory path handles what's not in the library.
-- **Survival rates are sourced estimates.** Calibrated from public data — directionally accurate, not actuarially precise.
+- **Survival rates are sourced estimates.** Calibrated from public data - directionally accurate, not actuarially precise.
 - **English-language sources only.** International failure modes are underrepresented.
 
 ---
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE)
+Apache 2.0 - see [LICENSE](LICENSE)

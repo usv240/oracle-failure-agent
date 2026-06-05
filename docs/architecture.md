@@ -1,8 +1,8 @@
-# The Failure Oracle — System Architecture
+# The Failure Oracle - System Architecture
 
 ## How it works
 
-You enter 11 startup metrics. The Failure Oracle sends them through a three-agent AI pipeline that matches them against a library of 100 documented failure patterns — each sourced from YC post-mortems, CB Insights reports, and public founder retrospectives. The first agent investigates and scores every plausible match. The second agent stress-tests the top match with deliberate skepticism and either confirms or disputes the finding. The third agent writes the final report.
+You enter 11 startup metrics. The Failure Oracle sends them through a three-agent AI pipeline that matches them against a library of 100 documented failure patterns, each sourced from YC post-mortems, CB Insights reports, and public founder retrospectives. The first agent investigates and scores every plausible match. The second agent stress-tests the top match with deliberate skepticism and either confirms or disputes the finding. The third agent writes the final report.
 
 Everything that happens in that pipeline is written to MongoDB Atlas as it happens. That means the system gets more useful over time: cohort percentile rankings emerge from accumulated analyses, cascade probabilities self-calibrate via Change Streams, and the pattern library grows richer as more startups are analysed.
 
@@ -57,7 +57,7 @@ flowchart TD
 
 **Voyage AI** (MongoDB's embedding partner) generates 1024-dimensional `voyage-4-large` embeddings for both pattern indexing and query-time retrieval, with Vertex AI `text-embedding-004` as a fallback.
 
-**Gemini 3 Flash** (`gemini-3-flash-preview`) runs all three ADK agents plus the pattern scorer and decision auditor. A fallback chain (`gemini-3.5-flash → gemini-3.1-flash-lite → gemini-3.1-flash-lite-preview`) exhausts all Gemini 3 variants before falling back to Vertex AI 2.5 Flash.
+**Gemini 3 Flash** (`gemini-3-flash-preview`) runs all three ADK agents plus the pattern scorer and decision auditor. A fallback chain tries `gemini-3.5-flash`, then `gemini-3.1-flash-lite`, then `gemini-3.1-flash-lite-preview` before falling back to Vertex AI 2.5 Flash.
 
 ---
 
@@ -65,14 +65,14 @@ flowchart TD
 
 Here is what happens when you load the WeWork preset (Q4 2019, month 22) and click Run:
 
-1. **Investigator** embeds the 11 metrics via Voyage AI and runs a hybrid Atlas Vector Search + BM25 RRF retrieval. Top-5 candidates are scored by Gemini 3 Flash. F-017 (Burn Multiple Death Spiral) comes back at 95% confidence. Three patterns fire simultaneously — a cocktail match.
-2. The SSE terminal emits: `MongoDB MCP → vectorSearch('failure_patterns', ...)` then `MongoDB MCP → find('failure_patterns', {pattern_id: 'F-017'})`.
-3. **Challenger** reads the Investigator's finding and argues against it with a deliberate brief to find holes. It produces a DISPUTED badge at 60% confidence — a Δ35pp gap. Both positions are shown to the user; the Reporter uses the reconciled confidence.
-4. **Reporter** calls `$graphLookup` on the `cascade_transitions` collection (depth 3): F-017 → F-054 Talent Density Collapse (+30d) → F-007 Bridge Round Spiral (+45d). Worst-case timeline: 120 days.
+1. **Investigator** embeds the 11 metrics via Voyage AI and runs a hybrid Atlas Vector Search + BM25 RRF retrieval. Top-5 candidates are scored by Gemini 3 Flash. F-017 (Burn Multiple Death Spiral) comes back at 95% confidence. Three patterns fire simultaneously, which the system flags as a cocktail match.
+2. The SSE terminal emits: `MongoDB MCP -> vectorSearch('failure_patterns', ...)` then `MongoDB MCP -> find('failure_patterns', {pattern_id: 'F-017'})`.
+3. **Challenger** reads the Investigator's finding and argues against it with a deliberate brief to find holes. It produces a DISPUTED badge at 60% confidence, a 35-point gap. Both positions are shown to the user. The Reporter uses the reconciled confidence.
+4. **Reporter** calls `$graphLookup` on the `cascade_transitions` collection (depth 3): F-017 to F-054 Talent Density Collapse in 30 days, then to F-007 Bridge Round Spiral in 45 more days. Worst-case timeline: 120 days.
 5. A Motor ACID transaction atomically writes to `startup_analyses`, `cascade_interventions`, and `cascade_transitions` in a single session.
-6. A Change Stream fires on the new document and Bayesian-updates the cascade probability for the F-017→F-054 edge.
+6. A Change Stream fires on the new document and Bayesian-updates the cascade probability for the F-017 to F-054 edge.
 7. A `$bucket` + `$facet` aggregation (5 sub-pipelines) ranks this startup in the 3rd percentile for Real Estate SaaS at month 22.
-8. The escape plan computes the minimum metric moves to drop the match below 60% — deterministic algebra, not AI-generated numbers.
+8. The escape plan computes the minimum metric moves to drop the match below 60%. This is deterministic algebra, not AI-generated numbers.
 9. The browser receives `cascade_complete`, `cohort_complete`, and `analysis_complete` SSE events and renders all panels simultaneously.
 
 ---
@@ -83,8 +83,8 @@ Here is what happens when you load the WeWork preset (Q4 2019, month 22) and cli
 
 | # | Feature | Where used |
 |---|---------|-----------|
-| 1 | Atlas Vector Search | Pattern matching — voyage-4-large 1024-dim embeddings |
-| 2 | Atlas Search BM25 + RRF | Hybrid retrieval — vector + BM25, Reciprocal Rank Fusion |
+| 1 | Atlas Vector Search | Pattern matching with voyage-4-large 1024-dim embeddings |
+| 2 | Atlas Search BM25 + RRF | Hybrid retrieval combining vector and BM25 via Reciprocal Rank Fusion |
 | 3 | Atlas Search $compound | Multi-field search with boost |
 | 4 | Atlas Search moreLikeThis | Similar pattern discovery |
 | 5 | Atlas Search Autocomplete | Startup name typeahead |
@@ -92,12 +92,12 @@ Here is what happens when you load the WeWork preset (Q4 2019, month 22) and cli
 | 7 | $facet analytics | Multi-facet pattern statistics |
 | 8 | $setWindowFields | Rolling window metrics |
 | 9 | $bucket | Cohort score distribution bucketing |
-| 10 | $graphLookup | Failure cascade chain traversal (max depth 3) |
+| 10 | $graphLookup | Failure cascade chain traversal up to depth 3 |
 | 11 | Motor ACID Transactions | Atomic write to 3 collections per analysis |
-| 12 | Change Streams | Alert detection + Bayesian cascade probability updates |
+| 12 | Change Streams | Alert detection and Bayesian cascade probability updates |
 | 13 | $lookup join | Pattern metadata enrichment |
 | 14 | $jsonSchema validation | Collection-level schema enforcement |
-| 15 | TTL Indexes | 30-day telemetry + 90-day shared reports |
+| 15 | TTL Indexes | 30-day telemetry and 90-day shared reports |
 | 16 | $facet (cohort) | 5 sub-pipelines in one query for cohort percentile ranking |
 | 17 | Telemetry events | Fire-and-forget event counters with TTL |
 | 18 | startup_analyses persistence | ACID-written, Change Stream watched, cohort intelligence source |
