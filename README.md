@@ -6,10 +6,6 @@
 
 **Live:** https://oracle-38381883054.us-central1.run.app
 
-![The Failure Oracle landing page](landing.png)
-
-![Diagnostic dashboard — a startup's metrics analyzed against the 100-pattern failure library](overview.png)
-
 ---
 
 ## The idea
