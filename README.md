@@ -18,38 +18,44 @@ We curated 100 documented failure patterns from YC post-mortems, CB Insights rep
 
 ## Architecture at a glance
 
-```
-   ┌────────────────────────────────────────────────────────────┐
-   │  BROWSER  ·  vanilla-JS single page                          │
-   │  Dashboard │ live SSE terminal │ VC Portfolio │ Pattern Lib   │
-   └────────────────────────────┬───────────────────────────────┘
-                                │  HTTPS + Server-Sent Events (live)
-                                ▼
-   ┌────────────────────────────────────────────────────────────┐
-   │  FastAPI backend  ·  async Python + Motor  ·  Cloud Run      │
-   │                                                              │
-   │   Google ADK  SequentialAgent                                │
-   │   ┌──────────────┐   ┌────────────┐   ┌──────────────┐       │
-   │   │ Investigator │ → │ Challenger │ → │   Reporter   │       │
-   │   └──────────────┘   └────────────┘   └──────────────┘       │
-   │       each sub-agent = one Gemini 3 Flash call               │
-   └───────┬───────────────────┬──────────────────┬──────────────┘
-           │                   │                  │
-           ▼                   ▼                  ▼
-   ┌──────────────┐   ┌──────────────┐   ┌─────────────────────────┐
-   │  Voyage AI   │   │  Gemini 3    │   │      MongoDB  Atlas      │
-   │  embeddings  │   │   Flash      │   │  Vector Search           │
-   │  1024-dim    │   │  scoring +   │   │  Atlas Search (BM25+RRF) │
-   └──────────────┘   │  reasoning   │   │  MCP server (24 tools)   │
-                      └──────────────┘   │  $graphLookup cascade    │
-                                         │  $bucket + $facet        │
-                                         │  Change Streams · ACID   │
-                                         └─────────────────────────┘
+```mermaid
+flowchart TD
+    U(["👤 Founder / VC"])
 
-   Cloud Scheduler ──every 6h──▶ re-analyze watched startups ──▶ Slack alert
+    subgraph CLOUD["Google Cloud Run"]
+        direction LR
+        FE["Frontend\nVanilla JS · SSE terminal"]
+        BE["Backend\nFastAPI · SSE stream"]
+        FE --> BE
+    end
+
+    subgraph ADK["Google ADK · SequentialAgent · Gemini 3 Flash"]
+        direction LR
+        INV["① Investigator\nEmbed → Vector+BM25 RRF\nMCP score → cocktail detect"]
+        CHA["② Challenger\nAdversarial stress-test\nCONFIRM / DISPUTE"]
+        REP["③ Reporter\n$graphLookup cascade\nEscape plan · cohort rank"]
+        INV --> CHA --> REP
+    end
+
+    subgraph MONGO["MongoDB Atlas · MCP Server (24 tools)"]
+        direction LR
+        VS["Atlas Vector Search\nVoyage-4-large 1024-dim"]
+        BM["Atlas Search BM25 + RRF\n$compound · moreLikeThis"]
+        AG["$graphLookup · $bucket\n$facet · $setWindowFields"]
+        TX["Motor ACID Transactions\n3 collections · atomic write"]
+        CS["Change Streams\nBayesian self-calibration"]
+        VS --> BM --> AG --> TX --> CS
+    end
+
+    U --> CLOUD --> ADK
+    INV <-->|"MongoDB MCP\nfind · aggregate · vectorSearch"| VS
+    REP <-->|"MongoDB MCP\n$graphLookup · $bucket+$facet"| AG
+    CS -->|"prob update on new analysis"| AG
 ```
 
 **The flow in one breath:** you enter 11 metrics in the browser → FastAPI hands them to a 3-agent Google ADK pipeline → the **Investigator** embeds them (Voyage AI) and searches the 100-pattern library (Atlas Vector Search + BM25, fused) → the **Challenger** re-checks the match skeptically → the **Reporter** assembles the Oracle Score, Escape Plan, and Cascade. Every step streams back to the terminal live. MongoDB Atlas is the single source of truth throughout — retrieval, graph cascade, cohort stats, and self-calibration all run inside it.
+
+> Full architecture walkthrough and design decisions: [docs/architecture.md](docs/architecture.md) · [docs/adr/](docs/adr/)
 
 ---
 
